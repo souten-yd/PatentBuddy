@@ -44,7 +44,9 @@ jobs:
         run: bash scripts/build-linux.sh dist
 
       - name: Build QPKG (QDK pinned)
-        run: bash scripts/build-qpkg.sh dist
+        run: |
+          command -v rsync >/dev/null || sudo apt-get install -y --no-install-recommends rsync
+          bash scripts/build-qpkg.sh dist
 
       - name: Release notes from CHANGELOG
         run: |
