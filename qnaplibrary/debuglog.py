@@ -69,7 +69,8 @@ def redact(value, depth=0):
     if isinstance(value, dict):
         out = {}
         for k, v in value.items():
-            if any(s in str(k).lower() for s in SECRET_KEYS) and not str(k).lower().endswith(("_set", "configured", "fingerprint")):
+            if not isinstance(v, (dict, list)) and any(s in str(k).lower() for s in SECRET_KEYS) and \
+                    not str(k).lower().endswith(("_set", "configured", "fingerprint")):
                 out[k] = "***" if v else v
             else:
                 out[k] = redact(v, depth + 1)

@@ -1,0 +1,3 @@
+# QDK default install/upgrade hooks. Persistent data lives in the sibling directory
+# <volume>/.qpkg/QnapLibrary-data (outside the replaceable installation root), so
+# upgrades and self-updates keep settings, secrets and the SQLite library intact.

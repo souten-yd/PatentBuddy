@@ -126,7 +126,10 @@ def safe_extract(tar_path, dest):
                 raise ValueError("不正なパスを含むアーカイブです: %s" % m.name)
             if m.issym() or m.islnk() or m.isdev():
                 raise ValueError("リンク/デバイスを含むアーカイブは拒否します: %s" % m.name)
-        tar.extractall(str(dest))
+        if hasattr(tarfile, "data_filter"):
+            tar.extractall(str(dest), filter="data")
+        else:  # Python < 3.12 without the filter backport; members were validated above
+            tar.extractall(str(dest))
 
 
 class Updater:
