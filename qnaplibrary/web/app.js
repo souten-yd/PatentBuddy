@@ -238,7 +238,7 @@ async function patentDetail(main, id) {
     const parsed = h("div", {});
     body.append(h("div", { class: "card" }, ta, field("メモ", note), h("div", { class: "row end" },
       h("button", { class: "btn", onclick: guard(async () => { const r = await api("POST", "/api/v1/patents/parse-claims", { text: ta.value });
-        clear(parsed).append(r.claims.map(c => h("div", { class: "card" }, h("strong", {}, "請求項" + c.no), h("table", {}, c.elements.map(e => h("tr", {}, h("td", {}, e.label), h("td", {}, e.text))))))); }) }, "構成要件に分解"),
+        clear(parsed).append(...r.claims.map(c => h("div", { class: "card" }, h("strong", {}, "請求項" + c.no), h("table", {}, c.elements.map(e => h("tr", {}, h("td", {}, e.label), h("td", {}, e.text))))))); }) }, "構成要件に分解"),
       h("button", { class: "btn primary", onclick: guard(async () => { await api("POST", "/api/v1/patents/" + id + "/claims", { text: ta.value, note: note.value }); toast("新しい版として保存"); render(); }) }, "版として保存"))), parsed,
       p.claims.length ? h("div", { class: "card" }, h("h2", {}, "版の履歴"), p.claims.map(c => h("details", {}, h("summary", {}, "v" + c.version + " " + fmtDate(c.created) + " " + (c.note || "")), h("div", { class: "pre" }, c.text)))) : null);
   } else if (tab === "refs") {
@@ -449,7 +449,7 @@ async function aiSettings(body) {
   const emb = cfg.embedding || {};
   const eProv = sel([["", "（使わない）"]].concat(provs.map(p => [p.id, p.label || p.id])), emb.provider || ""), eModel = h("input", { value: emb.model || "", placeholder: "例: openai/text-embedding-3-small / qwen3-embedding:0.6b" }),
     eDim = h("input", { type: "number", value: emb.dimensions || "" }), eQ = h("input", { value: emb.query_prefix || "", placeholder: "例: query: " }), eD = h("input", { value: emb.doc_prefix || "", placeholder: "例: passage: " }), topk = h("input", { type: "number", value: cfg.rag_top_k || 8 });
-  body.append(h("div", { class: "card" }, field("既定のプロバイダ", def), field("RAG で渡す根拠数", topk)), cards.map(c => c.el),
+  body.append(h("div", { class: "card" }, field("既定のプロバイダ", def), field("RAG で渡す根拠数", topk)), ...cards.map(c => c.el),
     h("div", { class: "card" }, h("h2", {}, "埋め込み（ベクトル検索・任意）"), h("p", { class: "small muted" }, "NAS（Celeron）での埋め込み計算は遅いため、OpenRouter / 別PCの Ollama などの /embeddings を使います。未設定でも全文検索で動作します。"),
       field("プロバイダ", eProv), field("モデル", eModel), field("次元（任意）", eDim), field("クエリ接頭辞", eQ), field("文書接頭辞", eD)),
     jsonEditor(provs, def),
@@ -492,7 +492,7 @@ function providerCard(p) {
       h("div", { class: "row" }, field("最大価格 prompt ($/1M)", orf.max_prompt), field("最大価格 completion ($/1M)", orf.max_completion)),
       h("div", { class: "row" }, h("label", {}, orf.zdr, " ZDR（ゼロデータ保持）のみ"), h("label", {}, orf.require_parameters, " 全パラメータ対応プロバイダのみ"), h("label", {}, orf.web, " Web 検索プラグイン")),
       h("div", { class: "row" }, field("推論 effort", orf.effort), field("推論 max_tokens", orf.rmax), h("label", {}, orf.rexclude, " 推論過程を返さない"))) : null,
-    h("div", { class: "row" }, h("button", { class: "btn", onclick: guard(async () => { const r = await api("GET", "/api/llm/models?provider=" + encodeURIComponent(p.id)); clear(list).append(r.models.map(m => h("option", { value: m.id }, m.name + (m.free ? " (free)" : "")))); toast(r.models.length + " モデル（モデル欄で候補表示）"); }) }, "モデル一覧を取得"),
+    h("div", { class: "row" }, h("button", { class: "btn", onclick: guard(async () => { const r = await api("GET", "/api/llm/models?provider=" + encodeURIComponent(p.id)); clear(list).append(...r.models.map(m => h("option", { value: m.id }, m.name + (m.free ? " (free)" : "")))); toast(r.models.length + " モデル（モデル欄で候補表示）"); }) }, "モデル一覧を取得"),
       h("button", { class: "btn", onclick: guard(async () => { testOut.textContent = "テスト中…"; try { const r = await api("POST", "/api/llm/test", { provider: p.id }); testOut.textContent = "OK: " + r.model + " " + r.ms + "ms 「" + r.content.slice(0, 20) + "」"; } catch (e) { testOut.textContent = e.message; } }) }, "接続テスト（保存後）"), testOut));
   const value = () => {
     const n = (i) => i.value === "" ? null : +i.value;
