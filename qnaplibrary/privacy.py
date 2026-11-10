@@ -61,5 +61,8 @@ def fixed_public_request(path, body):
     if path != "/chat/completions" or not isinstance(body, dict):
         return False
     messages = body.get("messages")
+    # A fixed connection check is also public-safe, unlike arbitrary user chat.
+    if messages == [{"role": "user", "content": "「OK」とだけ答えてください。"}]:
+        return True
     return any(messages == public_reference_messages(topic)
                for topic in PUBLIC_REFERENCE_TOPICS)
