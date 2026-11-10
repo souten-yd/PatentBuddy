@@ -15,7 +15,7 @@ QNAP NAS と Linux で動く**研究資料の保存・収集・検索APIサー�
 - **ログイン**: パスワード、パスキー（Face ID / Windows Hello などの顔認証。HTTPS 接続時）
 - **公開資料API**: 管理者がタイトル・公開番号・抜粋を確認して承認した資料だけを専用トークンで検索・取得。原文更新で承認を停止します。自動クラウド送信はありません。詳しくは [公開資料API](docs/public-catalog.md)。
 - **AI 向けデバッグ出力**: 状態・直近エラー・検索トレースを JSON で取得（秘密は除去）
-- **自動更新**: [QnapPatentBuddy Releases](https://github.com/souten-yd/QnapPatentBuddy/releases) から SHA-256 を検証して更新
+- **自動更新**: [ResearchDataHub Releases](https://github.com/souten-yd/PatentBuddy/releases) から SHA-256 を検証して更新
 - **バックアップ**: 管理 Web からSQLiteの一貫したスナップショットを手動作成（設定・秘密情報は別途保全が必要）
 - **iPhoneホーム画面**: Safariの「ホーム画面に追加」で専用アイコンから起動。ホームは主要件数をコンパクト表示し、ベクトル化・調査・更新の処理状況を確認できます
 - **機密保護**: 既定でクラウドLLM送信不可。手動承認の公開検索語だけ公的APIへ送信。通知は本文や案件名なし。詳しくは [機密境界](docs/privacy-boundary.md) / [開発計画](docs/patent-feature-plan.md)
@@ -29,7 +29,7 @@ QNAP NAS と Linux で動く**研究資料の保存・収集・検索APIサー�
 ## インストール
 
 ### QNAP
-1. [Releases](https://github.com/souten-yd/QnapPatentBuddy/releases) から `QnapLibrary_<版>_x86_64.qpkg` を取得。**リポジトリ改名前のv0.5.0等の自己更新機能は旧URLを前提としているため、v0.5.1への初回更新はQPKGの手動インストールが必要になる場合があります。**
+1. [Releases](https://github.com/souten-yd/PatentBuddy/releases) から `QnapLibrary_<版>_x86_64.qpkg` を取得。旧版で更新URLエラーが出る場合は[手動上書き更新の手順](docs/upgrade.md)に従ってください。
 2. App Center → 手動インストール で選択
 3. `http://<NAS>:17871/` を開き、管理者パスワードを設定（LAN から）
 
@@ -67,6 +67,8 @@ tailscale serve --bg --https=8443 http://127.0.0.1:17871
 - バックアップ対象: データフォルダ（`library.sqlite3*`、`settings.json`、`secrets.json`）。管理 Web「設定 > バックアップ」のスナップショットは SQLite のみ。詳しくは [docs/backup.md](docs/backup.md)
 
 ## トラブルシューティング
+
+- 「想定外のダウンロードURLです」: [旧版からの更新手順](docs/upgrade.md)を参照。
 
 - 起動しない（QNAP）: App Center で Python3 が有効か確認。`QNAPLIBRARY_LOG_MODE=disk` で起動するとデータフォルダにログが出ます
 - 不具合の報告: 設定 > デバッグ からバンドルをダウンロードして AI や開発者に渡してください

@@ -5,6 +5,7 @@ No production data or credentials are read. Does not load/unload models.
 """
 import argparse
 import json
+import os
 import time
 from tests.helpers import Client, LiveServer
 
@@ -15,11 +16,18 @@ def main():
     parser.add_argument("--model", default="Qwen3.8-27B")
     parser.add_argument("--verified-local", action="store_true", required=True,
                         help="confirm the runtime is local inference, not a cloud relay")
+    parser.add_argument("--api-key-env", help="optional environment variable holding a gateway key; never printed")
     args = parser.parse_args()
+    key = os.environ.get(args.api_key_env, "") if args.api_key_env else ""
+    if args.api_key_env and not key:
+        parser.error("specified gateway key environment variable is empty")
     srv = LiveServer()
     try:
+        if key:
+            srv.app.config.set_secret("test_gateway_key", key)
         srv.app.providers.save([{"id": "controldeck-local", "type": "openai",
             "base_url": args.base_url, "model": args.model, "local_only_verified": True,
+            "secret": "test_gateway_key" if key else "",
             "options": {"max_tokens": 1800, "temperature": 0.2}}], "controldeck-local")
         client = Client(srv.base)
         original_open = client.opener.open

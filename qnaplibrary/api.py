@@ -402,7 +402,9 @@ def collection_delete(req):
 
 @route("GET", "/api/v1/collections/{cid}/documents", "read")
 def documents_list(req):
-    return req.app.store.list_documents(req.params["cid"], int(req.arg("offset", 0)), int(req.arg("limit", 50)), req.arg("q", ""))
+    return req.app.store.list_documents(req.params["cid"], int(req.arg("offset", 0)),
+                                        int(req.arg("limit", 50)), req.arg("q", ""),
+                                        cursor=req.arg("cursor"), ext_id=req.arg("ext_id"))
 
 
 @route("POST", "/api/v1/collections/{cid}/documents", "user")

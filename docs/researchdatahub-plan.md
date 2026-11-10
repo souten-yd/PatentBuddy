@@ -74,3 +74,7 @@
 
 ### 2026-11-10 PR-A進捗
 PR #16の設計はmainへ統合済み。PR #17でLinux別名入口・doctor/serve/test・health/Web表示・配布同梱を実装し、61 tests、Linux配布/非rootインストール、QPKGのLinux上smoke、ControlDeckローカルLLMの合成案件assistを検証。リリース/更新は検証待ち、PR-B〜GとQNAP実機は未完了。詳細はHANDOFF。上記の「未実装」は設計チェックポイント時点の記録。
+
+## 2026-11-10 実装の更新
+
+PR-A/B/CとPR-Eの検索閲覧・同一ユーザーローカル自動認証はv0.5.6で公開/実導入済み。PR-D #13はv0.5.7候補。P0/P1の1千/1万/10万件測定と15分idle、全6再起動/復元受入が完了し、結果・索引の費用・遅くなった観測を `benchmark-datahub.md` と `benchmarks/pr-d-linux.json` に記録した。P2の一般フィールド/改版/出典/ライセンスと段階的索引設計は `document-metadata-design.md`。P2の検索表実装とP3のNAS移設は未完で、P0/P1完了から推定しない。旧節のDraft/未実装表記は設計当時の履歴。

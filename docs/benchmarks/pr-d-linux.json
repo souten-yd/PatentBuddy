@@ -1,0 +1,2878 @@
+{
+  "baseline-1000.json": {
+    "repo": "/data1tb/PatentBuddy-baseline-054",
+    "commit": "b7816cfcc1343764ce570a6c5f78a98611fcc9bc",
+    "documents": 1000,
+    "batch": 200,
+    "sqlite": "3.45.1",
+    "platform": "Linux-7.0.0-42-generic-x86_64-with-glibc2.39",
+    "cpu": "x86_64",
+    "fts5": true,
+    "filesystem_device": "../../devices/pci0000:00/0000:00:01.2/0000:04:00.0/nvme/nvme0/nvme0n1/nvme0n1p1",
+    "phases": {
+      "ingest": {
+        "seconds": 0.0669176299998071,
+        "cpu_seconds": 0.06726916000000002,
+        "sqlite_row_changes": 5245,
+        "sql_seconds": 0.0238895790071183,
+        "sql_calls": 4045,
+        "samples": 1,
+        "rss_peak_kib": 37784,
+        "files_before": {
+          "db": 4096,
+          "-wal": 395552,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 4096,
+          "-wal": 5821592,
+          "-shm": 32768
+        },
+        "p50_ms": 66.81194200064056,
+        "p95_ms": 66.81194200064056,
+        "p99_ms": 66.81194200064056,
+        "io_delta": {
+          "process": {
+            "rchar": 265,
+            "wchar": 5426040,
+            "syscr": 4,
+            "syscw": 2634,
+            "read_bytes": 0,
+            "write_bytes": 5427200,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        },
+        "added": 1000,
+        "updated": 0,
+        "unchanged": 0,
+        "batch_latency": {
+          "p50_ms": 12.793234999662673,
+          "p95_ms": 15.222801999698277,
+          "p99_ms": 15.222801999698277
+        },
+        "batches": 5,
+        "docs_per_second": 14943.745019106065,
+        "body_mib_per_second": 12.997336823868496
+      },
+      "identical_reingest": {
+        "seconds": 0.012048774000504636,
+        "cpu_seconds": 0.012404236999999985,
+        "sqlite_row_changes": 5,
+        "sql_seconds": 0.001686348033217655,
+        "sql_calls": 1035,
+        "samples": 1,
+        "rss_peak_kib": 38396,
+        "files_before": {
+          "db": 4096,
+          "-wal": 5821592,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 4096,
+          "-wal": 5842192,
+          "-shm": 32768
+        },
+        "p50_ms": 11.955910000324366,
+        "p95_ms": 11.955910000324366,
+        "p99_ms": 11.955910000324366,
+        "io_delta": {
+          "process": {
+            "rchar": 268,
+            "wchar": 20600,
+            "syscr": 4,
+            "syscw": 10,
+            "read_bytes": 0,
+            "write_bytes": 20480,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        },
+        "added": 0,
+        "updated": 0,
+        "unchanged": 1000,
+        "batch_latency": {
+          "p50_ms": 2.2607009996136185,
+          "p95_ms": 2.953592999801913,
+          "p99_ms": 2.953592999801913
+        },
+        "batches": 5,
+        "docs_per_second": 82995.99610367969,
+        "body_mib_per_second": 72.18584866195286
+      },
+      "update_1_percent": {
+        "seconds": 0.003596120999645791,
+        "cpu_seconds": 0.0036663900000000194,
+        "sqlite_row_changes": 572,
+        "sql_seconds": 0.0024008590016819653,
+        "sql_calls": 79,
+        "samples": 1,
+        "rss_peak_kib": 38396,
+        "files_before": {
+          "db": 4096,
+          "-wal": 5842192,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 4096,
+          "-wal": 6909272,
+          "-shm": 32768
+        },
+        "p50_ms": 3.429267000683467,
+        "p95_ms": 3.429267000683467,
+        "p99_ms": 3.429267000683467,
+        "io_delta": {
+          "process": {
+            "rchar": 268,
+            "wchar": 1067080,
+            "syscr": 4,
+            "syscw": 518,
+            "read_bytes": 0,
+            "write_bytes": 1064960,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        },
+        "added": 0,
+        "updated": 10,
+        "unchanged": 0,
+        "batch_latency": {
+          "p50_ms": 3.4200399995825137,
+          "p95_ms": 3.4200399995825137,
+          "p99_ms": 3.4200399995825137
+        },
+        "batches": 1,
+        "docs_per_second": 2780.774062103298,
+        "body_mib_per_second": 2.4504043897470926
+      },
+      "first_page": {
+        "seconds": 0.020270213000003423,
+        "cpu_seconds": 0.021460815999999994,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 0.003969315002905205,
+        "sql_calls": 150,
+        "samples": 30,
+        "rss_peak_kib": 38396,
+        "files_before": {
+          "db": 4096,
+          "-wal": 6909272,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 4096,
+          "-wal": 6909272,
+          "-shm": 32768
+        },
+        "p50_ms": 0.6494910003311816,
+        "p95_ms": 0.9123760000875336,
+        "p99_ms": 1.0216410000793985,
+        "io_delta": {
+          "process": {
+            "rchar": 268,
+            "wchar": 0,
+            "syscr": 4,
+            "syscw": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        }
+      },
+      "deep_page": {
+        "seconds": 0.01882056699923851,
+        "cpu_seconds": 0.019891343000000006,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 0.0041741639988686075,
+        "sql_calls": 150,
+        "samples": 30,
+        "rss_peak_kib": 38396,
+        "files_before": {
+          "db": 4096,
+          "-wal": 6909272,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 4096,
+          "-wal": 6909272,
+          "-shm": 32768
+        },
+        "p50_ms": 0.6173709998620325,
+        "p95_ms": 0.6989849998717546,
+        "p99_ms": 0.7209859995782608,
+        "io_delta": {
+          "process": {
+            "rchar": 268,
+            "wchar": 0,
+            "syscr": 4,
+            "syscw": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        }
+      },
+      "title_filter": {
+        "seconds": 0.014848047999294067,
+        "cpu_seconds": 0.016069522000000003,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 0.006389680000211229,
+        "sql_calls": 150,
+        "samples": 30,
+        "rss_peak_kib": 38396,
+        "files_before": {
+          "db": 4096,
+          "-wal": 6909272,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 4096,
+          "-wal": 6909272,
+          "-shm": 32768
+        },
+        "p50_ms": 0.4913729999316274,
+        "p95_ms": 0.5347050000636955,
+        "p99_ms": 0.5496630001289304,
+        "io_delta": {
+          "process": {
+            "rchar": 268,
+            "wchar": 0,
+            "syscr": 4,
+            "syscw": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        }
+      },
+      "keyword": {
+        "seconds": 0.049473420999675,
+        "cpu_seconds": 0.05071506199999998,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 0.033831675986220944,
+        "sql_calls": 180,
+        "samples": 30,
+        "rss_peak_kib": 38524,
+        "files_before": {
+          "db": 4096,
+          "-wal": 6909272,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 4096,
+          "-wal": 6909272,
+          "-shm": 32768
+        },
+        "p50_ms": 1.6230420005740598,
+        "p95_ms": 2.002695000555832,
+        "p99_ms": 2.0593819999703555,
+        "io_delta": {
+          "process": {
+            "rchar": 268,
+            "wchar": 0,
+            "syscr": 4,
+            "syscw": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        }
+      },
+      "backup": {
+        "seconds": 0.02268825899955118,
+        "cpu_seconds": 0.01976599299999998,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 0.007343066000430554,
+        "sql_calls": 3,
+        "samples": 1,
+        "rss_peak_kib": 43644,
+        "files_before": {
+          "db": 4096,
+          "-wal": 6909272,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 4096,
+          "-wal": 6909272,
+          "-shm": 32768
+        },
+        "p50_ms": 22.59410199985723,
+        "p95_ms": 22.59410199985723,
+        "p99_ms": 22.59410199985723,
+        "io_delta": {
+          "process": {
+            "rchar": 14361024,
+            "wchar": 5169676,
+            "syscr": 3519,
+            "syscw": 1264,
+            "read_bytes": 0,
+            "write_bytes": 5173248,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 0,
+            "write_bytes": 5242880
+          }
+        }
+      }
+    },
+    "notes": [
+      "synthetic data; warm OS cache; no cache drops",
+      "device counters include other processes",
+      "SQL timing covers execute/fetch calls, excludes executescript and row iteration",
+      "API/client and server CPU/RSS share this process; scheduler/background collection not started"
+    ],
+    "unsupported_baseline": [
+      "cursor_deep",
+      "exact_id API"
+    ],
+    "storage": {
+      "pragmas": {
+        "journal_mode": "wal",
+        "synchronous": 1,
+        "foreign_keys": 1,
+        "wal_autocheckpoint": 2000
+      },
+      "counts": {
+        "documents": 1000,
+        "chunks": 1000,
+        "vectors": 0
+      },
+      "index_bytes": {
+        "admin_sessions": 4096,
+        "audit": 4096,
+        "chat_messages": 4096,
+        "chat_threads": 4096,
+        "chunks": 1032192,
+        "chunks_coll": 12288,
+        "chunks_doc": 16384,
+        "chunks_fts_config": 4096,
+        "chunks_fts_content": 2052096,
+        "chunks_fts_data": 466944,
+        "chunks_fts_docsize": 16384,
+        "chunks_fts_idx": 4096,
+        "collections": 4096,
+        "devices": 4096,
+        "documents": 1372160,
+        "documents_coll": 24576,
+        "jobs": 4096,
+        "meta": 4096,
+        "notify_log": 4096,
+        "passkeys": 4096,
+        "patent_claims": 4096,
+        "patent_events": 4096,
+        "patent_refs": 4096,
+        "patents": 4096,
+        "published_patents": 4096,
+        "published_patents_fts_config": 4096,
+        "published_patents_fts_content": 4096,
+        "published_patents_fts_data": 4096,
+        "published_patents_fts_docsize": 4096,
+        "published_patents_fts_idx": 4096,
+        "sqlite_autoindex_admin_sessions_1": 4096,
+        "sqlite_autoindex_collections_1": 4096,
+        "sqlite_autoindex_devices_1": 4096,
+        "sqlite_autoindex_documents_1": 28672,
+        "sqlite_autoindex_meta_1": 4096,
+        "sqlite_autoindex_notify_log_1": 4096,
+        "sqlite_autoindex_passkeys_1": 4096,
+        "sqlite_autoindex_published_patents_1": 4096,
+        "sqlite_autoindex_watch_hits_1": 4096,
+        "sqlite_schema": 16384,
+        "vectors": 4096,
+        "vectors_coll": 4096,
+        "watch_hits": 4096,
+        "watches": 4096
+      }
+    },
+    "restart_seconds": 0.004482318000555097,
+    "restore_seconds": 0.024565407999944,
+    "restart_restore_verified": true
+  },
+  "restart-v2-baseline-1000.json": {
+    "documents": 1000,
+    "repo": "/data1tb/PatentBuddy-baseline-054",
+    "commit": "b7816cfcc1343764ce570a6c5f78a98611fcc9bc",
+    "initial_health_seconds": 0.10259639099967899,
+    "restart_health_seconds": 0.10233929000060016,
+    "restored_health_seconds": 0.10197999299998628,
+    "session_csrf_preserved": true,
+    "counts_search_preserved": true,
+    "snapshot_hash_verified": true,
+    "single_writer": true,
+    "settings_secrets_preserved": true,
+    "synthetic_passkey_record_preserved": true,
+    "notes": "Synthetic Linux process test, not QTS; readiness polling resolution 50ms"
+  },
+  "final-candidate-1000.json": {
+    "repo": "/data1tb/PatentBuddy",
+    "commit": "3726143efa11a698abe599fb8063eac07e79f18d",
+    "documents": 1000,
+    "batch": 200,
+    "sqlite": "3.45.1",
+    "platform": "Linux-7.0.0-42-generic-x86_64-with-glibc2.39",
+    "cpu": "x86_64",
+    "fts5": true,
+    "cpu_model": "AMD Ryzen 7 9700X 8-Core Processor",
+    "memory_total": "MemTotal:       31841580 kB",
+    "script_sha256": "a6348e8ca64cb12330eaec974455ff4bfe908e331302062379874242da6110d5",
+    "filesystem_device": "../../devices/pci0000:00/0000:00:01.2/0000:04:00.0/nvme/nvme0/nvme0n1/nvme0n1p1",
+    "phases": {
+      "ingest": {
+        "seconds": 0.06529819000024872,
+        "cpu_seconds": 0.065695603,
+        "sqlite_row_changes": 5245,
+        "sql_seconds": 0.022884375036483107,
+        "sql_calls": 3035,
+        "samples": 1,
+        "rss_peak_kib": 37676,
+        "files_before": {
+          "db": 4096,
+          "-wal": 407912,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 4096,
+          "-wal": 5895752,
+          "-shm": 32768
+        },
+        "p50_ms": 65.15804500031663,
+        "p95_ms": 65.15804500031663,
+        "p99_ms": 65.15804500031663,
+        "io_delta": {
+          "process": {
+            "rchar": 270,
+            "wchar": 5487840,
+            "syscr": 4,
+            "syscw": 2664,
+            "read_bytes": 0,
+            "write_bytes": 5488640,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 614400,
+            "write_bytes": 0
+          }
+        },
+        "added": 1000,
+        "updated": 0,
+        "unchanged": 0,
+        "batch_latency": {
+          "p50_ms": 13.013167999815778,
+          "p95_ms": 13.424151000435813,
+          "p99_ms": 13.424151000435813
+        },
+        "batches": 5,
+        "docs_per_second": 15314.360168270989,
+        "body_mib_per_second": 13.319679711783543
+      },
+      "identical_reingest": {
+        "seconds": 0.011489403000268794,
+        "cpu_seconds": 0.01187244300000001,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 0.0001961999969353201,
+        "sql_calls": 20,
+        "samples": 1,
+        "rss_peak_kib": 38368,
+        "files_before": {
+          "db": 4096,
+          "-wal": 5895752,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 4096,
+          "-wal": 5895752,
+          "-shm": 32768
+        },
+        "p50_ms": 11.385789000087243,
+        "p95_ms": 11.385789000087243,
+        "p99_ms": 11.385789000087243,
+        "io_delta": {
+          "process": {
+            "rchar": 273,
+            "wchar": 0,
+            "syscr": 4,
+            "syscw": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 155648,
+            "write_bytes": 0
+          }
+        },
+        "added": 0,
+        "updated": 0,
+        "unchanged": 1000,
+        "batch_latency": {
+          "p50_ms": 2.2034739995433483,
+          "p95_ms": 2.6231219999317545,
+          "p99_ms": 2.6231219999317545
+        },
+        "batches": 5,
+        "docs_per_second": 87036.72418633109,
+        "body_mib_per_second": 75.70027585786244
+      },
+      "update_1_percent": {
+        "seconds": 0.0035554750002120272,
+        "cpu_seconds": 0.0036219379999999912,
+        "sqlite_row_changes": 572,
+        "sql_seconds": 0.002478542000062589,
+        "sql_calls": 67,
+        "samples": 1,
+        "rss_peak_kib": 38368,
+        "files_before": {
+          "db": 4096,
+          "-wal": 5895752,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 4096,
+          "-wal": 6962832,
+          "-shm": 32768
+        },
+        "p50_ms": 3.484030999970855,
+        "p95_ms": 3.484030999970855,
+        "p99_ms": 3.484030999970855,
+        "io_delta": {
+          "process": {
+            "rchar": 273,
+            "wchar": 1067080,
+            "syscr": 4,
+            "syscw": 518,
+            "read_bytes": 0,
+            "write_bytes": 1064960,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 24576,
+            "write_bytes": 0
+          }
+        },
+        "added": 0,
+        "updated": 10,
+        "unchanged": 0,
+        "batch_latency": {
+          "p50_ms": 3.479462000541389,
+          "p95_ms": 3.479462000541389,
+          "p99_ms": 3.479462000541389
+        },
+        "batches": 1,
+        "docs_per_second": 2812.5637219791056,
+        "body_mib_per_second": 2.478417281254476
+      },
+      "first_page": {
+        "seconds": 0.021718436999435653,
+        "cpu_seconds": 0.02302737099999999,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 0.0035993299934489187,
+        "sql_calls": 150,
+        "samples": 30,
+        "rss_peak_kib": 38368,
+        "files_before": {
+          "db": 4096,
+          "-wal": 6962832,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 4096,
+          "-wal": 6962832,
+          "-shm": 32768
+        },
+        "p50_ms": 0.7174590000431635,
+        "p95_ms": 0.8055640000748099,
+        "p99_ms": 0.933265000639949,
+        "io_delta": {
+          "process": {
+            "rchar": 273,
+            "wchar": 0,
+            "syscr": 4,
+            "syscw": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 188416,
+            "write_bytes": 0
+          }
+        }
+      },
+      "deep_page": {
+        "seconds": 0.020188630999655288,
+        "cpu_seconds": 0.021445449999999977,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 0.003913137001291034,
+        "sql_calls": 150,
+        "samples": 30,
+        "rss_peak_kib": 38368,
+        "files_before": {
+          "db": 4096,
+          "-wal": 6962832,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 4096,
+          "-wal": 6962832,
+          "-shm": 32768
+        },
+        "p50_ms": 0.6581970001207083,
+        "p95_ms": 0.7446800000252551,
+        "p99_ms": 0.7763100002193823,
+        "io_delta": {
+          "process": {
+            "rchar": 273,
+            "wchar": 0,
+            "syscr": 4,
+            "syscw": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 172032,
+            "write_bytes": 0
+          }
+        }
+      },
+      "title_filter": {
+        "seconds": 0.016093489999548183,
+        "cpu_seconds": 0.01727288299999996,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 0.006594289003260201,
+        "sql_calls": 150,
+        "samples": 30,
+        "rss_peak_kib": 38368,
+        "files_before": {
+          "db": 4096,
+          "-wal": 6962832,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 4096,
+          "-wal": 6962832,
+          "-shm": 32768
+        },
+        "p50_ms": 0.5153990005055675,
+        "p95_ms": 0.6188240004121326,
+        "p99_ms": 0.7899449992692098,
+        "io_delta": {
+          "process": {
+            "rchar": 273,
+            "wchar": 0,
+            "syscr": 4,
+            "syscw": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 126976,
+            "write_bytes": 0
+          }
+        }
+      },
+      "cursor_deep": {
+        "seconds": 0.018788808999488538,
+        "cpu_seconds": 0.020014370000000004,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 0.0024664229968038853,
+        "sql_calls": 60,
+        "samples": 30,
+        "rss_peak_kib": 38368,
+        "files_before": {
+          "db": 4096,
+          "-wal": 6962832,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 4096,
+          "-wal": 6962832,
+          "-shm": 32768
+        },
+        "p50_ms": 0.6129720004537376,
+        "p95_ms": 0.6897869998283568,
+        "p99_ms": 0.7041039998512133,
+        "io_delta": {
+          "process": {
+            "rchar": 273,
+            "wchar": 0,
+            "syscr": 4,
+            "syscw": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 131072,
+            "write_bytes": 0
+          }
+        }
+      },
+      "exact_id": {
+        "seconds": 0.00944318599977123,
+        "cpu_seconds": 0.010648939000000024,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 0.0005749039955844637,
+        "sql_calls": 60,
+        "samples": 30,
+        "rss_peak_kib": 38368,
+        "files_before": {
+          "db": 4096,
+          "-wal": 6962832,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 4096,
+          "-wal": 6962832,
+          "-shm": 32768
+        },
+        "p50_ms": 0.293732000500313,
+        "p95_ms": 0.4335250005169655,
+        "p99_ms": 0.48753600003692554,
+        "io_delta": {
+          "process": {
+            "rchar": 273,
+            "wchar": 0,
+            "syscr": 4,
+            "syscw": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 61440,
+            "write_bytes": 0
+          }
+        }
+      },
+      "keyword": {
+        "seconds": 0.049681494999276765,
+        "cpu_seconds": 0.051109598000000034,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 0.032890160996430495,
+        "sql_calls": 90,
+        "samples": 30,
+        "rss_peak_kib": 38368,
+        "files_before": {
+          "db": 4096,
+          "-wal": 6962832,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 4096,
+          "-wal": 6962832,
+          "-shm": 32768
+        },
+        "p50_ms": 1.630075000321085,
+        "p95_ms": 1.8087500002366141,
+        "p99_ms": 2.046367999355425,
+        "io_delta": {
+          "process": {
+            "rchar": 273,
+            "wchar": 0,
+            "syscr": 4,
+            "syscw": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 544768,
+            "write_bytes": 0
+          }
+        }
+      },
+      "backup": {
+        "seconds": 0.02313484000023891,
+        "cpu_seconds": 0.01957331400000001,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 0.007926463000330841,
+        "sql_calls": 3,
+        "samples": 1,
+        "rss_peak_kib": 43108,
+        "files_before": {
+          "db": 4096,
+          "-wal": 6962832,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 4096,
+          "-wal": 6962832,
+          "-shm": 32768
+        },
+        "p50_ms": 23.01414300018223,
+        "p95_ms": 23.01414300018223,
+        "p99_ms": 23.01414300018223,
+        "io_delta": {
+          "process": {
+            "rchar": 14377413,
+            "wchar": 5186060,
+            "syscr": 3523,
+            "syscw": 1268,
+            "read_bytes": 8192,
+            "write_bytes": 5189632,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 262144,
+            "write_bytes": 5259264
+          }
+        }
+      }
+    },
+    "notes": [
+      "synthetic data; warm OS cache; no cache drops",
+      "device counters include other processes",
+      "SQL timing covers execute/fetch calls, excludes executescript and row iteration",
+      "API/client and server CPU/RSS share this process; scheduler/background collection not started"
+    ],
+    "storage": {
+      "pragmas": {
+        "journal_mode": "wal",
+        "synchronous": 1,
+        "foreign_keys": 1,
+        "wal_autocheckpoint": 2000
+      },
+      "counts": {
+        "documents": 1000,
+        "chunks": 1000,
+        "vectors": 0
+      },
+      "index_bytes": {
+        "admin_sessions": 4096,
+        "audit": 4096,
+        "chat_messages": 4096,
+        "chat_threads": 4096,
+        "chunks": 1032192,
+        "chunks_coll": 12288,
+        "chunks_doc": 16384,
+        "chunks_fts_config": 4096,
+        "chunks_fts_content": 2052096,
+        "chunks_fts_data": 466944,
+        "chunks_fts_docsize": 16384,
+        "chunks_fts_idx": 4096,
+        "collections": 4096,
+        "devices": 4096,
+        "documents": 1372160,
+        "documents_coll": 24576,
+        "documents_coll_id": 16384,
+        "jobs": 4096,
+        "meta": 4096,
+        "notify_log": 4096,
+        "passkeys": 4096,
+        "patent_claims": 4096,
+        "patent_events": 4096,
+        "patent_refs": 4096,
+        "patents": 4096,
+        "published_patents": 4096,
+        "published_patents_fts_config": 4096,
+        "published_patents_fts_content": 4096,
+        "published_patents_fts_data": 4096,
+        "published_patents_fts_docsize": 4096,
+        "published_patents_fts_idx": 4096,
+        "sqlite_autoindex_admin_sessions_1": 4096,
+        "sqlite_autoindex_collections_1": 4096,
+        "sqlite_autoindex_devices_1": 4096,
+        "sqlite_autoindex_documents_1": 28672,
+        "sqlite_autoindex_meta_1": 4096,
+        "sqlite_autoindex_notify_log_1": 4096,
+        "sqlite_autoindex_passkeys_1": 4096,
+        "sqlite_autoindex_published_patents_1": 4096,
+        "sqlite_autoindex_watch_hits_1": 4096,
+        "sqlite_schema": 16384,
+        "vectors": 4096,
+        "vectors_coll": 4096,
+        "watch_hits": 4096,
+        "watches": 4096
+      }
+    },
+    "store_reopen_and_verify_seconds": 0.004503316999944218,
+    "copy_restore_and_verify_seconds": 0.026638748999175732,
+    "restart_restore_verified": true
+  },
+  "restart-v2-candidate-1000.json": {
+    "documents": 1000,
+    "repo": "/data1tb/PatentBuddy",
+    "commit": "3726143efa11a698abe599fb8063eac07e79f18d",
+    "initial_health_seconds": 0.10237185900041368,
+    "restart_health_seconds": 0.10304765999990195,
+    "restored_health_seconds": 0.1020466280006076,
+    "session_csrf_preserved": true,
+    "counts_search_preserved": true,
+    "snapshot_hash_verified": true,
+    "single_writer": true,
+    "settings_secrets_preserved": true,
+    "synthetic_passkey_record_preserved": true,
+    "notes": "Synthetic Linux process test, not QTS; readiness polling resolution 50ms"
+  },
+  "baseline-10000.json": {
+    "repo": "/data1tb/PatentBuddy-baseline-054",
+    "commit": "b7816cfcc1343764ce570a6c5f78a98611fcc9bc",
+    "documents": 10000,
+    "batch": 200,
+    "sqlite": "3.45.1",
+    "platform": "Linux-7.0.0-42-generic-x86_64-with-glibc2.39",
+    "cpu": "x86_64",
+    "fts5": true,
+    "cpu_model": "AMD Ryzen 7 9700X 8-Core Processor",
+    "memory_total": "MemTotal:       31841580 kB",
+    "script_sha256": "a6348e8ca64cb12330eaec974455ff4bfe908e331302062379874242da6110d5",
+    "filesystem_device": "../../devices/pci0000:00/0000:00:01.2/0000:04:00.0/nvme/nvme0/nvme0n1/nvme0n1p1",
+    "phases": {
+      "ingest": {
+        "seconds": 0.7681546679996245,
+        "cpu_seconds": 0.717625308,
+        "sqlite_row_changes": 57799,
+        "sql_seconds": 0.3423607221848215,
+        "sql_calls": 40450,
+        "samples": 1,
+        "rss_peak_kib": 89084,
+        "files_before": {
+          "db": 4096,
+          "-wal": 395552,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 49020928,
+          "-wal": 9101112,
+          "-shm": 32768
+        },
+        "p50_ms": 767.976543000259,
+        "p95_ms": 767.976543000259,
+        "p99_ms": 767.976543000259,
+        "io_delta": {
+          "process": {
+            "rchar": 56713481,
+            "wchar": 127359112,
+            "syscr": 13850,
+            "syscw": 48148,
+            "read_bytes": 4096,
+            "write_bytes": 127406080,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 4096,
+            "write_bytes": 126918656
+          }
+        },
+        "added": 10000,
+        "updated": 0,
+        "unchanged": 0,
+        "batch_latency": {
+          "p50_ms": 13.43319799980236,
+          "p95_ms": 25.34062700033246,
+          "p99_ms": 30.71414999976696
+        },
+        "batches": 50,
+        "docs_per_second": 13018.211587571695,
+        "body_mib_per_second": 11.322602241387735
+      },
+      "identical_reingest": {
+        "seconds": 0.1319424439998329,
+        "cpu_seconds": 0.13556355899999994,
+        "sqlite_row_changes": 50,
+        "sql_seconds": 0.03040699593930185,
+        "sql_calls": 10350,
+        "samples": 1,
+        "rss_peak_kib": 90568,
+        "files_before": {
+          "db": 49020928,
+          "-wal": 9101112,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 49020928,
+          "-wal": 9101112,
+          "-shm": 32768
+        },
+        "p50_ms": 131.81713900030445,
+        "p95_ms": 131.81713900030445,
+        "p99_ms": 131.81713900030445,
+        "io_delta": {
+          "process": {
+            "rchar": 279,
+            "wchar": 206000,
+            "syscr": 4,
+            "syscw": 100,
+            "read_bytes": 0,
+            "write_bytes": 204800,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        },
+        "added": 0,
+        "updated": 0,
+        "unchanged": 10000,
+        "batch_latency": {
+          "p50_ms": 2.5580199999239994,
+          "p95_ms": 3.0647220000901143,
+          "p99_ms": 4.958823000379198
+        },
+        "batches": 50,
+        "docs_per_second": 75790.62276588316,
+        "body_mib_per_second": 65.91896816490693
+      },
+      "update_1_percent": {
+        "seconds": 0.023041874000227835,
+        "cpu_seconds": 0.02311199400000008,
+        "sqlite_row_changes": 4502,
+        "sql_seconds": 0.018068595007207477,
+        "sql_calls": 709,
+        "samples": 1,
+        "rss_peak_kib": 91088,
+        "files_before": {
+          "db": 49020928,
+          "-wal": 9101112,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 49020928,
+          "-wal": 9101112,
+          "-shm": 32768
+        },
+        "p50_ms": 22.90338399961911,
+        "p95_ms": 22.90338399961911,
+        "p99_ms": 22.90338399961911,
+        "io_delta": {
+          "process": {
+            "rchar": 280,
+            "wchar": 4787440,
+            "syscr": 5,
+            "syscw": 2324,
+            "read_bytes": 0,
+            "write_bytes": 4788224,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        },
+        "added": 0,
+        "updated": 100,
+        "unchanged": 0,
+        "batch_latency": {
+          "p50_ms": 22.893926000506326,
+          "p95_ms": 22.893926000506326,
+          "p99_ms": 22.893926000506326
+        },
+        "batches": 1,
+        "docs_per_second": 4339.924782116733,
+        "body_mib_per_second": 3.8243203150519
+      },
+      "first_page": {
+        "seconds": 0.027280795000478975,
+        "cpu_seconds": 0.02848760699999997,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 0.010796798989758827,
+        "sql_calls": 150,
+        "samples": 30,
+        "rss_peak_kib": 91088,
+        "files_before": {
+          "db": 49020928,
+          "-wal": 9101112,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 49020928,
+          "-wal": 9101112,
+          "-shm": 32768
+        },
+        "p50_ms": 0.8754460004638531,
+        "p95_ms": 1.2510230008047074,
+        "p99_ms": 1.4122349994067918,
+        "io_delta": {
+          "process": {
+            "rchar": 279,
+            "wchar": 0,
+            "syscr": 4,
+            "syscw": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        }
+      },
+      "deep_page": {
+        "seconds": 0.03252438399977109,
+        "cpu_seconds": 0.033660825000000116,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 0.016535454001314065,
+        "sql_calls": 150,
+        "samples": 30,
+        "rss_peak_kib": 91344,
+        "files_before": {
+          "db": 49020928,
+          "-wal": 9101112,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 49020928,
+          "-wal": 9101112,
+          "-shm": 32768
+        },
+        "p50_ms": 1.0819350000019767,
+        "p95_ms": 1.1533980004969635,
+        "p99_ms": 1.1597000002439017,
+        "io_delta": {
+          "process": {
+            "rchar": 279,
+            "wchar": 0,
+            "syscr": 4,
+            "syscw": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        }
+      },
+      "title_filter": {
+        "seconds": 0.07259631899978558,
+        "cpu_seconds": 0.07394157899999998,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 0.05844951299332024,
+        "sql_calls": 150,
+        "samples": 30,
+        "rss_peak_kib": 131152,
+        "files_before": {
+          "db": 49020928,
+          "-wal": 9101112,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 49020928,
+          "-wal": 9101112,
+          "-shm": 32768
+        },
+        "p50_ms": 2.316255000550882,
+        "p95_ms": 2.5772560002224054,
+        "p99_ms": 4.638592000446806,
+        "io_delta": {
+          "process": {
+            "rchar": 279,
+            "wchar": 0,
+            "syscr": 4,
+            "syscw": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        }
+      },
+      "keyword": {
+        "seconds": 0.2842679229997884,
+        "cpu_seconds": 0.2855296359999999,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 0.2652640409924061,
+        "sql_calls": 180,
+        "samples": 30,
+        "rss_peak_kib": 131408,
+        "files_before": {
+          "db": 49020928,
+          "-wal": 9101112,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 49020928,
+          "-wal": 9101112,
+          "-shm": 32768
+        },
+        "p50_ms": 9.360258999549842,
+        "p95_ms": 10.061658000267926,
+        "p99_ms": 10.36069099973247,
+        "io_delta": {
+          "process": {
+            "rchar": 279,
+            "wchar": 0,
+            "syscr": 4,
+            "syscw": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        }
+      },
+      "backup": {
+        "seconds": 0.20267070999943826,
+        "cpu_seconds": 0.1792064390000001,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 0.06210448999900109,
+        "sql_calls": 3,
+        "samples": 1,
+        "rss_peak_kib": 184528,
+        "files_before": {
+          "db": 49020928,
+          "-wal": 9101112,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 49020928,
+          "-wal": 9101112,
+          "-shm": 32768
+        },
+        "p50_ms": 202.49649299967132,
+        "p95_ms": 202.49649299967132,
+        "p99_ms": 202.49649299967132,
+        "io_delta": {
+          "process": {
+            "rchar": 147669451,
+            "wchar": 49971724,
+            "syscr": 36065,
+            "syscw": 12202,
+            "read_bytes": 0,
+            "write_bytes": 49975296,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 0,
+            "write_bytes": 50065408
+          }
+        }
+      }
+    },
+    "notes": [
+      "synthetic data; warm OS cache; no cache drops",
+      "device counters include other processes",
+      "SQL timing covers execute/fetch calls, excludes executescript and row iteration",
+      "API/client and server CPU/RSS share this process; scheduler/background collection not started"
+    ],
+    "unsupported_baseline": [
+      "cursor_deep",
+      "exact_id API"
+    ],
+    "storage": {
+      "pragmas": {
+        "journal_mode": "wal",
+        "synchronous": 1,
+        "foreign_keys": 1,
+        "wal_autocheckpoint": 2000
+      },
+      "counts": {
+        "documents": 10000,
+        "chunks": 10000,
+        "vectors": 0
+      },
+      "index_bytes": {
+        "admin_sessions": 4096,
+        "audit": 4096,
+        "chat_messages": 4096,
+        "chat_threads": 4096,
+        "chunks": 10272768,
+        "chunks_coll": 98304,
+        "chunks_doc": 118784,
+        "chunks_fts_config": 4096,
+        "chunks_fts_content": 20529152,
+        "chunks_fts_data": 4636672,
+        "chunks_fts_docsize": 118784,
+        "chunks_fts_idx": 4096,
+        "collections": 4096,
+        "devices": 4096,
+        "documents": 13692928,
+        "documents_coll": 200704,
+        "jobs": 4096,
+        "meta": 4096,
+        "notify_log": 4096,
+        "passkeys": 4096,
+        "patent_claims": 4096,
+        "patent_events": 4096,
+        "patent_refs": 4096,
+        "patents": 4096,
+        "published_patents": 4096,
+        "published_patents_fts_config": 4096,
+        "published_patents_fts_content": 4096,
+        "published_patents_fts_data": 4096,
+        "published_patents_fts_docsize": 4096,
+        "published_patents_fts_idx": 4096,
+        "sqlite_autoindex_admin_sessions_1": 4096,
+        "sqlite_autoindex_collections_1": 4096,
+        "sqlite_autoindex_devices_1": 4096,
+        "sqlite_autoindex_documents_1": 245760,
+        "sqlite_autoindex_meta_1": 4096,
+        "sqlite_autoindex_notify_log_1": 4096,
+        "sqlite_autoindex_passkeys_1": 4096,
+        "sqlite_autoindex_published_patents_1": 4096,
+        "sqlite_autoindex_watch_hits_1": 4096,
+        "sqlite_schema": 16384,
+        "vectors": 4096,
+        "vectors_coll": 4096,
+        "watch_hits": 4096,
+        "watches": 4096
+      }
+    },
+    "store_reopen_and_verify_seconds": 0.033228227000108745,
+    "copy_restore_and_verify_seconds": 0.19418143900020368,
+    "restart_restore_verified": true
+  },
+  "restart-v2-baseline-10000.json": {
+    "documents": 10000,
+    "repo": "/data1tb/PatentBuddy-baseline-054",
+    "commit": "b7816cfcc1343764ce570a6c5f78a98611fcc9bc",
+    "initial_health_seconds": 0.0516156530002263,
+    "restart_health_seconds": 0.10224811700027203,
+    "restored_health_seconds": 0.10206146500058821,
+    "session_csrf_preserved": true,
+    "counts_search_preserved": true,
+    "snapshot_hash_verified": true,
+    "single_writer": true,
+    "settings_secrets_preserved": true,
+    "synthetic_passkey_record_preserved": true,
+    "notes": "Synthetic Linux process test, not QTS; readiness polling resolution 50ms"
+  },
+  "final-candidate-10000.json": {
+    "repo": "/data1tb/PatentBuddy",
+    "commit": "3726143efa11a698abe599fb8063eac07e79f18d",
+    "documents": 10000,
+    "batch": 200,
+    "sqlite": "3.45.1",
+    "platform": "Linux-7.0.0-42-generic-x86_64-with-glibc2.39",
+    "cpu": "x86_64",
+    "fts5": true,
+    "cpu_model": "AMD Ryzen 7 9700X 8-Core Processor",
+    "memory_total": "MemTotal:       31841580 kB",
+    "script_sha256": "a6348e8ca64cb12330eaec974455ff4bfe908e331302062379874242da6110d5",
+    "filesystem_device": "../../devices/pci0000:00/0000:00:01.2/0000:04:00.0/nvme/nvme0/nvme0n1/nvme0n1p1",
+    "phases": {
+      "ingest": {
+        "seconds": 0.7749881340005231,
+        "cpu_seconds": 0.709484424,
+        "sqlite_row_changes": 57799,
+        "sql_seconds": 0.3530220550346712,
+        "sql_calls": 30350,
+        "samples": 1,
+        "rss_peak_kib": 85744,
+        "files_before": {
+          "db": 4096,
+          "-wal": 407912,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 49229824,
+          "-wal": 9224712,
+          "-shm": 32768
+        },
+        "p50_ms": 774.8297150001235,
+        "p95_ms": 774.8297150001235,
+        "p99_ms": 774.8297150001235,
+        "io_delta": {
+          "process": {
+            "rchar": 57037065,
+            "wchar": 128683856,
+            "syscr": 13929,
+            "syscw": 48713,
+            "read_bytes": 8192,
+            "write_bytes": 128733184,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 6537216,
+            "write_bytes": 128634880
+          }
+        },
+        "added": 10000,
+        "updated": 0,
+        "unchanged": 0,
+        "batch_latency": {
+          "p50_ms": 13.227301000370062,
+          "p95_ms": 26.607249000335287,
+          "p99_ms": 35.72371100017335
+        },
+        "batches": 50,
+        "docs_per_second": 12903.423370341887,
+        "body_mib_per_second": 11.222765077354241
+      },
+      "identical_reingest": {
+        "seconds": 0.10920622900084709,
+        "cpu_seconds": 0.11306228600000001,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 0.0019180990011591348,
+        "sql_calls": 200,
+        "samples": 1,
+        "rss_peak_kib": 86628,
+        "files_before": {
+          "db": 49229824,
+          "-wal": 9224712,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 49229824,
+          "-wal": 9224712,
+          "-shm": 32768
+        },
+        "p50_ms": 109.08081400066294,
+        "p95_ms": 109.08081400066294,
+        "p99_ms": 109.08081400066294,
+        "io_delta": {
+          "process": {
+            "rchar": 279,
+            "wchar": 0,
+            "syscr": 4,
+            "syscw": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 1081344,
+            "write_bytes": 0
+          }
+        },
+        "added": 0,
+        "updated": 0,
+        "unchanged": 10000,
+        "batch_latency": {
+          "p50_ms": 2.105669000229682,
+          "p95_ms": 2.343437000490667,
+          "p99_ms": 4.726096000013058
+        },
+        "batches": 50,
+        "docs_per_second": 91569.86823455311,
+        "body_mib_per_second": 79.64298232070202
+      },
+      "update_1_percent": {
+        "seconds": 0.02335981400028686,
+        "cpu_seconds": 0.02343033800000005,
+        "sqlite_row_changes": 4502,
+        "sql_seconds": 0.018066739002279064,
+        "sql_calls": 607,
+        "samples": 1,
+        "rss_peak_kib": 86924,
+        "files_before": {
+          "db": 49229824,
+          "-wal": 9224712,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 49229824,
+          "-wal": 9224712,
+          "-shm": 32768
+        },
+        "p50_ms": 23.18998400005512,
+        "p95_ms": 23.18998400005512,
+        "p99_ms": 23.18998400005512,
+        "io_delta": {
+          "process": {
+            "rchar": 280,
+            "wchar": 4787440,
+            "syscr": 5,
+            "syscw": 2324,
+            "read_bytes": 0,
+            "write_bytes": 4788224,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 176128,
+            "write_bytes": 0
+          }
+        },
+        "added": 0,
+        "updated": 100,
+        "unchanged": 0,
+        "batch_latency": {
+          "p50_ms": 23.18062700032897,
+          "p95_ms": 23.18062700032897,
+          "p99_ms": 23.18062700032897
+        },
+        "batches": 1,
+        "docs_per_second": 4280.856003338554,
+        "body_mib_per_second": 3.7722691984985577
+      },
+      "first_page": {
+        "seconds": 0.029446458000165876,
+        "cpu_seconds": 0.030870895999999926,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 0.011192365993338171,
+        "sql_calls": 150,
+        "samples": 30,
+        "rss_peak_kib": 90952,
+        "files_before": {
+          "db": 49229824,
+          "-wal": 9224712,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 49229824,
+          "-wal": 9224712,
+          "-shm": 32768
+        },
+        "p50_ms": 0.9280550002586097,
+        "p95_ms": 1.505901000200538,
+        "p99_ms": 1.5611349999744562,
+        "io_delta": {
+          "process": {
+            "rchar": 279,
+            "wchar": 0,
+            "syscr": 4,
+            "syscw": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 253952,
+            "write_bytes": 0
+          }
+        }
+      },
+      "deep_page": {
+        "seconds": 0.03272433100028138,
+        "cpu_seconds": 0.034019512999999946,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 0.01632069698189298,
+        "sql_calls": 150,
+        "samples": 30,
+        "rss_peak_kib": 93896,
+        "files_before": {
+          "db": 49229824,
+          "-wal": 9224712,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 49229824,
+          "-wal": 9224712,
+          "-shm": 32768
+        },
+        "p50_ms": 1.0791490003612125,
+        "p95_ms": 1.19690100018488,
+        "p99_ms": 1.3106550004522433,
+        "io_delta": {
+          "process": {
+            "rchar": 279,
+            "wchar": 0,
+            "syscr": 4,
+            "syscw": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 274432,
+            "write_bytes": 0
+          }
+        }
+      },
+      "title_filter": {
+        "seconds": 0.07157748600002378,
+        "cpu_seconds": 0.07279752800000017,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 0.05799583099906158,
+        "sql_calls": 150,
+        "samples": 30,
+        "rss_peak_kib": 131400,
+        "files_before": {
+          "db": 49229824,
+          "-wal": 9224712,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 49229824,
+          "-wal": 9224712,
+          "-shm": 32768
+        },
+        "p50_ms": 2.2880819997226354,
+        "p95_ms": 2.575392999460746,
+        "p99_ms": 4.533485000138171,
+        "io_delta": {
+          "process": {
+            "rchar": 279,
+            "wchar": 0,
+            "syscr": 4,
+            "syscw": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 688128,
+            "write_bytes": 0
+          }
+        }
+      },
+      "cursor_deep": {
+        "seconds": 0.018581489000098372,
+        "cpu_seconds": 0.01964020699999991,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 0.0025474010026300675,
+        "sql_calls": 60,
+        "samples": 30,
+        "rss_peak_kib": 131400,
+        "files_before": {
+          "db": 49229824,
+          "-wal": 9224712,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 49229824,
+          "-wal": 9224712,
+          "-shm": 32768
+        },
+        "p50_ms": 0.6087350002417224,
+        "p95_ms": 0.6829140002082568,
+        "p99_ms": 0.7175789996836102,
+        "io_delta": {
+          "process": {
+            "rchar": 279,
+            "wchar": 0,
+            "syscr": 4,
+            "syscw": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 249856,
+            "write_bytes": 0
+          }
+        }
+      },
+      "exact_id": {
+        "seconds": 0.008858596000209218,
+        "cpu_seconds": 0.010074236999999986,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 0.0005379580015869578,
+        "sql_calls": 60,
+        "samples": 30,
+        "rss_peak_kib": 131400,
+        "files_before": {
+          "db": 49229824,
+          "-wal": 9224712,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 49229824,
+          "-wal": 9224712,
+          "-shm": 32768
+        },
+        "p50_ms": 0.2850559994840296,
+        "p95_ms": 0.3638640000644955,
+        "p99_ms": 0.3676409996842267,
+        "io_delta": {
+          "process": {
+            "rchar": 279,
+            "wchar": 0,
+            "syscr": 4,
+            "syscw": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 69632,
+            "write_bytes": 0
+          }
+        }
+      },
+      "keyword": {
+        "seconds": 0.27260029799981567,
+        "cpu_seconds": 0.274127094,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 0.2534830120030165,
+        "sql_calls": 90,
+        "samples": 30,
+        "rss_peak_kib": 131912,
+        "files_before": {
+          "db": 49229824,
+          "-wal": 9224712,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 49229824,
+          "-wal": 9224712,
+          "-shm": 32768
+        },
+        "p50_ms": 8.95555900024192,
+        "p95_ms": 9.927326000251924,
+        "p99_ms": 10.075945999233227,
+        "io_delta": {
+          "process": {
+            "rchar": 279,
+            "wchar": 0,
+            "syscr": 4,
+            "syscw": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 2490368,
+            "write_bytes": 0
+          }
+        }
+      },
+      "backup": {
+        "seconds": 0.19579324899950734,
+        "cpu_seconds": 0.1784094580000002,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 0.05421835700144584,
+        "sql_calls": 3,
+        "samples": 1,
+        "rss_peak_kib": 185672,
+        "files_before": {
+          "db": 49229824,
+          "-wal": 9224712,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 49229824,
+          "-wal": 9224712,
+          "-shm": 32768
+        },
+        "p50_ms": 195.637275000081,
+        "p95_ms": 195.637275000081,
+        "p99_ms": 195.637275000081,
+        "io_delta": {
+          "process": {
+            "rchar": 147784139,
+            "wchar": 50086412,
+            "syscr": 36093,
+            "syscw": 12230,
+            "read_bytes": 8192,
+            "write_bytes": 50089984,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 1822720,
+            "write_bytes": 50180096
+          }
+        }
+      }
+    },
+    "notes": [
+      "synthetic data; warm OS cache; no cache drops",
+      "device counters include other processes",
+      "SQL timing covers execute/fetch calls, excludes executescript and row iteration",
+      "API/client and server CPU/RSS share this process; scheduler/background collection not started"
+    ],
+    "storage": {
+      "pragmas": {
+        "journal_mode": "wal",
+        "synchronous": 1,
+        "foreign_keys": 1,
+        "wal_autocheckpoint": 2000
+      },
+      "counts": {
+        "documents": 10000,
+        "chunks": 10000,
+        "vectors": 0
+      },
+      "index_bytes": {
+        "admin_sessions": 4096,
+        "audit": 4096,
+        "chat_messages": 4096,
+        "chat_threads": 4096,
+        "chunks": 10272768,
+        "chunks_coll": 98304,
+        "chunks_doc": 118784,
+        "chunks_fts_config": 4096,
+        "chunks_fts_content": 20529152,
+        "chunks_fts_data": 4636672,
+        "chunks_fts_docsize": 118784,
+        "chunks_fts_idx": 4096,
+        "collections": 4096,
+        "devices": 4096,
+        "documents": 13692928,
+        "documents_coll": 200704,
+        "documents_coll_id": 212992,
+        "jobs": 4096,
+        "meta": 4096,
+        "notify_log": 4096,
+        "passkeys": 4096,
+        "patent_claims": 4096,
+        "patent_events": 4096,
+        "patent_refs": 4096,
+        "patents": 4096,
+        "published_patents": 4096,
+        "published_patents_fts_config": 4096,
+        "published_patents_fts_content": 4096,
+        "published_patents_fts_data": 4096,
+        "published_patents_fts_docsize": 4096,
+        "published_patents_fts_idx": 4096,
+        "sqlite_autoindex_admin_sessions_1": 4096,
+        "sqlite_autoindex_collections_1": 4096,
+        "sqlite_autoindex_devices_1": 4096,
+        "sqlite_autoindex_documents_1": 245760,
+        "sqlite_autoindex_meta_1": 4096,
+        "sqlite_autoindex_notify_log_1": 4096,
+        "sqlite_autoindex_passkeys_1": 4096,
+        "sqlite_autoindex_published_patents_1": 4096,
+        "sqlite_autoindex_watch_hits_1": 4096,
+        "sqlite_schema": 16384,
+        "vectors": 4096,
+        "vectors_coll": 4096,
+        "watch_hits": 4096,
+        "watches": 4096
+      }
+    },
+    "store_reopen_and_verify_seconds": 0.03167792399926839,
+    "copy_restore_and_verify_seconds": 0.21025333699981275,
+    "restart_restore_verified": true
+  },
+  "restart-v2-candidate-10000.json": {
+    "documents": 10000,
+    "repo": "/data1tb/PatentBuddy",
+    "commit": "3726143efa11a698abe599fb8063eac07e79f18d",
+    "initial_health_seconds": 0.0519317169992064,
+    "restart_health_seconds": 0.0513906890000726,
+    "restored_health_seconds": 0.10243249399991328,
+    "session_csrf_preserved": true,
+    "counts_search_preserved": true,
+    "snapshot_hash_verified": true,
+    "single_writer": true,
+    "settings_secrets_preserved": true,
+    "synthetic_passkey_record_preserved": true,
+    "notes": "Synthetic Linux process test, not QTS; readiness polling resolution 50ms"
+  },
+  "baseline-100000.json": {
+    "repo": "/data1tb/PatentBuddy-baseline-054",
+    "commit": "b7816cfcc1343764ce570a6c5f78a98611fcc9bc",
+    "documents": 100000,
+    "batch": 200,
+    "sqlite": "3.45.1",
+    "platform": "Linux-7.0.0-42-generic-x86_64-with-glibc2.39",
+    "cpu": "x86_64",
+    "fts5": true,
+    "cpu_model": "AMD Ryzen 7 9700X 8-Core Processor",
+    "memory_total": "MemTotal:       31841580 kB",
+    "script_sha256": "a6348e8ca64cb12330eaec974455ff4bfe908e331302062379874242da6110d5",
+    "filesystem_device": "../../devices/pci0000:00/0000:00:01.2/0000:04:00.0/nvme/nvme0/nvme0n1/nvme0n1p1",
+    "phases": {
+      "ingest": {
+        "seconds": 8.877140307000445,
+        "cpu_seconds": 8.200416714,
+        "sqlite_row_changes": 629236,
+        "sql_seconds": 4.556230467879686,
+        "sql_calls": 404500,
+        "samples": 1,
+        "rss_peak_kib": 156544,
+        "files_before": {
+          "db": 4096,
+          "-wal": 395552,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 499552256,
+          "-wal": 13369432,
+          "-shm": 32768
+        },
+        "p50_ms": 8876.90971399934,
+        "p95_ms": 8876.90971399934,
+        "p99_ms": 8876.90971399934,
+        "io_delta": {
+          "process": {
+            "rchar": 737255689,
+            "wchar": 1589059072,
+            "syscr": 179998,
+            "syscw": 598460,
+            "read_bytes": 45056,
+            "write_bytes": 1589596160,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 45056,
+            "write_bytes": 1591816192
+          }
+        },
+        "added": 100000,
+        "updated": 0,
+        "unchanged": 0,
+        "batch_latency": {
+          "p50_ms": 15.271484000550117,
+          "p95_ms": 31.797047000509338,
+          "p99_ms": 40.46279999965918
+        },
+        "batches": 500,
+        "docs_per_second": 11264.888977944931,
+        "body_mib_per_second": 9.797648189435746
+      },
+      "identical_reingest": {
+        "seconds": 2.5130710909998015,
+        "cpu_seconds": 2.549680456000001,
+        "sqlite_row_changes": 500,
+        "sql_seconds": 1.463250623971362,
+        "sql_calls": 103500,
+        "samples": 1,
+        "rss_peak_kib": 364316,
+        "files_before": {
+          "db": 499552256,
+          "-wal": 13369432,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 499552256,
+          "-wal": 13369432,
+          "-shm": 32768
+        },
+        "p50_ms": 2512.934884999595,
+        "p95_ms": 2512.934884999595,
+        "p99_ms": 2512.934884999595,
+        "io_delta": {
+          "process": {
+            "rchar": 56127774,
+            "wchar": 2060000,
+            "syscr": 13708,
+            "syscw": 1000,
+            "read_bytes": 0,
+            "write_bytes": 2060288,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 0,
+            "write_bytes": 36864
+          }
+        },
+        "added": 0,
+        "updated": 0,
+        "unchanged": 100000,
+        "batch_latency": {
+          "p50_ms": 4.915893000543292,
+          "p95_ms": 5.540887999814004,
+          "p99_ms": 6.040627999936987
+        },
+        "batches": 500,
+        "docs_per_second": 39791.95031853076,
+        "body_mib_per_second": 34.60908764886861
+      },
+      "update_1_percent": {
+        "seconds": 0.6298291639996023,
+        "cpu_seconds": 0.22085663200000027,
+        "sqlite_row_changes": 34979,
+        "sql_seconds": 0.5803590409786921,
+        "sql_calls": 7045,
+        "samples": 1,
+        "rss_peak_kib": 364800,
+        "files_before": {
+          "db": 499552256,
+          "-wal": 13369432,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 500543488,
+          "-wal": 18078592,
+          "-shm": 65536
+        },
+        "p50_ms": 629.634167000404,
+        "p95_ms": 629.634167000404,
+        "p99_ms": 629.634167000404,
+        "io_delta": {
+          "process": {
+            "rchar": 38592797,
+            "wchar": 56619600,
+            "syscr": 9426,
+            "syscw": 21320,
+            "read_bytes": 0,
+            "write_bytes": 56664064,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 0,
+            "write_bytes": 55504896
+          }
+        },
+        "added": 0,
+        "updated": 1000,
+        "unchanged": 0,
+        "batch_latency": {
+          "p50_ms": 43.67080200063356,
+          "p95_ms": 311.26324199976807,
+          "p99_ms": 311.26324199976807
+        },
+        "batches": 5,
+        "docs_per_second": 1587.7321298520108,
+        "body_mib_per_second": 1.3991017227013187
+      },
+      "first_page": {
+        "seconds": 0.09860850799941545,
+        "cpu_seconds": 0.10000363899999876,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 0.08053517500684393,
+        "sql_calls": 150,
+        "samples": 30,
+        "rss_peak_kib": 364800,
+        "files_before": {
+          "db": 500543488,
+          "-wal": 18078592,
+          "-shm": 65536
+        },
+        "files_after": {
+          "db": 500543488,
+          "-wal": 18078592,
+          "-shm": 65536
+        },
+        "p50_ms": 3.166232999319618,
+        "p95_ms": 3.857001999676868,
+        "p99_ms": 4.109245999643463,
+        "io_delta": {
+          "process": {
+            "rchar": 285,
+            "wchar": 0,
+            "syscr": 4,
+            "syscw": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        }
+      },
+      "deep_page": {
+        "seconds": 0.15786436400048842,
+        "cpu_seconds": 0.15943663900000082,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 0.13900854400344542,
+        "sql_calls": 150,
+        "samples": 30,
+        "rss_peak_kib": 364800,
+        "files_before": {
+          "db": 500543488,
+          "-wal": 18078592,
+          "-shm": 65536
+        },
+        "files_after": {
+          "db": 500543488,
+          "-wal": 18078592,
+          "-shm": 65536
+        },
+        "p50_ms": 5.250672999864037,
+        "p95_ms": 5.358976000024995,
+        "p99_ms": 5.770650000158639,
+        "io_delta": {
+          "process": {
+            "rchar": 285,
+            "wchar": 0,
+            "syscr": 4,
+            "syscw": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 0,
+            "write_bytes": 49152
+          }
+        }
+      },
+      "title_filter": {
+        "seconds": 0.10399393499938014,
+        "cpu_seconds": 0.10543967999999992,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 0.08596339900122985,
+        "sql_calls": 150,
+        "samples": 30,
+        "rss_peak_kib": 364800,
+        "files_before": {
+          "db": 500543488,
+          "-wal": 18078592,
+          "-shm": 65536
+        },
+        "files_after": {
+          "db": 500543488,
+          "-wal": 18078592,
+          "-shm": 65536
+        },
+        "p50_ms": 3.43493899981695,
+        "p95_ms": 3.898180000760476,
+        "p99_ms": 3.898259999914444,
+        "io_delta": {
+          "process": {
+            "rchar": 285,
+            "wchar": 0,
+            "syscr": 4,
+            "syscw": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        }
+      },
+      "keyword": {
+        "seconds": 2.912790452999616,
+        "cpu_seconds": 2.912046838,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 2.8759263200026908,
+        "sql_calls": 180,
+        "samples": 30,
+        "rss_peak_kib": 364800,
+        "files_before": {
+          "db": 500543488,
+          "-wal": 18078592,
+          "-shm": 65536
+        },
+        "files_after": {
+          "db": 500543488,
+          "-wal": 18078592,
+          "-shm": 65536
+        },
+        "p50_ms": 96.41065499999968,
+        "p95_ms": 103.07155000009516,
+        "p99_ms": 104.48019799969188,
+        "io_delta": {
+          "process": {
+            "rchar": 45113629,
+            "wchar": 0,
+            "syscr": 11018,
+            "syscw": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 0,
+            "write_bytes": 32768
+          }
+        }
+      },
+      "idle": {
+        "seconds": 900.00039741,
+        "cpu_seconds": 0.051989930000001294,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 0.0,
+        "sql_calls": 0,
+        "samples": 1,
+        "rss_peak_kib": 364800,
+        "files_before": {
+          "db": 500543488,
+          "-wal": 18078592,
+          "-shm": 65536
+        },
+        "files_after": {
+          "db": 500543488,
+          "-wal": 18078592,
+          "-shm": 65536
+        },
+        "p50_ms": 900000.0785909997,
+        "p95_ms": 900000.0785909997,
+        "p99_ms": 900000.0785909997,
+        "io_delta": {
+          "process": {
+            "rchar": 285,
+            "wchar": 0,
+            "syscr": 4,
+            "syscw": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 17733812224,
+            "write_bytes": 7773962240
+          }
+        }
+      },
+      "backup": {
+        "seconds": 1.9383213920000344,
+        "cpu_seconds": 1.7502794849999983,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 0.5510566020002443,
+        "sql_calls": 3,
+        "samples": 1,
+        "rss_peak_kib": 431312,
+        "files_before": {
+          "db": 500543488,
+          "-wal": 18078592,
+          "-shm": 65536
+        },
+        "files_after": {
+          "db": 500543488,
+          "-wal": 18078592,
+          "-shm": 65536
+        },
+        "p50_ms": 1938.1488580002042,
+        "p95_ms": 1938.1488580002042,
+        "p99_ms": 1938.1488580002042,
+        "io_delta": {
+          "process": {
+            "rchar": 1670996438,
+            "wchar": 498586648,
+            "syscr": 407972,
+            "syscw": 121729,
+            "read_bytes": 49152,
+            "write_bytes": 498524160,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 49152,
+            "write_bytes": 498700288
+          }
+        }
+      }
+    },
+    "notes": [
+      "synthetic data; warm OS cache; no cache drops",
+      "device counters include other processes",
+      "SQL timing covers execute/fetch calls, excludes executescript and row iteration",
+      "API/client and server CPU/RSS share this process; scheduler/background collection not started"
+    ],
+    "unsupported_baseline": [
+      "cursor_deep",
+      "exact_id API"
+    ],
+    "storage": {
+      "pragmas": {
+        "journal_mode": "wal",
+        "synchronous": 1,
+        "foreign_keys": 1,
+        "wal_autocheckpoint": 2000
+      },
+      "counts": {
+        "documents": 100000,
+        "chunks": 100000,
+        "vectors": 0
+      },
+      "index_bytes": {
+        "admin_sessions": 4096,
+        "audit": 32768,
+        "chat_messages": 4096,
+        "chat_threads": 4096,
+        "chunks": 102658048,
+        "chunks_coll": 995328,
+        "chunks_doc": 1306624,
+        "chunks_fts_config": 4096,
+        "chunks_fts_content": 205316096,
+        "chunks_fts_data": 46280704,
+        "chunks_fts_docsize": 1196032,
+        "chunks_fts_idx": 16384,
+        "collections": 4096,
+        "devices": 4096,
+        "documents": 136876032,
+        "documents_coll": 2031616,
+        "jobs": 4096,
+        "meta": 4096,
+        "notify_log": 4096,
+        "passkeys": 4096,
+        "patent_claims": 4096,
+        "patent_events": 4096,
+        "patent_refs": 4096,
+        "patents": 4096,
+        "published_patents": 4096,
+        "published_patents_fts_config": 4096,
+        "published_patents_fts_content": 4096,
+        "published_patents_fts_data": 4096,
+        "published_patents_fts_docsize": 4096,
+        "published_patents_fts_idx": 4096,
+        "sqlite_autoindex_admin_sessions_1": 4096,
+        "sqlite_autoindex_collections_1": 4096,
+        "sqlite_autoindex_devices_1": 4096,
+        "sqlite_autoindex_documents_1": 2494464,
+        "sqlite_autoindex_meta_1": 4096,
+        "sqlite_autoindex_notify_log_1": 4096,
+        "sqlite_autoindex_passkeys_1": 4096,
+        "sqlite_autoindex_published_patents_1": 4096,
+        "sqlite_autoindex_watch_hits_1": 4096,
+        "sqlite_schema": 16384,
+        "vectors": 4096,
+        "vectors_coll": 4096,
+        "watch_hits": 4096,
+        "watches": 4096
+      }
+    },
+    "store_reopen_and_verify_seconds": 0.32774953600073786,
+    "copy_restore_and_verify_seconds": 1.9988546330005192,
+    "restart_restore_verified": true
+  },
+  "restart-v2-baseline-100000.json": {
+    "documents": 100000,
+    "repo": "/data1tb/PatentBuddy-baseline-054",
+    "commit": "b7816cfcc1343764ce570a6c5f78a98611fcc9bc",
+    "initial_health_seconds": 0.051912730999902124,
+    "restart_health_seconds": 0.051572731000305794,
+    "restored_health_seconds": 2.7188383950006028,
+    "session_csrf_preserved": true,
+    "counts_search_preserved": true,
+    "snapshot_hash_verified": true,
+    "single_writer": true,
+    "settings_secrets_preserved": true,
+    "synthetic_passkey_record_preserved": true,
+    "notes": "Synthetic Linux process test, not QTS; readiness polling resolution 50ms"
+  },
+  "candidate-100000.json": {
+    "repo": "/data1tb/PatentBuddy",
+    "commit": "eb6354d8da3083fcf158a06713e155f214c0e1d4",
+    "documents": 100000,
+    "batch": 200,
+    "sqlite": "3.45.1",
+    "platform": "Linux-7.0.0-42-generic-x86_64-with-glibc2.39",
+    "cpu": "x86_64",
+    "fts5": true,
+    "cpu_model": "AMD Ryzen 7 9700X 8-Core Processor",
+    "memory_total": "MemTotal:       31841580 kB",
+    "script_sha256": "a6348e8ca64cb12330eaec974455ff4bfe908e331302062379874242da6110d5",
+    "filesystem_device": "../../devices/pci0000:00/0000:00:01.2/0000:04:00.0/nvme/nvme0/nvme0n1/nvme0n1p1",
+    "phases": {
+      "ingest": {
+        "seconds": 8.113733731999673,
+        "cpu_seconds": 7.466232259,
+        "sqlite_row_changes": 629236,
+        "sql_seconds": 3.861128960100359,
+        "sql_calls": 303500,
+        "samples": 1,
+        "rss_peak_kib": 136160,
+        "files_before": {
+          "db": 4096,
+          "-wal": 407912,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 502018048,
+          "-wal": 13171672,
+          "-shm": 32768
+        },
+        "p50_ms": 8113.568552000288,
+        "p95_ms": 8113.568552000288,
+        "p99_ms": 8113.568552000288,
+        "io_delta": {
+          "process": {
+            "rchar": 739680521,
+            "wchar": 1602212608,
+            "syscr": 180590,
+            "syscw": 604269,
+            "read_bytes": 4096,
+            "write_bytes": 1602768896,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 200704,
+            "write_bytes": 1606860800
+          }
+        },
+        "added": 100000,
+        "updated": 0,
+        "unchanged": 0,
+        "batch_latency": {
+          "p50_ms": 13.303585000357998,
+          "p95_ms": 30.07296600026166,
+          "p99_ms": 37.501163000342785
+        },
+        "batches": 500,
+        "docs_per_second": 12324.782067423657,
+        "body_mib_per_second": 10.719491239061714
+      },
+      "identical_reingest": {
+        "seconds": 1.1256849940000393,
+        "cpu_seconds": 1.1646914290000003,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 0.02020950799305865,
+        "sql_calls": 2000,
+        "samples": 1,
+        "rss_peak_kib": 364288,
+        "files_before": {
+          "db": 502018048,
+          "-wal": 13171672,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 502018048,
+          "-wal": 13171672,
+          "-shm": 32768
+        },
+        "p50_ms": 1125.533970000106,
+        "p95_ms": 1125.533970000106,
+        "p99_ms": 1125.533970000106,
+        "io_delta": {
+          "process": {
+            "rchar": 56508701,
+            "wchar": 0,
+            "syscr": 13801,
+            "syscw": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        },
+        "added": 0,
+        "updated": 0,
+        "unchanged": 100000,
+        "batch_latency": {
+          "p50_ms": 2.1734170004492626,
+          "p95_ms": 2.6923220002572634,
+          "p99_ms": 3.546698999343789
+        },
+        "batches": 500,
+        "docs_per_second": 88834.79884071059,
+        "body_mib_per_second": 77.26415304444129
+      },
+      "update_1_percent": {
+        "seconds": 0.6040838480003003,
+        "cpu_seconds": 0.21178049799999954,
+        "sqlite_row_changes": 34979,
+        "sql_seconds": 0.552281895030319,
+        "sql_calls": 6035,
+        "samples": 1,
+        "rss_peak_kib": 364376,
+        "files_before": {
+          "db": 502018048,
+          "-wal": 13171672,
+          "-shm": 32768
+        },
+        "files_after": {
+          "db": 503013376,
+          "-wal": 18078592,
+          "-shm": 65536
+        },
+        "p50_ms": 603.9418310001565,
+        "p95_ms": 603.9418310001565,
+        "p99_ms": 603.9418310001565,
+        "io_delta": {
+          "process": {
+            "rchar": 38600988,
+            "wchar": 56640080,
+            "syscr": 9428,
+            "syscw": 21325,
+            "read_bytes": 0,
+            "write_bytes": 56684544,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 0,
+            "write_bytes": 54173696
+          }
+        },
+        "added": 0,
+        "updated": 1000,
+        "unchanged": 0,
+        "batch_latency": {
+          "p50_ms": 44.999391999226646,
+          "p95_ms": 324.48168199971406,
+          "p99_ms": 324.48168199971406
+        },
+        "batches": 5,
+        "docs_per_second": 1655.3993345630768,
+        "body_mib_per_second": 1.4587297297823743
+      },
+      "first_page": {
+        "seconds": 0.09872744699987379,
+        "cpu_seconds": 0.10010065099999998,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 0.08013792800375086,
+        "sql_calls": 150,
+        "samples": 30,
+        "rss_peak_kib": 364376,
+        "files_before": {
+          "db": 503013376,
+          "-wal": 18078592,
+          "-shm": 65536
+        },
+        "files_after": {
+          "db": 503013376,
+          "-wal": 18078592,
+          "-shm": 65536
+        },
+        "p50_ms": 3.220775999579928,
+        "p95_ms": 3.8344799995684298,
+        "p99_ms": 3.9009050005915924,
+        "io_delta": {
+          "process": {
+            "rchar": 1454364,
+            "wchar": 0,
+            "syscr": 359,
+            "syscw": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        }
+      },
+      "deep_page": {
+        "seconds": 0.1592883899993467,
+        "cpu_seconds": 0.1607000879999987,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 0.1399494559973391,
+        "sql_calls": 150,
+        "samples": 30,
+        "rss_peak_kib": 364376,
+        "files_before": {
+          "db": 503013376,
+          "-wal": 18078592,
+          "-shm": 65536
+        },
+        "files_after": {
+          "db": 503013376,
+          "-wal": 18078592,
+          "-shm": 65536
+        },
+        "p50_ms": 5.215275999944424,
+        "p95_ms": 5.758127000262903,
+        "p99_ms": 5.768076000094879,
+        "io_delta": {
+          "process": {
+            "rchar": 917788,
+            "wchar": 0,
+            "syscr": 228,
+            "syscw": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        }
+      },
+      "title_filter": {
+        "seconds": 0.10439027400025225,
+        "cpu_seconds": 0.10589222200000137,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 0.08573765200526395,
+        "sql_calls": 150,
+        "samples": 30,
+        "rss_peak_kib": 364376,
+        "files_before": {
+          "db": 503013376,
+          "-wal": 18078592,
+          "-shm": 65536
+        },
+        "files_after": {
+          "db": 503013376,
+          "-wal": 18078592,
+          "-shm": 65536
+        },
+        "p50_ms": 3.4241280000060215,
+        "p95_ms": 3.8637449997622753,
+        "p99_ms": 3.9967749999050284,
+        "io_delta": {
+          "process": {
+            "rchar": 284,
+            "wchar": 0,
+            "syscr": 4,
+            "syscw": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        }
+      },
+      "cursor_deep": {
+        "seconds": 0.019104662000245298,
+        "cpu_seconds": 0.020319426000000362,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 0.002707943000132218,
+        "sql_calls": 60,
+        "samples": 30,
+        "rss_peak_kib": 364376,
+        "files_before": {
+          "db": 503013376,
+          "-wal": 18078592,
+          "-shm": 65536
+        },
+        "files_after": {
+          "db": 503013376,
+          "-wal": 18078592,
+          "-shm": 65536
+        },
+        "p50_ms": 0.6272390000958694,
+        "p95_ms": 0.7810890001564985,
+        "p99_ms": 0.9476119994360488,
+        "io_delta": {
+          "process": {
+            "rchar": 284,
+            "wchar": 0,
+            "syscr": 4,
+            "syscw": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        }
+      },
+      "exact_id": {
+        "seconds": 0.009546590999889304,
+        "cpu_seconds": 0.010940678999999065,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 0.0005739370008086553,
+        "sql_calls": 60,
+        "samples": 30,
+        "rss_peak_kib": 364376,
+        "files_before": {
+          "db": 503013376,
+          "-wal": 18078592,
+          "-shm": 65536
+        },
+        "files_after": {
+          "db": 503013376,
+          "-wal": 18078592,
+          "-shm": 65536
+        },
+        "p50_ms": 0.3107049997197464,
+        "p95_ms": 0.3751659996851231,
+        "p99_ms": 0.40411999998468673,
+        "io_delta": {
+          "process": {
+            "rchar": 284,
+            "wchar": 0,
+            "syscr": 4,
+            "syscw": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        }
+      },
+      "keyword": {
+        "seconds": 2.817989081999258,
+        "cpu_seconds": 2.817446369999999,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 2.7860376420021566,
+        "sql_calls": 90,
+        "samples": 30,
+        "rss_peak_kib": 364376,
+        "files_before": {
+          "db": 503013376,
+          "-wal": 18078592,
+          "-shm": 65536
+        },
+        "files_after": {
+          "db": 503013376,
+          "-wal": 18078592,
+          "-shm": 65536
+        },
+        "p50_ms": 92.37473200028035,
+        "p95_ms": 102.6752600000691,
+        "p99_ms": 119.6707270000843,
+        "io_delta": {
+          "process": {
+            "rchar": 45433116,
+            "wchar": 0,
+            "syscr": 11096,
+            "syscw": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        }
+      },
+      "idle": {
+        "seconds": 900.0003962209994,
+        "cpu_seconds": 0.05811282700000042,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 0.0,
+        "sql_calls": 0,
+        "samples": 1,
+        "rss_peak_kib": 364376,
+        "files_before": {
+          "db": 503013376,
+          "-wal": 18078592,
+          "-shm": 65536
+        },
+        "files_after": {
+          "db": 503013376,
+          "-wal": 18078592,
+          "-shm": 65536
+        },
+        "p50_ms": 900000.0972389998,
+        "p95_ms": 900000.0972389998,
+        "p99_ms": 900000.0972389998,
+        "io_delta": {
+          "process": {
+            "rchar": 284,
+            "wchar": 0,
+            "syscr": 4,
+            "syscw": 0,
+            "read_bytes": 0,
+            "write_bytes": 0,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 3819925504,
+            "write_bytes": 253505536
+          }
+        }
+      },
+      "backup": {
+        "seconds": 2.0141307900003085,
+        "cpu_seconds": 1.7826768810000004,
+        "sqlite_row_changes": 0,
+        "sql_seconds": 0.5852864369999224,
+        "sql_calls": 3,
+        "samples": 1,
+        "rss_peak_kib": 431480,
+        "files_before": {
+          "db": 503013376,
+          "-wal": 18078592,
+          "-shm": 65536
+        },
+        "files_after": {
+          "db": 503013376,
+          "-wal": 18078592,
+          "-shm": 65536
+        },
+        "p50_ms": 2013.98463500027,
+        "p95_ms": 2013.98463500027,
+        "p99_ms": 2013.98463500027,
+        "io_delta": {
+          "process": {
+            "rchar": 1673261526,
+            "wchar": 499840024,
+            "syscr": 408525,
+            "syscw": 122035,
+            "read_bytes": 20480,
+            "write_bytes": 499773440,
+            "cancelled_write_bytes": 0
+          },
+          "device": {
+            "read_bytes": 20480,
+            "write_bytes": 500072448
+          }
+        }
+      }
+    },
+    "notes": [
+      "synthetic data; warm OS cache; no cache drops",
+      "device counters include other processes",
+      "SQL timing covers execute/fetch calls, excludes executescript and row iteration",
+      "API/client and server CPU/RSS share this process; scheduler/background collection not started"
+    ],
+    "storage": {
+      "pragmas": {
+        "journal_mode": "wal",
+        "synchronous": 1,
+        "foreign_keys": 1,
+        "wal_autocheckpoint": 2000
+      },
+      "counts": {
+        "documents": 100000,
+        "chunks": 100000,
+        "vectors": 0
+      },
+      "index_bytes": {
+        "admin_sessions": 4096,
+        "audit": 32768,
+        "chat_messages": 4096,
+        "chat_threads": 4096,
+        "chunks": 102658048,
+        "chunks_coll": 995328,
+        "chunks_doc": 1306624,
+        "chunks_fts_config": 4096,
+        "chunks_fts_content": 205316096,
+        "chunks_fts_data": 46280704,
+        "chunks_fts_docsize": 1196032,
+        "chunks_fts_idx": 16384,
+        "collections": 4096,
+        "devices": 4096,
+        "documents": 136876032,
+        "documents_coll": 2031616,
+        "documents_coll_id": 2469888,
+        "jobs": 4096,
+        "meta": 4096,
+        "notify_log": 4096,
+        "passkeys": 4096,
+        "patent_claims": 4096,
+        "patent_events": 4096,
+        "patent_refs": 4096,
+        "patents": 4096,
+        "published_patents": 4096,
+        "published_patents_fts_config": 4096,
+        "published_patents_fts_content": 4096,
+        "published_patents_fts_data": 4096,
+        "published_patents_fts_docsize": 4096,
+        "published_patents_fts_idx": 4096,
+        "sqlite_autoindex_admin_sessions_1": 4096,
+        "sqlite_autoindex_collections_1": 4096,
+        "sqlite_autoindex_devices_1": 4096,
+        "sqlite_autoindex_documents_1": 2494464,
+        "sqlite_autoindex_meta_1": 4096,
+        "sqlite_autoindex_notify_log_1": 4096,
+        "sqlite_autoindex_passkeys_1": 4096,
+        "sqlite_autoindex_published_patents_1": 4096,
+        "sqlite_autoindex_watch_hits_1": 4096,
+        "sqlite_schema": 16384,
+        "vectors": 4096,
+        "vectors_coll": 4096,
+        "watch_hits": 4096,
+        "watches": 4096
+      }
+    },
+    "store_reopen_and_verify_seconds": 0.31868915899940475,
+    "copy_restore_and_verify_seconds": 3.7834600799997133,
+    "restart_restore_verified": true
+  },
+  "restart-v2-candidate-100000.json": {
+    "documents": 100000,
+    "repo": "/data1tb/PatentBuddy",
+    "commit": "3726143efa11a698abe599fb8063eac07e79f18d",
+    "initial_health_seconds": 0.05161057300028915,
+    "restart_health_seconds": 0.10233083200000692,
+    "restored_health_seconds": 1.6122510260001945,
+    "session_csrf_preserved": true,
+    "counts_search_preserved": true,
+    "snapshot_hash_verified": true,
+    "single_writer": true,
+    "settings_secrets_preserved": true,
+    "synthetic_passkey_record_preserved": true,
+    "notes": "Synthetic Linux process test, not QTS; readiness polling resolution 50ms"
+  }
+}
