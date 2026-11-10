@@ -1,4 +1,4 @@
-"""Authentication: admin password, RAM sessions, LAN pairing passcode and device tokens.
+"""Authentication: admin password, persistent sessions, LAN pairing passcode and device tokens.
 
 * Admin (management web): password (PBKDF2-SHA256) or passkey (WebAuthn: Face ID / Windows Hello).
   Sessions keep only SHA-256 digests in persistent SQLite (survive restarts),
@@ -89,6 +89,8 @@ class RateLimiter:
 class Sessions:
     """Bounded persistent admin sessions, with only hashed cookie IDs on disk."""
 
+    MAX_SESSIONS = 128
+
     def __init__(self, hours=720, store=None):
         try:
             self.ttl = max(3600, min(int(hours) * 3600, 30 * 86400))
@@ -99,8 +101,8 @@ class Sessions:
         self._items = {}
         if store is not None:
             # In-memory lookups avoid disk reads/writes per request.
-            for row in store.q("SELECT sid_hash, csrf, exp, via, created FROM admin_sessions WHERE exp>?",
-                               (time.time(),)):
+            for row in store.q("SELECT sid_hash, csrf, exp, via, created FROM admin_sessions WHERE exp>? ORDER BY created DESC, sid_hash DESC LIMIT ?",
+                               (time.time(), self.MAX_SESSIONS)):
                 self._items[row["sid_hash"]] = {
                     "exp": row["exp"], "csrf": row["csrf"], "via": row["via"],
                     "hash": row["sid_hash"], "created": row["created"],
@@ -116,14 +118,26 @@ class Sessions:
         session = {"exp": t + self.ttl, "csrf": secrets.token_urlsafe(24), "via": via,
                    "hash": digest, "created": t}
         with self._lock:
+            active = {k: v for k, v in self._items.items() if v["exp"] > t}
+            active[digest] = session
+            kept = sorted(active, key=lambda k: (active[k]["created"], k), reverse=True)[:self.MAX_SESSIONS]
             if self.store is not None:
                 with self.store.lock:
-                    self.store.db.execute("DELETE FROM admin_sessions WHERE exp<=?", (t,))
-                    self.store.db.execute(
-                        "INSERT INTO admin_sessions(sid_hash,csrf,exp,via,created) VALUES(?,?,?,?,?)",
-                        (digest, session["csrf"], session["exp"], via, t))
-            self._items = {k: v for k, v in self._items.items() if v["exp"] > t}
-            self._items[digest] = session
+                    self.store.db.execute("BEGIN IMMEDIATE")
+                    try:
+                        self.store.db.execute("DELETE FROM admin_sessions WHERE exp<=?", (t,))
+                        self.store.db.execute(
+                            "INSERT INTO admin_sessions(sid_hash,csrf,exp,via,created) VALUES(?,?,?,?,?)",
+                            (digest, session["csrf"], session["exp"], via, t))
+                        self.store.db.execute(
+                            "DELETE FROM admin_sessions WHERE sid_hash NOT IN "
+                            "(SELECT sid_hash FROM admin_sessions ORDER BY created DESC, sid_hash DESC LIMIT ?)",
+                            (self.MAX_SESSIONS,))
+                        self.store.db.execute("COMMIT")
+                    except Exception:
+                        self.store.db.execute("ROLLBACK")
+                        raise
+            self._items = {k: active[k] for k in kept}
         return sid, session
 
     def get(self, sid):
@@ -136,9 +150,7 @@ class Sessions:
                 return None
             if session["exp"] <= time.time():
                 self._items.pop(digest, None)
-                if self.store is not None:
-                    with self.store.lock:
-                        self.store.db.execute("DELETE FROM admin_sessions WHERE sid_hash=?", (digest,))
+                # Expiry reads stay RAM-only; prune disk rows on the next login.
                 return None
             return session
 
@@ -175,7 +187,9 @@ class Auth:
     def set_admin_password(self, password):
         if not isinstance(password, str) or len(password) < 10:
             raise ValueError("パスワードは10文字以上にしてください")
-        self.config.set_secret("admin_password", hash_password(password))
+        password_hash = hash_password(password)
+        self.sessions.clear()
+        self.config.set_secret("admin_password", password_hash)
 
     def check_admin_password(self, password):
         stored = self.config.secret("admin_password")

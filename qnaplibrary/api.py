@@ -116,7 +116,6 @@ def change_password(req):
     if not req.app.auth.check_admin_password(body.get("current", "")):
         raise _err(401, "現在のパスワードが違います")
     req.app.auth.set_admin_password(body.get("password", ""))
-    req.app.auth.sessions.clear()
     return {"ok": True}
 
 
