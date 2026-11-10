@@ -123,7 +123,7 @@ class Searcher:
         trace = {"query": query, "mode": mode, "stages": []}
         coll_ids = None
         if collections:
-            coll_ids = [self.store.get_collection(c)["id"] for c in collections]
+            coll_ids = [self.store.get_collection(c, counts=False)["id"] for c in collections]
         if kinds:
             of_kind = self.store.collection_ids_of_kind(kinds)
             coll_ids = [c for c in coll_ids if c in of_kind] if coll_ids else of_kind
