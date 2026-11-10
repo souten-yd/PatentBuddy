@@ -236,7 +236,7 @@ class Request:
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "QnapLibrary/" + VERSION
+    server_version = "QnapPatentBuddy/" + VERSION
     sys_version = ""
     protocol_version = "HTTP/1.1"
 
@@ -434,7 +434,7 @@ class Server(ThreadingHTTPServer):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(prog="qnaplibrary", description="QnapLibrary server")
+    parser = argparse.ArgumentParser(prog="qnaplibrary", description="QnapPatentBuddy server")
     parser.add_argument("--data", default=os.environ.get("QNAPLIBRARY_DATA", "./.data"), help="persistent data directory")
     parser.add_argument("--bind", default=None)
     parser.add_argument("--port", type=int, default=None)
