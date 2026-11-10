@@ -1,6 +1,6 @@
-"""QnapLibrary — strategic database platform for QNAP NAS and Linux."""
+"""QnapPatentBuddy — private patent research and invention support on QNAP/Linux."""
 
-APP_NAME = "QnapLibrary"
-VERSION = "0.5.0"
-REPO = "souten-yd/QnapLibrary"
+APP_NAME = "QnapPatentBuddy"
+VERSION = "0.5.1"
+REPO = "souten-yd/QnapPatentBuddy"
 DEFAULT_PORT = 17871
