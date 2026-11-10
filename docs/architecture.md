@@ -25,6 +25,13 @@
 - `patents` / `patent_events` / `patent_claims`（版）/ `patent_refs`（X/Y/A 分類）
 - `devices`（トークンは SHA-256 で保存）/ `passkeys` / `chat_threads` / `chat_messages` / `audit`
 
+## 大規模化の実装方針（PR #13）
+
+- NAS側は外部IDによる冪等取り込みをバッチ化し、FTS5日本語2-gramとSQLite索引で検索する。
+- 全文を含む文書詳細と一覧の読み出しを分離する。一覧は必要項目だけにし、深いページ取得にはIDカーソルを使う。
+- 既存のコレクション・索引・認証・データをそのまま維持。最初の起動時のみ新しい文献カーソル索引を作成する（大容量DBで起動が長くなる可能性）。
+- ベクトル規模が増えたときのQdrant/PC分担・実データ性能測定は [scalability.md](scalability.md) にまとめる。
+
 ## 低ディスク I/O の工夫
 
 | 項目 | 方法 |
