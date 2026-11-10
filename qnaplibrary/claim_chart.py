@@ -99,6 +99,8 @@ def validate(chart, body, get_document):
         answers.append(row.get('assessment'))
     parse_answer(json.dumps({'rows': answers}, ensure_ascii=False), rows)
     if chart['schema_version'] == 2:
+        from .chart_trace import validate as validate_trace
+        validate_trace(chart)
         generation = chart.get('generation')
         executed = any(row['evidence'] for row in rows)
         if not isinstance(generation, dict) or generation.get('executed') is not executed:

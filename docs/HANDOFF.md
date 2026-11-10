@@ -366,3 +366,11 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - 新一時fixtureでControlDeck実LLM→候補保存→PatentBuddy1280/320px引用表示を再確認（/tmp/pb-relation-register-generation.log）。続けてResearchDataHub実Chrome1280で候補登録→承認、320で同じ候補再登録→却下。overflow/JS例外0、edge重複0（/tmp/pb-relation-register-browser.log）。正本DBでedge1/inferred/rejected/method=host_relation_proposal/model欄129文字を照合。
 - fixture PID571342をSIGINT停止、一時addon/user/session/grants除去。本番0.5.10・利用者資料は不変。PR23 Draft/未配布。次は候補レビュー状態の整理・PatentBuddy→管理Web導線、履歴ページング、検索trace保存境界、性能I/O/配布更新、P2/PR-G。goal active。
 - 全verify **196 tests成功67.512秒**（/tmp/pb-relation-register-verify.log）、JS構文・diff whitespace・変更diff確認成功。
+
+## チャート検索traceの保存境界（2026-11-11）
+
+- 前turn f190faeは推定候補の登録/レビューprogress。今回、schema2チャートの正本保存境界で検索trace検証が欠けていたことを確認しchart_trace.pyを追加。4検索段階・行ラベル/件数・固定field、embedding/reranker 64hex・索引epoch/generation・revision_kindを検証。モデル/索引/総vector数は全行同一。scanned/total上限とstrict整数、打切りstrict boolと全体summary一致、候補0〜12と採用min(3,candidate_count)を確認。
+- 各引用の取得経路keyword/vector/graph:id、有限rerank scoreの降順、重複引用範囲を検証。不整合は保存transaction前半で拒否し部分保存しない。schema1閲覧/保存互換は維持。traceは認証済みクライアントの整合性検証であり、検索実行自体を暗号的に証明するものではない。新規schema/索引/GET書込みなし。
+- 関連12 tests成功7.870秒（/tmp/pb-chart-trace-tests.log）。その後candidate_countと採用件数の厳密一致を追加、no-evidence fixtureを実契約のcandidate_count=0へ修正。テストには行/モデル/索引/範囲/件数/型/打切り/非有限順位の不正とatomic拒否、schema1互換を含む。
+- 全verify197 tests成功69.079秒（/tmp/pb-chart-trace-verify.log）。実Host local-only LLMの3行chart生成/保存成功、正本traceを再検証。1280/320pxで引用/検索段階/生成版表示、overflow/JS例外0（/tmp/pb-chart-trace-browser.log）。fixture PID574617を停止し一時addon/user/session/grants除去を確認。本番不変。
+- ユーザー追加要求: パワエレ機器の異常検知手法について約10件の特許を調査・情報抽出。日本語公報優先、特許ファミリー重複を避け、検知対象/信号/手法/請求項/図を比較する実資料受入へ進む。PR-F全体・P2/PR-Gは引き続き未完、goal active。

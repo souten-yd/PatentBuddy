@@ -24,7 +24,7 @@ class ChartTests(unittest.TestCase):
         self.chart={'schema_version':1,'review_status':'unreviewed','claim_no':1,'claim_text':claim,'rows':[]}
         for element in items:
             ref=element['label']+'-E1'
-            evidence={'ref':ref,'doc_id':self.ref['id'],'revision':self.ref['revision'],'start':0,'end':2,'quote':'正極'}
+            evidence={'ref':ref,'doc_id':self.ref['id'],'revision':self.ref['revision'],'start':0,'end':2,'quote':'正極','via':'keyword','rerank_score':1.0}
             self.chart['rows'].append({'element':element,'evidence':[evidence],
                 'assessment':{'label':element['label'],'judgment':'△','reason':'候補の記載を確認','citations':[ref]}})
 
@@ -80,7 +80,7 @@ class ChartTests(unittest.TestCase):
             retriever = factory.return_value
             def retrieve(query, keywords, excluded, label):
                 row = next(r for r in self.chart['rows'] if r['element']['label'] == label)
-                return row['evidence'], {'graph_truncated': False, 'vector_truncated': False}
+                return row['evidence'], self.trace()
             retriever.retrieve.side_effect = retrieve
             value=json.loads(chart.generate(Data(),Session(),self.doc,1,'/unused'))
             retriever.finish.assert_called_once()
@@ -117,6 +117,7 @@ class ChartTests(unittest.TestCase):
     def test_generation_provenance_storage_is_atomic_and_legacy_compatible(self):
         value = copy.deepcopy(self.chart)
         value['schema_version'] = 2
+        value['retrieval'] = self.retrieval(value)
         proof = {'execution_policy': 'local_only', 'revision_kind': 'host_process_file_metadata_v1',
                  'model_ref': 'a'*64, 'runtime_ref': 'b'*64}
         for generation in (None, {'executed': False, 'reason': 'no_evidence'},
@@ -135,7 +136,7 @@ class ChartTests(unittest.TestCase):
         session = Mock()
         session.aborted = threading.Event()
         with patch('qnaplibrary.chart_retrieval.ChartRetrieval') as factory:
-            factory.return_value.retrieve.return_value = ([], {'graph_truncated': False, 'vector_truncated': False})
+            factory.return_value.retrieve.return_value = ([], dict(self.trace(),candidate_count=0))
             value = json.loads(chart.generate(Mock(), session, self.doc, 1, '/unused'))
         session.stream.assert_not_called()
         self.assertEqual(value['generation'], {'executed': False, 'reason': 'no_evidence'})
@@ -143,3 +144,30 @@ class ChartTests(unittest.TestCase):
         value['generation']['provenance'] = {}
         with self.assertRaises(StoreError): self.save(value, identifier='forged')
         self.assertEqual(self.store.one('SELECT COUNT(*) FROM document_analyses')[0], 1)
+
+
+    def trace(self):
+        return dict(stages=['keyword','vector','graph','rerank'], embedding_model_ref='a'*64,
+                    reranker_model_ref='b'*64,revision_kind='host_file_metadata_v1',snapshot_etag='c'*32+':1',
+                    vector_scanned=1,vector_total=1,vector_truncated=False,graph_truncated=False,candidate_count=1)
+
+    def retrieval(self, value):
+        return dict(stages=['keyword','vector','graph','rerank'],graph_truncated=False,vector_truncated=False,
+                    rows=[dict(self.trace(),label=r['element']['label']) for r in value['rows']])
+
+    def test_retrieval_trace_rejects_mismatch_without_partial_write(self):
+        value=copy.deepcopy(self.chart);value['schema_version']=2;value['retrieval']=self.retrieval(value)
+        value['generation']=dict(executed=True,provenance=dict(execution_policy='local_only',
+            revision_kind='host_process_file_metadata_v1',model_ref='a'*64,runtime_ref='b'*64))
+        invalid=[]
+        for field,new in [('label','wrong'),('embedding_model_ref','invalid'),('vector_scanned',True),
+                          ('vector_total',0),('candidate_count',13),('snapshot_etag','secret'),('graph_truncated',1)]:
+            v=copy.deepcopy(value);v['retrieval']['rows'][0][field]=new;invalid.append(v)
+        v=copy.deepcopy(value);v['retrieval']['rows'][0]['embedding_model_ref']='d'*64;invalid.append(v)
+        v=copy.deepcopy(value);v['retrieval']['graph_truncated']=True;invalid.append(v)
+        for field,new in [('via','unknown'),('rerank_score',float('nan'))]:
+            v=copy.deepcopy(value);v['rows'][0]['evidence'][0][field]=new;invalid.append(v)
+        for v in invalid:
+            with self.assertRaises(StoreError):self.save(v)
+            self.assertEqual(self.store.one('SELECT COUNT(*) FROM document_analyses')[0],0)
+        self.save(value)
