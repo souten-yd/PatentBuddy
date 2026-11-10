@@ -7,6 +7,9 @@ claims, notes, passwords or LLM prompts to a public-only API client.
 The source hash gates visibility: any edit automatically makes that
 publication inactive until an administrator reviews and approves it again.
 """
+import hashlib
+import hmac
+import json
 import secrets
 import sqlite3
 import time
@@ -24,6 +27,10 @@ CREATE TABLE IF NOT EXISTS published_patents(
   excerpt TEXT NOT NULL,
   approved_at REAL NOT NULL
 );
+CREATE TRIGGER IF NOT EXISTS published_source_changed AFTER UPDATE ON documents
+BEGIN
+  UPDATE published_patents SET source_hash='' WHERE doc_id=NEW.id AND source_hash<>'';
+END;
 """
 MAX_EXCERPT = 12000
 
@@ -31,17 +38,18 @@ MAX_EXCERPT = 12000
 class PublicCatalog:
     def __init__(self, store):
         self.store = store
+        self._preview_key = secrets.token_bytes(32)
         with self.store.lock:
             self.store.db.executescript(PUBLIC_SCHEMA)
             try:
+                existed = self.store.db.execute(
+                    "SELECT 1 FROM sqlite_master WHERE name='published_patents_fts'").fetchone()
                 self.store.db.execute(
                     "CREATE VIRTUAL TABLE IF NOT EXISTS published_patents_fts "
                     "USING fts5(title,tok,tokenize='unicode61 remove_diacritics 0')")
                 self.fts = True
                 # A database initially created without FTS5 may later gain it.
-                approved = self.store.db.execute("SELECT COUNT(*) FROM published_patents").fetchone()[0]
-                indexed = self.store.db.execute("SELECT COUNT(*) FROM published_patents_fts").fetchone()[0]
-                if approved and not indexed:
+                if not existed:
                     for r in self.store.db.execute("SELECT doc_id,title,excerpt FROM published_patents"):
                         self.store.db.execute(
                             "INSERT INTO published_patents_fts(rowid,title,tok) VALUES(?,?,?)",
@@ -55,22 +63,59 @@ class PublicCatalog:
         return {"id": row["public_id"], "title": row["title"],
                 "publication_number": row["ext_id"], "text": row["excerpt"]}
 
-    def approve(self, doc_id, excerpt, *, acknowledged=False):
+    @staticmethod
+    def _source(db, doc_id, excerpt):
+        if isinstance(doc_id, bool) or not isinstance(doc_id, int) or doc_id < 1:
+            raise ValueError("文献IDが不正です")
+        if not isinstance(excerpt, str) or not excerpt.strip() or len(excerpt) > MAX_EXCERPT:
+            raise ValueError("抜粋は1〜12000文字にしてください")
+        source = db.execute(
+            "SELECT id,title,ext_id,body,hash,updated FROM documents WHERE id=?", (doc_id,)
+        ).fetchone()
+        if not source:
+            raise ValueError("文献が見つかりません")
+        if excerpt not in source["body"]:
+            raise ValueError("公開する抜粋は元文献に存在する範囲から選択してください")
+        if not source["ext_id"] or len(source["ext_id"]) > 300:
+            raise ValueError("公開番号は1〜300文字にしてください")
+        return source
+
+    def _signature(self, source, excerpt, expires):
+        data = json.dumps([source["id"], source["hash"], source["updated"],
+                           source["title"], source["ext_id"], excerpt, expires],
+                          ensure_ascii=False, separators=(",", ":")).encode()
+        return hmac.new(self._preview_key, data, hashlib.sha256).hexdigest()
+
+    def preview(self, doc_id, excerpt):
+        # No durable writes or network: the token binds every displayed field
+        # to this source version. Restarting the server invalidates previews.
+        with self.store.lock:
+            source = self._source(self.store.db, doc_id, excerpt)
+            expires = int(time.time()) + 600
+            token = str(expires) + "." + self._signature(source, excerpt, expires)
+            return {"preview_token": token, "expires_at": expires,
+                    "publication": {"title": source["title"],
+                                    "publication_number": source["ext_id"], "text": excerpt},
+                    "external_llm_called": False}
+
+    def approve(self, doc_id, excerpt, *, acknowledged=False, preview_token=None):
         if acknowledged is not True:
             raise ValueError("公開済み資料と送信可能な抜粋であることの明示確認が必要です")
-        if not isinstance(excerpt, str) or not (1 <= len(excerpt.strip()) <= MAX_EXCERPT):
-            raise ValueError("抜粋は1〜12000文字にしてください")
-        excerpt = excerpt.strip()
+        if not isinstance(preview_token, str) or len(preview_token) > 100:
+            raise ValueError("先に送信プレビューを確認してください")
+        try:
+            expiry, signature = preview_token.split(".", 1)
+            if not expiry.isascii() or not expiry.isdigit() or len(signature) != 64 or any(
+                    c not in "0123456789abcdef" for c in signature):
+                raise ValueError("invalid token")
+            expires = int(expiry)
+        except (ValueError, TypeError):
+            raise ValueError("プレビューが不正です")
         with self.store.tx() as db:
-            source = db.execute(
-                "SELECT id,title,ext_id,body,hash FROM documents WHERE id=?", (int(doc_id),)
-            ).fetchone()
-            if not source:
-                raise ValueError("文献が見つかりません")
-            if excerpt not in source["body"]:
-                raise ValueError("公開する抜粋は元文献に存在する範囲から選択してください")
-            if not source["ext_id"]:
-                raise ValueError("公開番号がない文献は公開カタログへ登録できません")
+            source = self._source(db, doc_id, excerpt)
+            if expires <= time.time() or not hmac.compare_digest(
+                    signature, self._signature(source, excerpt, expires)):
+                raise ValueError("文献の変更または期限切れです。プレビューを再確認してください")
             key = secrets.token_urlsafe(16)
             db.execute(
                 "INSERT INTO published_patents(doc_id,public_id,source_hash,title,ext_id,excerpt,approved_at) "
@@ -78,8 +123,8 @@ class PublicCatalog:
                 "public_id=excluded.public_id,source_hash=excluded.source_hash,"
                 "title=excluded.title,ext_id=excluded.ext_id,excerpt=excluded.excerpt,"
                 "approved_at=excluded.approved_at",
-                (source["id"], key, source["hash"], source["title"][:500],
-                 source["ext_id"][:300], excerpt, time.time()))
+                (source["id"], key, source["hash"], source["title"],
+                 source["ext_id"], excerpt, time.time()))
             if self.fts:
                 db.execute("DELETE FROM published_patents_fts WHERE rowid=?", (source["id"],))
                 db.execute("INSERT INTO published_patents_fts(rowid,title,tok) VALUES(?,?,?)",

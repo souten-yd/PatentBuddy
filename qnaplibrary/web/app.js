@@ -270,16 +270,36 @@ async function openDoc(id) {
     h("div", { class: "card" }, h("div", { class: "row" }, h("h2", {}, "本文"), h("span", { class: "spacer" }),
       h("button", { class: "btn", onclick: guard(() => addRefDialog(d)) }, "特許案件の先行文献に追加")), h("div", { class: "pre" }, d.body || "(本文なし)")),
     h("div", { class: "card" }, h("h2", {}, "チャンク（索引単位） " + d.chunks.length), d.chunks.map(c => h("details", {}, h("summary", {}, "#" + c.ord + " " + c.section), h("div", { class: "pre" }, c.text)))));
-  const excerpt = h("textarea", { placeholder: "公開公報本文から、外部AIにも共有してよい箇所だけを貼り付け（最大12000文字）" });
+  const excerpt = h("textarea", { maxlength: 12000, placeholder: "公開本文から共有してよい箇所だけを選択（最大12000文字）" });
   const approvalCheck = h("input", { type: "checkbox" });
-  const approveButton = h("button", { class: "btn primary", disabled: !d.ext_id, onclick: guard(async () => {
-    if (!approvalCheck.checked) throw new Error("公開資料であることを確認してください");
-    if (!confirm("指定した抜粋を外部AIアプリ用の公開データAPIへ登録しますか？")) return;
-    await api("POST", "/api/v1/publications", { doc_id: d.id, excerpt: excerpt.value, confirm_public: true });
-    toast("公開資料として登録しました");
-    excerpt.value = "";
-    approvalCheck.checked = false;
-  }) }, "公開抜粋を登録");
+  const previewBox = h("div", {});
+  let preview = null;
+  const approveButton = h("button", { class: "btn primary", disabled: true, onclick: guard(async () => {
+    if (!preview || !approvalCheck.checked) throw new Error("プレビュー全項目と公開・利用許諾を確認してください");
+    const reviewed = preview;
+    approveButton.disabled = true;
+    try {
+      await api("POST", "/api/v1/publications", { doc_id: d.id, excerpt: reviewed.publication.text,
+        preview_token: reviewed.preview_token, confirm_public: true });
+      toast("公開資料として登録しました");
+    } finally { preview = null; approvalCheck.checked = false; clear(previewBox); }
+  }) }, "確認した内容を承認");
+  const previewButton = h("button", { class: "btn", disabled: !d.ext_id, onclick: guard(async () => {
+    const text = excerpt.value;
+    preview = null; approveButton.disabled = true; approvalCheck.checked = false; clear(previewBox);
+    const result = await api("POST", "/api/v1/publications/preview", { doc_id: d.id, excerpt: text });
+    if (excerpt.value !== text) return;
+    preview = result;
+    previewBox.append(h("h3", {}, "共有される全項目"),
+      h("dl", { class: "dl" }, h("dt", {}, "タイトル"), h("dd", {}, result.publication.title),
+        h("dt", {}, "公開番号"), h("dd", {}, result.publication.publication_number)),
+      h("div", { class: "pre" }, result.publication.text),
+      h("p", { class: "small muted" }, "この内容だけが専用APIに公開されます。外部LLMへの送信は行いません。"));
+    approveButton.disabled = false;
+  }) }, "送信プレビュー");
+  excerpt.addEventListener("input", () => {
+    preview = null; approveButton.disabled = true; approvalCheck.checked = false; clear(previewBox);
+  });
   const revokeButton = h("button", { class: "btn danger", onclick: guard(async () => {
     if (!confirm("この文献の公開登録を取り消しますか？")) return;
     await api("DELETE", "/api/v1/publications/" + d.id);
@@ -288,8 +308,8 @@ async function openDoc(id) {
   main.append(h("div", { class: "card" },
     h("h2", {}, "外部AIアプリ用の公開資料"),
     h("p", { class: "small muted" }, "この操作はNAS・ControlDeck間の共有とは別です。未公開発明・社内メモや未公開の請求項案は登録しないでください。外部AIアプリに共有するのは、手動で確認・選択した抜粋だけです。"),
-    excerpt,
-    h("label", {}, approvalCheck, " 公開済み文献の抜粋で、外部AIに渡してよいことを確認"),
+    excerpt, previewButton, previewBox,
+    h("label", {}, approvalCheck, " タイトル・公開番号・抜粋すべてが公開済みで、共有する利用許諾があることを確認"),
     h("div", { class: "row end" }, approveButton, revokeButton)));
 }
 async function addRefDialog(d) {

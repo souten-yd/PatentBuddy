@@ -1,5 +1,7 @@
 """Never expose drafts through the external-app public catalogue token."""
+import re
 import tempfile
+from unittest import mock
 import unittest
 
 from tests.helpers import Client, LiveServer
@@ -29,6 +31,13 @@ class PublicCatalogApiTest(unittest.TestCase):
         self.public = Client(self.server.base)
         self.public.token = public_token["token"]
 
+    def approve(self, payload):
+        status, preview = self.admin.call("POST", "/api/v1/publications/preview", payload)
+        if status != 200:
+            return status, preview
+        return self.admin.call("POST", "/api/v1/publications",
+                               dict(payload, preview_token=preview["preview_token"]))
+
     def tearDown(self):
         self.server.close()
 
@@ -54,11 +63,9 @@ class PublicCatalogApiTest(unittest.TestCase):
             {"doc_id": self.doc_id, "excerpt": "正極と固体電解質層を備える。", "confirm_public": "true"},
             {"doc_id": self.doc_id, "excerpt": "入力していない任意の社外機密", "confirm_public": True},
         ):
-            status, _ = self.admin.call("POST", "/api/v1/publications", payload)
+            status, _ = self.approve(payload)
             self.assertEqual(status, 400, payload)
-        status, approved = self.admin.call(
-            "POST", "/api/v1/publications",
-            {"doc_id": self.doc_id, "excerpt": "正極と固体電解質層を備える。",
+        status, approved = self.approve({"doc_id": self.doc_id, "excerpt": "正極と固体電解質層を備える。",
              "confirm_public": True})
         self.assertEqual(status, 200, approved)
         status, result = self.public.call(
@@ -79,9 +86,7 @@ class PublicCatalogApiTest(unittest.TestCase):
         self.assertEqual(blocked["results"], [])
 
     def test_source_edit_invalidates_without_sending_old_excerpt(self):
-        status, approved = self.admin.call(
-            "POST", "/api/v1/publications",
-            {"doc_id": self.doc_id, "excerpt": "正極と固体電解質層を備える。",
+        status, approved = self.approve({"doc_id": self.doc_id, "excerpt": "正極と固体電解質層を備える。",
              "confirm_public": True})
         self.assertEqual(status, 200)
         code, updated = self.admin.call(
@@ -117,9 +122,7 @@ class PublicCatalogApiTest(unittest.TestCase):
         self.assertEqual(client.call("POST", "/api/v1/public-catalog/search", {"q":"電池"})[0],403)
 
     def test_admin_can_revoke_publication_without_deleting_source(self):
-        status, approved = self.admin.call(
-            "POST", "/api/v1/publications",
-            {"doc_id": self.doc_id, "excerpt": "正極と固体電解質層を備える。",
+        status, approved = self.approve({"doc_id": self.doc_id, "excerpt": "正極と固体電解質層を備える。",
              "confirm_public": True})
         self.assertEqual(status, 200)
         status, response = self.admin.call("DELETE", "/api/v1/publications/%s" % self.doc_id)
@@ -129,8 +132,7 @@ class PublicCatalogApiTest(unittest.TestCase):
         self.assertEqual(self.admin.call("GET", "/api/v1/documents/%s" % self.doc_id)[0], 200)
 
     def test_fts_off_keeps_approval_filter(self):
-        self.admin.call("POST", "/api/v1/publications",
-                        {"doc_id":self.doc_id, "excerpt":"正極と固体電解質層を備える。",
+        self.approve({"doc_id":self.doc_id, "excerpt":"正極と固体電解質層を備える。",
                          "confirm_public":True})
         self.server.app.public_catalog.fts = False
         status, response = self.public.call("POST", "/api/v1/public-catalog/search", {"q":"固体電解質"})
@@ -138,6 +140,46 @@ class PublicCatalogApiTest(unittest.TestCase):
         self.assertEqual(len(response["results"]), 1)
         self.assertEqual(self.public.call("POST", "/api/v1/public-catalog/search",
             {"q":"絶対秘密"})[1]["results"], [])
+
+    def test_preview_required_exact_and_invalid_after_edit(self):
+        payload = {"doc_id": self.doc_id, "excerpt": "正極と固体電解質層を備える。", "confirm_public": True}
+        self.assertEqual(self.admin.call("POST", "/api/v1/publications", payload)[0], 400)
+        st, preview = self.admin.call("POST", "/api/v1/publications/preview", payload)
+        self.assertEqual(st, 200)
+        self.assertEqual(preview["publication"], {"title": "公開された電池公報",
+            "publication_number": "JP2024-111111A", "text": payload["excerpt"]})
+        self.assertEqual(self.admin.call("POST", "/api/v1/publications", dict(payload,
+            preview_token=preview["preview_token"], excerpt="内部メモ：絶対秘密の発明案"))[0], 400)
+        for token in ("", "0.fake", "9999999999." + "あ" * 64):
+            self.assertEqual(self.admin.call("POST", "/api/v1/publications", dict(payload, preview_token=token))[0], 400)
+        self.admin.call("POST", "/api/v1/collections/patents/documents", {"documents": [
+            {"id": "JP2024-111111A", "title": "新しい秘密タイトル", "body": payload["excerpt"]}]})
+        self.assertEqual(self.admin.call("POST", "/api/v1/publications", dict(payload,
+            preview_token=preview["preview_token"]))[0], 400)
+
+    def test_restoring_original_content_does_not_restore_approval(self):
+        payload = {"doc_id": self.doc_id, "excerpt": "正極と固体電解質層を備える。", "confirm_public": True}
+        st, approved = self.approve(payload)
+        self.assertEqual(st, 200)
+        for title, body in (("変更", "別の本文"), ("公開された電池公報", "正極と固体電解質層を備える。内部メモ：絶対秘密の発明案")):
+            self.assertEqual(self.admin.call("POST", "/api/v1/collections/patents/documents", {"documents": [
+                {"id": "JP2024-111111A", "title": title, "body": body}]})[0], 200)
+        self.assertEqual(self.public.call("GET", "/api/v1/public-catalog/" + approved["id"])[0], 404)
+        self.assertEqual(self.public.call("POST", "/api/v1/public-catalog/search", {"q": "固体電解質"})[1]["results"], [])
+        self.assertEqual(self.approve(payload)[0], 200)
+
+    def test_public_token_denied_on_every_non_catalog_route_without_llm_egress(self):
+        from qnaplibrary.api import ROUTES
+        with mock.patch("qnaplibrary.llm._DIRECT_OPENER.open", side_effect=AssertionError("unexpected LLM request")) as outgoing:
+            for route in ROUTES:
+                if route["auth"] == "published":
+                    continue
+                path = re.sub(r"\{\w+\}", "1", route["pattern"])
+                with self.subTest(method=route["method"], path=path):
+                    status, _ = self.public.call(route["method"], path,
+                        {} if route["method"] != "GET" else None)
+                    self.assertEqual(status, 403)
+            outgoing.assert_not_called()
 
 
 if __name__ == "__main__":

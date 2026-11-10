@@ -305,13 +305,22 @@ def publications_admin(req):
     return req.app.public_catalog.admin_list()
 
 
+@route("POST", "/api/v1/publications/preview", "admin")
+def publications_preview(req):
+    b = req.json()
+    if not isinstance(b, dict):
+        raise _err(400, "JSON object required")
+    return req.app.public_catalog.preview(b.get("doc_id"), b.get("excerpt"))
+
+
 @route("POST", "/api/v1/publications", "admin")
 def publications_approve(req):
     b = req.json()
     if not isinstance(b, dict):
         raise _err(400, "JSON object required")
     result = req.app.public_catalog.approve(b.get("doc_id"), b.get("excerpt"),
-                                             acknowledged=b.get("confirm_public") is True)
+                                             acknowledged=b.get("confirm_public") is True,
+                                             preview_token=b.get("preview_token"))
     req.app.store.audit("admin", "publication.approve", "approved excerpt")
     return result
 
