@@ -70,7 +70,9 @@ class ChartTests(unittest.TestCase):
         class Session:
             aborted=threading.Event()
             def progress(self,*args):pass
-            def stream(self,messages):
+            generation_provenance = {'execution_policy':'local_only','revision_kind':'host_process_file_metadata_v1','model_ref':'a'*64,'runtime_ref':'b'*64}
+            def stream(self,messages,require_provenance=False):
+                outer.assertTrue(require_provenance)
                 inputs=json.loads(messages[1]['content'])['elements']
                 return json.dumps({'rows':[{'label':r['label'],'judgment':'△','reason':'根拠の候補',
                     'citations':[r['sources'][0]['ref']]} for r in inputs]})
@@ -110,3 +112,34 @@ class ChartTests(unittest.TestCase):
         self.assertEqual(stranger.call('GET', path)[0], 401)
         stranger.token = self.server.app.auth.create_device('public-receipt', 'published')['token']
         self.assertEqual(stranger.call('GET', path)[0], 403)
+
+
+    def test_generation_provenance_storage_is_atomic_and_legacy_compatible(self):
+        value = copy.deepcopy(self.chart)
+        value['schema_version'] = 2
+        proof = {'execution_policy': 'local_only', 'revision_kind': 'host_process_file_metadata_v1',
+                 'model_ref': 'a'*64, 'runtime_ref': 'b'*64}
+        for generation in (None, {'executed': False, 'reason': 'no_evidence'},
+                           {'executed': True, 'provenance': dict(proof, runtime_ref='invalid')},
+                           {'executed': 1, 'provenance': proof}):
+            value['generation'] = generation
+            with self.assertRaises(StoreError): self.save(value)
+            self.assertEqual(self.store.one('SELECT COUNT(*) FROM document_analyses')[0], 0)
+        value['generation'] = {'executed': True, 'provenance': proof}
+        self.save(value)
+        self.save(identifier='legacy')
+        self.assertEqual(self.store.one('SELECT COUNT(*) FROM document_analyses')[0], 2)
+
+    def test_no_evidence_never_calls_llm_or_claims_provenance(self):
+        from unittest.mock import Mock
+        session = Mock()
+        session.aborted = threading.Event()
+        with patch('qnaplibrary.chart_retrieval.ChartRetrieval') as factory:
+            factory.return_value.retrieve.return_value = ([], {'graph_truncated': False, 'vector_truncated': False})
+            value = json.loads(chart.generate(Mock(), session, self.doc, 1, '/unused'))
+        session.stream.assert_not_called()
+        self.assertEqual(value['generation'], {'executed': False, 'reason': 'no_evidence'})
+        self.save(value)
+        value['generation']['provenance'] = {}
+        with self.assertRaises(StoreError): self.save(value, identifier='forged')
+        self.assertEqual(self.store.one('SELECT COUNT(*) FROM document_analyses')[0], 1)

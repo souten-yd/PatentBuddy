@@ -83,6 +83,7 @@ async function loadAnalyses(id) {
     if (item.kind === 'chart') {
       const chart = JSON.parse(item.content);
       text.textContent = `請求項${chart.claim_no} · ${item.review_status === 'approved' ? '確認済み' : '未確認'}\n` +
+        (chart.generation?.executed ? '生成モデルの版を記録済み（ローカル実行）\n' : chart.generation?.executed === false ? '生成LLM未実行（対比根拠なし）\n' : '生成モデル版は未記録\n') +
         (chart.retrieval?.stages?.includes('vector') ? 'キーワード・ベクトル・承認済み関係から検索し、ローカルAIで再順位付け\n' : '') +
         (chart.retrieval?.vector_truncated || chart.retrieval?.graph_truncated ? '検索上限に達したため、候補は一部の範囲です。\n' : '') +
         chart.rows.map(row => `${row.element.label}: ${row.element.text}\n${row.assessment.judgment} ${row.assessment.reason}\n引用: ${row.assessment.citations.join(', ') || 'なし'}\n候補の根拠:\n` +

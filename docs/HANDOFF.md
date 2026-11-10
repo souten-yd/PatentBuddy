@@ -315,3 +315,13 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - Host実機受入文書の追加commit b40989cをpushしdocs-only follow-up PRを作成。Host `.venv`/frontend/node_modules symlink、生成tsbuildinfoはstageしない。旧worktree `/data1tb/ControlDeck-retrieval-ai` のdirtyも不変。
 - **次の実装:** PB `/data1tb/PatentBuddy-graph` のHostSession.streamにopt-inを追加。要求前にcapabilities対応確認、provenance eventのpolicy/kind/64hex/重複・欠落・done順を厳密検証し、欠落時は原文を送らない/結果を保存しない。chart.generateから要求し、実際に生成した場合だけ検証済み生成版を正本chart JSONへ保存（候補なしでLLM未実行なら明示）。旧schemaの保存/閲覧互換と新schemaの検証を検討。既存HostSession/summary/claimsを暗黙に壊さない。Host新APIはすでに実導入済みなので再反映/再起動不要。
 - その後、人手レビュー/graph提案・管理UI、検索trace保存境界の検証、性能/配布、P2/PR-Gを続ける。goal active。
+
+## チャート生成モデル版の保存・実LLM確認（2026-11-11）
+
+- 前turnはOCR状態回答のみでコード進捗なし。今回、残っていたHostSession/claim_chart変更を確認して完成。Host docs follow-up PR353はmain bfb0e42へ統合済み。
+- HostSession.streamのrequire_provenance opt-inは要求前にHost capabilitiesを確認。対応なしではPOSTしない。正常content→provenance→doneのみ受理し、policy/kind/64hex/余剰field、欠落/重複/順序/異常終了を検査。成功確定までsessionへ証明を保持しない。通常summary/claimsは従来契約を維持。
+- 新生成chart schema2にgeneration.executedとHostのopaque model_ref/runtime_refを保存。根拠候補なしではLLMを呼ばずno_evidenceを保存。正本保存境界も形式/実行状態を検証し不正時はatomic拒否。schema1は互換維持しUIで版未記録と表示。schema2の形式検証自体は、任意APIクライアントが提出した指紋の真正性を暗号的に証明するものではない。
+- 関連15 tests成功7.096秒、全verify189 tests成功65.191秒（/tmp/pb-generation-verify.log）。その後no-evidence非実行/保存テストを追加しchart全7 tests成功4.038秒（/tmp/pb-generation-chart-final.log）。JS構文、diff whitespace確認成功。新しい依存なし。保存JSONの小さい版情報のみ追加し、GET/検索時の書込み追加なし。
+- 実ControlDeck一時addon/一時RDHで索引→検索→実ローカルLLM→chart保存を検証。正本chart schema2/3行、generation.executed=true、model/runtime各64hexを読取確認（/tmp/pb-chart-provenance-saved.json）。1280/320pxで引用・生成版記録表示、overflow/JSエラー0（/tmp/pb-chart-provenance-browser.log、.data/chart-provenance-*.png）。UI表示検証であり指紋値の視認性改善は今後検討。
+- fixture PID540215をSIGINTで終了、temporary_addon_user_session_grants_removed=trueを確認。Host jobs/auditは保持。本番PatentBuddy/RDH 0.5.10と利用者資料は不変。PR23 Draft、未配布。
+- 次: 人手レビュー/graph提案・管理UI、検索trace保存境界の検証、graph推定表示/逆方向要否、性能/物理I/O・配布更新、P2一般メタデータ、PR-G最終NAS移行。goal active。現作業場所 /data1tb/PatentBuddy-graph。

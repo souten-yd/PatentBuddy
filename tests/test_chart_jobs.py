@@ -32,7 +32,9 @@ class ChartHost(FakeHost):
         if cap == 'text.embed': value.update(dimensions=2, vectors=[[1, 0] for _ in inputs])
         else: value['rankings'] = [dict(index=i, score=1-i) for i in range(len(inputs))]
         return value
-    def stream(self, messages):
+    def stream(self, messages, require_provenance=False):
+        assert require_provenance
+        self.generation_provenance = dict(execution_policy='local_only', revision_kind='host_process_file_metadata_v1', model_ref=MODEL, runtime_ref='b'*64)
         super().stream(messages)
         rows = json.loads(messages[1]['content'])['elements']
         return json.dumps({'rows': [dict(label=r['label'], judgment='△', reason='原文に対応候補あり',

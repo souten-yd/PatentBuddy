@@ -69,7 +69,7 @@ def parse_answer(raw, rows):
 
 def validate(chart, body, get_document):
     """Validate both model output and every stored source at the server write boundary."""
-    if (not isinstance(chart, dict) or type(chart.get('schema_version')) is not int or chart.get('schema_version') != 1
+    if (not isinstance(chart, dict) or type(chart.get('schema_version')) is not int or chart.get('schema_version') not in (1, 2)
             or chart.get('review_status') != 'unreviewed'):
         raise StoreError('invalid chart schema')
     claim, expected = elements(body, chart.get('claim_no'))
@@ -98,6 +98,21 @@ def validate(chart, body, get_document):
                 raise StoreError('chart evidence changed or quote is invalid')
         answers.append(row.get('assessment'))
     parse_answer(json.dumps({'rows': answers}, ensure_ascii=False), rows)
+    if chart['schema_version'] == 2:
+        generation = chart.get('generation')
+        executed = any(row['evidence'] for row in rows)
+        if not isinstance(generation, dict) or generation.get('executed') is not executed:
+            raise StoreError('invalid chart generation state')
+        if executed:
+            from .generation_contract import validate_provenance
+            if set(generation) != {'executed', 'provenance'}:
+                raise StoreError('invalid chart generation provenance')
+            try:
+                validate_provenance(generation['provenance'])
+            except ValueError:
+                raise StoreError('invalid chart generation provenance') from None
+        elif generation != {'executed': False, 'reason': 'no_evidence'}:
+            raise StoreError('unexecuted generation must not claim model provenance')
     return chart
 
 
@@ -128,12 +143,15 @@ def generate(client, session, document, claim_no, cache_directory):
         payload = [{'label':r['element']['label'],'element':r['element']['text'],
                     'sources':[{'ref':e['ref'],'quote':e['quote']} for e in r['evidence']]} for r in rows]
         raw = session.stream([{'role':'system','content':SYSTEM},
-                              {'role':'user','content':json.dumps({'elements':payload},ensure_ascii=False)}])
+                              {'role':'user','content':json.dumps({'elements':payload},ensure_ascii=False)}], require_provenance=True)
         assessed = parse_answer(raw, rows)
+        from .generation_contract import validate_provenance
+        generation = {'executed': True, 'provenance': validate_provenance(session.generation_provenance)}
     else:
+        generation = {'executed': False, 'reason': 'no_evidence'}
         assessed = [dict(r, assessment={'label':r['element']['label'],'judgment':'?',
                     'reason':'対比文献の根拠候補がありません','citations':[]}) for r in rows]
-    chart = {'schema_version':1,'claim_no':claim_no,'claim_text':claim,'rows':assessed,
+    chart = {'schema_version':2,'generation':generation,'claim_no':claim_no,'claim_text':claim,'rows':assessed,
              'retrieval':{'stages':['keyword','vector','graph','rerank'], 'rows':traces,
                           'graph_truncated':any(t['graph_truncated'] for t in traces),
                           'vector_truncated':any(t['vector_truncated'] for t in traces)},'review_status':'unreviewed'}
