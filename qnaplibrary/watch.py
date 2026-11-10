@@ -155,9 +155,10 @@ class Watches:
 
     def due(self):
         t = time.time()
-        return [w["id"] for w in self.list()
-                if w["enabled"] and w["params"].get("public_only_confirmed") is True
-                and (not w["last_run"] or t - w["last_run"] >= w["interval_hours"] * 3600)]
+        return [r["id"] for r in self.store.q(
+            "SELECT id, params, last_run, interval_hours FROM watches WHERE enabled=1")
+            if json.loads(r["params"] or "{}").get("public_only_confirmed") is True
+            and (not r["last_run"] or t - r["last_run"] >= r["interval_hours"] * 3600)]
 
 
 class Scheduler:
