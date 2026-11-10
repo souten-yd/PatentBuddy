@@ -669,14 +669,14 @@ def watches_list(req):
     return {"watches": req.app.watches.list(req.arg("patent_id"))}
 
 
-@route("POST", "/api/v1/watches", "user")
+@route("POST", "/api/v1/watches", "admin")
 def watches_create(req):
     b = req.json()
     return req.app.watches.create(b.get("name"), b.get("connector"), b.get("params"), b.get("collection", ""),
                                   b.get("patent_id"), b.get("interval_hours", 168))
 
 
-@route("PATCH", "/api/v1/watches/{wid}", "user")
+@route("PATCH", "/api/v1/watches/{wid}", "admin")
 def watches_patch(req):
     return req.app.watches.update(req.params["wid"], req.json())
 
@@ -686,7 +686,7 @@ def watches_delete(req):
     return {"deleted": req.app.watches.delete(req.params["wid"])}
 
 
-@route("POST", "/api/v1/watches/{wid}/run", "user")
+@route("POST", "/api/v1/watches/{wid}/run", "admin")
 def watches_run(req):
     return req.app.watches.run(req.params["wid"])
 
@@ -913,9 +913,11 @@ def connectors_list(req):
     return {"connectors": out}
 
 
-@route("POST", "/api/v1/connectors/{name}/run", "user")
+@route("POST", "/api/v1/connectors/{name}/run", "admin")
 def connectors_run(req):
     b = req.json()
+    if b.get("public_query_confirmed") is not True:
+        raise _err(403, "機密保護: 外部APIへの検索語送信を明示承認してください")
     name = req.params["name"]
     spec = next((c for c in connectors.CATALOG if c["id"] == name), None)
     if not spec:
