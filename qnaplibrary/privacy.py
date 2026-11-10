@@ -31,7 +31,9 @@ def local_endpoint(url, allow_lan_https=False):
 
 
 def confidential_allowed(provider, config):
-    if provider.get("type") == "openrouter":
+    # A localhost API may itself be a cloud proxy. An administrator must
+    # affirm that the backing model is genuinely local/offline.
+    if provider.get("type") == "openrouter" or provider.get("local_only_verified") is not True:
         return False
     allow = config.get("privacy", "allow_lan_https_llm", default=False)
     return local_endpoint(provider.get("base_url"), allow_lan_https=bool(allow))
