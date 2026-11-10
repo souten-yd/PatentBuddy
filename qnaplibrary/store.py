@@ -11,6 +11,7 @@ import sqlite3
 import threading
 import time
 from array import array
+from contextlib import nullcontext
 
 from . import textproc
 
@@ -36,6 +37,17 @@ CREATE TABLE IF NOT EXISTS document_analyses(
   id TEXT PRIMARY KEY, doc_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
   source_revision TEXT NOT NULL, kind TEXT NOT NULL, content TEXT NOT NULL, created REAL NOT NULL);
 CREATE INDEX IF NOT EXISTS document_analyses_doc ON document_analyses(doc_id, created DESC);
+CREATE TABLE IF NOT EXISTS source_pdfs(
+  sha256 TEXT PRIMARY KEY, content BLOB NOT NULL, created REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS document_pdfs(
+  doc_id INTEGER PRIMARY KEY REFERENCES documents(id) ON DELETE CASCADE,
+  source_sha256 TEXT NOT NULL REFERENCES source_pdfs(sha256),
+  extraction_sha256 TEXT UNIQUE NOT NULL, extraction TEXT NOT NULL, created REAL NOT NULL);
+CREATE INDEX IF NOT EXISTS document_pdfs_source ON document_pdfs(source_sha256);
+CREATE TRIGGER IF NOT EXISTS document_pdfs_gc AFTER DELETE ON document_pdfs BEGIN
+  DELETE FROM source_pdfs WHERE sha256=OLD.source_sha256
+    AND NOT EXISTS(SELECT 1 FROM document_pdfs WHERE source_sha256=OLD.source_sha256);
+END;
 CREATE TABLE IF NOT EXISTS chunks(
   id INTEGER PRIMARY KEY, doc_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
   collection_id INTEGER NOT NULL, ord INTEGER NOT NULL, section TEXT NOT NULL DEFAULT '', text TEXT NOT NULL);
@@ -289,7 +301,7 @@ class Store:
             out.append(("title", str(doc["title"])))
         return out
 
-    def add_documents(self, cid, docs, actor="system"):
+    def add_documents(self, cid, docs, actor="system", *, _connection=None):
         """Insert or replace documents (by ext_id). Returns counts. One transaction per call."""
         c = self.get_collection(cid, counts=False)
         if not isinstance(docs, list):
@@ -301,7 +313,9 @@ class Store:
         added = updated = unchanged = 0
         ids, added_ids = [], []
         t = now()
-        with self.tx() as db:
+        if _connection is not None and (_connection is not self.db or not self.db.in_transaction):
+            raise StoreError("internal document transaction is not active")
+        with (self.tx() if _connection is None else nullcontext(_connection)) as db:
             identifiers = list(dict.fromkeys(str(d.get("id") or d.get("ext_id") or "") for d in docs))
             identifiers = [ext for ext in identifiers if ext]
             existing = {}
@@ -366,7 +380,7 @@ class Store:
                                    (cur.lastrowid, title_tok, textproc.index_text(section + " " + text)))
             if added or updated:
                 db.execute("UPDATE collections SET updated=? WHERE id=?", (t, c["id"]))
-        if added or updated:
+        if (added or updated) and _connection is None:
             self.vector_version += 1
             if self.on_change:
                 self.on_change()

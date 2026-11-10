@@ -1052,3 +1052,32 @@ def analysis_save(req):
 @route("GET", "/api/v1/documents/{did}/analyses", "read")
 def analysis_list(req):
     return req.app.store.list_analyses(int(req.params["did"]))
+
+
+@route('POST', '/api/v1/pdf-imports', 'pdf_import')
+def pdf_import(req):
+    import base64
+    from . import pdf_store
+    body = req.json(limit=88 * 1024 * 1024)
+    encoded = body.get('pdf_base64')
+    if not isinstance(encoded, str) or len(encoded) > ((pdf_store.MAX_PDF + 2) // 3) * 4:
+        raise _err(400, 'PDFのサイズまたは形式が不正です')
+    try:
+        content = base64.b64decode(encoded, validate=True)
+    except ValueError:
+        raise _err(400, 'PDFのエンコードが不正です') from None
+    return pdf_store.import_pdf(req.app.store, content, body.get('extraction'), body.get('title'), req.actor)
+
+
+@route('GET', '/api/v1/documents/{did}/pdf-extraction', 'read')
+def pdf_extraction(req):
+    from . import pdf_store
+    return pdf_store.extraction_for(req.app.store, int(req.params['did']))
+
+
+@route('GET', '/api/v1/documents/{did}/original.pdf', 'read')
+def pdf_original(req):
+    from . import pdf_store
+    return req.h.send_bytes(200, pdf_store.original_for(req.app.store, int(req.params['did'])),
+                            'application/pdf', {'Content-Disposition': 'attachment; filename="original.pdf"',
+                                                'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff'})

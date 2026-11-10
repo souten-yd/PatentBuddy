@@ -492,7 +492,7 @@ class Handler(BaseHTTPRequestHandler):
                     raise HTTPError(401, "認証が必要です")
                 if access == "admin" and req.actor != "admin":
                     raise HTTPError(403, "管理者のみ実行できます")
-                if req.device and method != "GET" and req.device["scopes"] != "rw" and access not in ("read", "published") and not (access == "analysis" and req.device["scopes"] == "analysis"):
+                if req.device and method != "GET" and req.device["scopes"] != "rw" and access not in ("read", "published") and not (access in ("analysis", "pdf_import") and req.device["scopes"] == access):
                     raise HTTPError(403, "読み取り専用デバイスです")
             if req.session and access != "public" and method not in ("GET", "HEAD"):
                 origin = self.headers.get("Origin")
@@ -610,6 +610,7 @@ def main(argv=None):
         try:
             local_auth.append(LocalAuthServer(app.auth, httpd.server_port))
             local_auth.append(LocalAuthServer(app.auth, httpd.server_port, "analysis"))
+            local_auth.append(LocalAuthServer(app.auth, httpd.server_port, "pdf_import"))
         except OSError:
             LOG.warning("Local automatic authentication unavailable; explicit device authentication remains available")
 

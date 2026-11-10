@@ -104,12 +104,12 @@ class AddonClient:
 
     def data(self, method, path, body=None):
         config = self.settings()
-        if config.get('auth_method') == 'local_peer' and method == 'POST' and path.endswith('/analyses'):
+        if config.get('auth_method') == 'local_peer' and method == 'POST' and (path.endswith('/analyses') or path == '/api/v1/pdf-imports'):
             from .local_auth import connect
             try:
-                config = connect(17871, 'analysis')
+                config = connect(17871, 'pdf_import' if path == '/api/v1/pdf-imports' else 'analysis')
             except (OSError, ValueError):
-                raise AddonError(503, 'ResearchDataHubの分析結果保存用認証を利用できません') from None
+                raise AddonError(503, 'ResearchDataHubの保存用認証を利用できません') from None
         token = config.get('server_token')
         if not isinstance(token, str) or not token or '\n' in token or '\r' in token:
             raise AddonError(503, 'ResearchDataHubの接続トークンを設定してください')

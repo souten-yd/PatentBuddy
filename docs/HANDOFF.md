@@ -154,3 +154,17 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - 次: コア最終tests・コードreview後push。Host Files grant・Jobs/CPU lease・狭いimport認証・原本blob/ページ根拠の正本保存/復元・UIを実装する。PDF原本/抽出資料をAddon永続文献DBへ保存しない。PR21はDraftでリリース未実施。PR-F/P2/PR-Gも未完。
 
 - PDFコア最終全verify126 tests成功（/tmp/pb-pdf-extract-verify-final.log）。低信頼単語の行/段落を最大1000件残し、超過時は省略flagを明示。実際のOCR取り込み画面・Host Job/Broker・原本保存は引き続き未実装。次回は `/data1tb/PatentBuddy-pdf` のPR21から続ける。
+
+## PR21 PDFの正本保存・Host接続（作業中）
+
+- `pdf_store.py` / API POST `/api/v1/pdf-imports` を追加。原本はSHA256キーのSQLite BLOBとして1個だけ保存、抽出版ごとにimmutable文献とページ根拠を作る。取り込み専用scopeはfixed `pdf-imports` コレクションへの新規作成のみ、任意文献更新/削除/設定/分析保存不可。原本readは認証必須、published tokenでは不可。
+- 原本/抽出/本文/FTS/監査は同じtransaction。既存add_documentsに内部connection引数を追加して正本transaction内で再利用（外部APIから指定不可、通知はcommit後）。全抽出版を削除したときだけ原本BLOBを削除する。snapshotに原本も含まれるので、別ディレクトリコピーによる復元漏れはない。
+- 独立RAM `pdf_import` tokenとUnix socketを追加。ro/analysis tokenは既存のまま。別UID/非loopback/再起動/無効化時に受け付けない。NASの手動接続は現時点rw tokenが必要で、狭い永続import tokenと接続設定UIはまだ未対応。
+- `addon_pdf_host.py`: 正規grant UUID/期限/サイズ/PDF名確認、Host原本stream取得、2GiBのHost RAM/CPU lease取得・activate/renew/release、GPUへの代替を拒否、取消時にsocket停止。Host実RuntimeResourceRequestで要求schema検証成功。HostSessionのrequired能力をclass属性にし、PDF処理にAI能力を不要とする。
+- 関連9 tests成功3.486秒、全133 tests成功35.100秒（/tmp/pb-pdf-storage-verify.log）。atomic失敗rollback、二重取込DB変更0、抽出版2つに原本1個、最終参照削除、原本/抽出/監査のsnapshot復元、scope境界、独立Unix token失効を確認。
+- 指定122330-byte PDFのtemp正本保存測定: 初回0.0095秒/process write622592 bytes/DB changes214、WAL総量1009432 bytes（増分とは異なる）。同一再投入0.0004秒/DB changes0/process write0。snapshot733184 bytes、復元含む0.0082秒、原本SHA一致/quick_check=ok、maxRSS23380 KiB。/tmp/pb-pdf-store-measure.json。これは1資料のPC上観測であり大量/NAS/50MiB上限の性能保証ではない。原本BLOBと版根拠の追加writeがバックアップ一貫性に必要。
+- 実Host Jobs/CPU lease/files grantで指定PDFを取得する試験を実行。初回は高速nativeページのprogressがHostの2Hz制約に当たりHTTP429。途中成功扱いせず、lease解放/一時addon・user・session除去。失敗証拠 /tmp/pb-pdf-host-live-attempt1.*。progressを1Hzにまとめ、最終page通知は取消可能な待ちで間隔維持、回帰4 tests成功。
+- 再試験 `/tmp/pb-pdf-host-live.py` は実Hostで原本取得→15ページOCR併用→temp ResearchDataHub保存→CPUlease解放→Host完了照合まで成功。続けて同文献を実Host local-only LLMで要約中。結果は `/tmp/pb-pdf-host-live.jsonl`、session66815。実原本を使うが本番DBへはまだ未登録。
+- 次: LLM試験/一時grant metadata cleanup/最終verify結果を確認してpush。PDFJob managerの中断・再起動・Host終端再送・一時原本掃除、UIのFiles pickerとページ根拠/原本/図閲覧、署名配布/実更新/実画面受入が未完。既存AnalysisJobsと並行できるよう上限とowner境界を保持。PR-F/P2/PR-Gも継続。
+
+- 再試験完了: 指定PDFの取込後に実Host local-only LLMの要約生成/正本保存/Host終端同期成功64.59秒/3962文字。これは内容品質の人間承認ではない。temp addon/user/session削除、監査/Host履歴保持、一時grant metadata 2件も除去。最終134 tests成功37.560秒（/tmp/pb-pdf-storage-verify-final.log）。lease解放応答のID/状態/Job照合も追加し回帰検証済み。

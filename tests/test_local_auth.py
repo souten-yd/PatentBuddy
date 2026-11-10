@@ -78,6 +78,26 @@ class LocalAuthTests(unittest.TestCase):
             with self.assertRaises(OSError): check_private(Path(tmp), directory=True)
 
 
+    def test_pdf_socket_is_independent_and_revoked_on_restart(self):
+        hub = LiveServer()
+        try:
+            Client(hub.base).login_setup()
+            with tempfile.TemporaryDirectory() as tmp:
+                with mock.patch('qnaplibrary.local_auth.socket_path', side_effect=lambda port, scope='read': Path(tmp) / (scope + '.sock')):
+                    endpoint = LocalAuthServer(hub.app.auth, hub.httpd.server_port, 'pdf_import')
+                    try:
+                        token = connect(hub.httpd.server_port, 'pdf_import')['server_token']
+                        self.assertEqual(hub.app.auth.device_for_token(token, '127.0.0.1')['scopes'], 'pdf_import')
+                        self.assertNotEqual(token, hub.app.auth.local_token('analysis'))
+                        self.assertNotEqual(token, hub.app.auth.local_token('read'))
+                        from qnaplibrary.auth import Auth
+                        self.assertIsNone(Auth(hub.app.config, hub.app.store).device_for_token(token, '127.0.0.1'))
+                        hub.app.config.update({'auth': {'local_auto_connect': False}})
+                        self.assertIsNone(hub.app.auth.device_for_token(token, '127.0.0.1'))
+                        with self.assertRaises(OSError): connect(hub.httpd.server_port, 'pdf_import')
+                    finally: endpoint.close()
+        finally: hub.close()
+
     def test_analysis_socket_has_independent_scoped_credential(self):
         hub = LiveServer()
         try:
