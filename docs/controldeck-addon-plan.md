@@ -72,3 +72,9 @@ PR #10（クレーム）、#11（認証）、#13（大量投入）は別PR。PR 
 接続設定はFeature data内の `connection.json`（0600）に `server_url` と `server_token`。同一PCのHTTP loopbackまたは別端末のHTTPSだけを受理し、環境proxyとredirectを無効化する。接続tokenはResearchDataHubから発行された読み取り専用を推奨し、GET/API/logへ返さない。
 
 配布は `python3 scripts/build_cd_feature.py --out dist` と、既存publisher鍵を指定した `scripts/sign_cd_feature.py` を使う。新しい鍵は生成しない。`.tar.gz`、`.tar.gz.manifest.json`、`.tar.gz.manifest.json.sig`を同じversionのReleaseへ添付する。Host trusted catalogの公開鍵・feature_id・asset名・versionの一致と署名を検証してから導入する。Linux/QPKGの既存資産名・内部IDは維持する。
+
+## A3実装候補とPDF/OCR追加要求（2026-11-10）
+
+PR #19 / v0.5.8候補でHost local-only AI、Jobs、キャンセル/再実行、原文版付きの結果保存を追加。Host PR #349で推論先を検証し、機密入力の前に契約対応を確認する。別正本文献DBは作らない。実Host Jobs/LLMの合成請求項テストが成功し、ブラウザ幅1280/390/320pxは合成Host+実Addon/ResearchDataHubで成功。配布後の実Host画面受入はこれから。
+
+ユーザーがPDF/OCR対応を追加要求。後続のPDF取り込み単位で、Host Filesの限定grant→PC上のpdftotext→必要ページのみpdftoppm/Tesseract jpn+eng→ページ/抽出法/原本hash/根拠位置付きでResearchDataHubへ保存する。OCRは精度保証せず原本との照合を可能にする。Poppler/Tesseractは現在のPCに既存、日本語/英語データ利用可。QNAPへOCR負荷を移さず、任意ファイルパス/コマンドAPIを追加しない。CPU/RAMのHost Broker制約・ページ数/画像サイズ/時間上限・キャンセルを適用する。文字入りPDFを無条件OCRせず、直接抽出を優先。現在のclient PDF抽出はOCRなしであるため既存機能と混同しない。

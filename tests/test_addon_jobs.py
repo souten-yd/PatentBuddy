@@ -78,6 +78,10 @@ class AnalysisJobsTests(unittest.TestCase):
         self.assertEqual(self.jobs.path.stat().st_mode & 0o777, 0o600)
         self.assertFalse((Path(self.temp.name) / 'library.sqlite3').exists())
         self.assertEqual(self.jobs.list({'subject': '2'})['items'], [])
+        with self.assertRaises(AddonError): self.jobs.forget(result['id'], {'subject': '2'})
+        self.assertTrue(self.jobs.forget(result['id'], self.identity)['removed'])
+        self.assertEqual(self.jobs.list(self.identity)['items'], [])
+        self.assertEqual(len(self.hub.app.store.list_analyses(self.did)['items']), 1)
 
     def test_cancel_aborts_inference_does_not_save_and_keeps_owner_boundary(self):
         FakeHost.gate = threading.Event()

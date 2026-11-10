@@ -431,6 +431,8 @@ class Handler(BaseHTTPRequestHandler):
                             result["addon"]["version"] = VERSION
                         elif method == "GET" and path == "/addon/v1/jobs":
                             result = self.server.app.jobs.list(identity)
+                        elif method == "DELETE" and re.fullmatch(r"/addon/v1/jobs/[a-f0-9]{32}", path):
+                            result = self.server.app.jobs.forget(path.rsplit('/', 1)[1], identity)
                         elif method == "POST" and path == "/addon/v1/jobs":
                             body = Request(self, method, path, {}, {}).json()
                             if not isinstance(body, dict):

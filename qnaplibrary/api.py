@@ -1046,7 +1046,7 @@ def mcp_endpoint(req):
 
 @route("POST", "/api/v1/documents/{did}/analyses", "analysis")
 def analysis_save(req):
-    return req.app.store.save_analysis(int(req.params["did"]), req.json())
+    return req.app.store.save_analysis(int(req.params["did"]), req.json(), actor=req.actor)
 
 
 @route("GET", "/api/v1/documents/{did}/analyses", "read")

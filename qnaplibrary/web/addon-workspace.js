@@ -5,8 +5,8 @@ let polling = false;
 const knownJobs = new Map();
 const root = location.pathname.startsWith('/addon-frame/') ? '/' + location.pathname.split('/').filter(Boolean).slice(0, 2).join('/') : '';
 const el = id => document.getElementById(id);
-async function api(path, body) {
-  const response = await fetch(root + '/addon/v1/' + path, {method: body ? 'POST' : 'GET', credentials: 'include',
+async function api(path, body, method) {
+  const response = await fetch(root + '/addon/v1/' + path, {method: method || (body ? 'POST' : 'GET'), credentials: 'include',
     headers: {'Content-Type': 'application/json', 'X-Control-Deck-Bridge-Session': nonce}, body: body ? JSON.stringify(body) : undefined});
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || '接続を確認してください');
@@ -121,6 +121,17 @@ async function loadJobs() {
           finally { await loadJobs(); }
         };
         row.append(sync);
+      }
+      if (!['queued', 'running'].includes(job.status) && !job.host_sync_pending) {
+        const menu = document.createElement('details');
+        const heading = document.createElement('summary'); heading.textContent = 'その他';
+        const forget = document.createElement('button'); forget.textContent = '処理履歴から除外（分析結果は保持）';
+        forget.onclick = async () => {
+          try { await api('jobs/' + job.id, undefined, 'DELETE'); }
+          catch (error) { el('message').textContent = error.message; }
+          finally { await loadJobs(); }
+        };
+        menu.append(heading, forget); row.append(menu);
       }
       el('jobs').append(row);
       if (job.status === 'succeeded' && knownJobs.get(job.id) !== 'succeeded' && currentDoc === job.doc_id) await loadAnalyses(currentDoc);

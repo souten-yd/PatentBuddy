@@ -6,7 +6,7 @@
 
 - Repo: `souten-yd/PatentBuddy`。最新公開 **v0.5.7**、main `11c500b`。
 - 作業ブランチ **feat/patentbuddy-host-ai-jobs**。PR #13 / PR-Dはマージ・公開・更新済み。PR-C #15はマージ・v0.5.4公開・自動更新確認済み。
-- ユーザー目標は計画全体の完了。**PR-D〜G、QNAP実機は未完了**。勝手にPR-Cだけを全体完了としない。
+- ユーザー目標は計画全体の完了。**PR-E残作業・PR-F/G、QNAP実機は未完了**。勝手にPR-Cだけを全体完了としない。
 - 内部package `qnaplibrary`、QPKG ID `QnapLibrary`、port17871、Cookie/パスキーRP ID、Release資産名を維持する。ResearchDataHubは唯一の正本、PatentBuddyはPC上のControlDeck Add-on。SQLiteをSMB/NFSで共有・同時二重書込みしない。
 - 未公開情報は検証済みローカルLLMのみ。既存privacy gateを弱めない。NAS↔PCの認証/TLS通信とクラウドLLM送信は区別する。
 
@@ -120,3 +120,10 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - Chrome合成Host API/AI+実Addon/ResearchDataHubで1280/390/320pxの要約/請求項操作、320pxキャンセル/再実行成功。横溢れ/JSエラー0、`.data/addon-ai-ui.json`。これは実Hostブラウザ受入ではない。
 - キャンセルをfailed表示する回帰を修正しjobs5 tests成功。実socketでblocked SSEをabortしてpartial回答を採用しないことも確認。最終全verifyはこれから。
 - 実ControlDeck Host Jobs/AIと候補Addon clientを使う合成案件テスト `/tmp/pb-analysis-live.py` を実行中（session94450）。候補データはtempだけ。稼働サービスのPatentBuddy/ResearchDataHubはまだv0.5.7、PR19変更は未公開/未導入。
+
+- v0.5.8候補。実Host Jobs/AI→候補Addon→temp ResearchDataHubで請求項分析成功22.59秒/1585文字、Host終端同期成功。キャンセル時の未保存も確認。一時アドオン/user/session削除、監査/job履歴は保持（owner FKのみ解除）。/tmp/pb-analysis-live.jsonl。
+- 最終verifyの前段119 tests成功30.433秒。snapshot復元と分析専用Unix認証の検証を追加し121 testsを実行したところ、HANDOFFに候補版番号を書き忘れた文書規則で1件失敗。実装テストは成功。候補版を追記し再検証する。
+- 追加ディスク書込み: 正本のdocument_analyses表/索引と作成時監査、Addon側の最大32件のジョブ状態checkpoint（0600）が再実行/冪等保存/原文版照合に必要。本文/回答はAddonへ永続化しない。GET一覧と既存無変更投入は追加writeなし。
+
+- v0.5.8最終121 tests成功33.258秒、Linux/QPKG build/payload成功。保存snapshot復元/監査保持、独立analysis Unix tokenとro境界を確認。公開/実更新/実Host画面はこれから。
+- 追加ユーザー要求: PDF読み取りと必要時OCR。PC上にpdftotext/pdftoppm/tesseract、jpn/eng/osdが既存。画面からのPDF取込/OCRは未実装。指定PDFの表紙OCRは過去の個別処理でありアプリ統合と区別。PR19 AI/Jobsを完了後、Host Files/Brokerとページ単位抽出・原本hash/ページ/方法の根拠保存を実装する。

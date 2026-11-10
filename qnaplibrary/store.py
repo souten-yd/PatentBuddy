@@ -401,7 +401,7 @@ class Store:
     def document_revision(row):
         return hashlib.sha256(json.dumps([row["hash"], row["source"]], ensure_ascii=False).encode()).hexdigest()
 
-    def save_analysis(self, doc_id, value):
+    def save_analysis(self, doc_id, value, actor="system"):
         import re
         if not isinstance(value, dict):
             raise StoreError("analysis must be an object")
@@ -425,6 +425,7 @@ class Store:
             else:
                 db.execute("INSERT INTO document_analyses VALUES(?,?,?,?,?,?)",
                            (identifier, doc_id, revision, kind, content, now()))
+                self.audit(actor, "analysis.add", "%s %s %s" % (doc_id, kind, identifier))
         return {"id": identifier, "doc_id": doc_id, "review_status": "unreviewed"}
 
     def list_analyses(self, doc_id):

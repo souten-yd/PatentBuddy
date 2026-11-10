@@ -113,6 +113,17 @@ class AnalysisJobs:
                 session.finish('canceled')
             return self._public(value)
 
+    def forget(self, identifier, identity):
+        with self.lock:
+            job = self.jobs.get(identifier)
+            if not job or job['owner'] != owner_key(identity):
+                raise AddonError(404, 'ジョブがありません')
+            if identifier in self.sessions or job['status'] in ('queued', 'running') or job.get('host_sync_pending'):
+                raise AddonError(409, '終了しHostと同期したジョブだけ履歴から除外できます')
+            del self.jobs[identifier]
+            self._save()
+            return {'removed': True}
+
     def reconcile(self, headers, identifier):
         session = HostSession(self.client, headers)
         with self.lock:

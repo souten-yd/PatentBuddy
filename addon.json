@@ -2,7 +2,7 @@
   "api_version": "2",
   "id": "patent-buddy",
   "name": "PatentBuddy",
-  "version": "0.5.7",
+  "version": "0.5.8",
   "description": "ResearchDataHubへ接続する特許調査・分析アドオン",
   "publisher": "souten-yd",
   "requires": {

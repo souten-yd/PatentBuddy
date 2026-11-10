@@ -1,4 +1,9 @@
 import unittest
+import tempfile
+import shutil
+from pathlib import Path
+from qnaplibrary.store import Store
+from qnaplibrary.backup import Backups
 from tests.helpers import Client, LiveServer
 
 
@@ -36,3 +41,23 @@ class AnalysisTests(unittest.TestCase):
             server.app.store.delete_document(doc_id)
             self.assertEqual(server.app.store.one('SELECT count(*) FROM document_analyses')[0], 0)
         finally: server.close()
+
+
+    def test_analysis_survives_snapshot_restore(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'original.sqlite3'; store = Store(path)
+            try:
+                store.create_collection('synthetic')
+                doc_id = store.add_documents('synthetic', [{'id': 'a', 'body': '合成資料'}])['ids'][0]
+                revision = store.get_document(doc_id)['revision']
+                store.save_analysis(doc_id, {'id': 'job-restore', 'kind': 'claims', 'content': '合成の請求項分析', 'source_revision': revision})
+                snapshot = Backups(store).create()
+                restored_path = Path(tmp) / 'restored.sqlite3'
+                shutil.copy2(Path(tmp) / snapshot['path'], restored_path)
+                restored = Store(restored_path)
+                try:
+                    self.assertEqual(restored.one('PRAGMA quick_check')[0], 'ok')
+                    self.assertEqual(restored.list_analyses(doc_id), store.list_analyses(doc_id))
+                    self.assertEqual(restored.one("SELECT count(*) FROM audit WHERE action='analysis.add'")[0], 1)
+                finally: restored.close()
+            finally: store.close()
