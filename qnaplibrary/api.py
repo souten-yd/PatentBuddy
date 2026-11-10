@@ -1172,3 +1172,21 @@ def chart_review(req):
     if not isinstance(body, dict):
         raise _err(400, '確認内容を指定してください')
     return review(req.app.store, req.params['aid'], body.get('status'), req.actor)
+
+
+@route('GET', '/api/v1/host-vectors/pending', 'read')
+def host_vectors_pending(req):
+    from .host_vectors import pending
+    return pending(req.app.store, req.arg('model_ref'), int(req.arg('after', '0')), int(req.arg('limit', '32')))
+
+
+@route('POST', '/api/v1/host-vectors', 'embedding')
+def host_vectors_save(req):
+    from .host_vectors import save
+    return save(req.app.store, req.json(limit=4 * 1024 * 1024), req.actor)
+
+
+@route('DELETE', '/api/v1/host-vectors/{model_ref}', 'admin')
+def host_vectors_remove(req):
+    from .host_vectors import remove
+    return remove(req.app.store, req.params['model_ref'], req.actor)

@@ -115,3 +115,23 @@ class LocalAuthTests(unittest.TestCase):
                         self.assertIsNone(hub.app.auth.device_for_token(analysis, '192.168.1.2'))
                     finally: writer.close(); reader.close()
         finally: hub.close()
+
+    def test_embedding_socket_is_independent_and_revoked_on_restart(self):
+        hub = LiveServer()
+        try:
+            Client(hub.base).login_setup()
+            with tempfile.TemporaryDirectory() as tmp:
+                with mock.patch('qnaplibrary.local_auth.socket_path', side_effect=lambda port, scope='read': Path(tmp) / (scope + '.sock')):
+                    endpoint = LocalAuthServer(hub.app.auth, hub.httpd.server_port, 'embedding')
+                    try:
+                        token = connect(hub.httpd.server_port, 'embedding')['server_token']
+                        self.assertEqual(hub.app.auth.device_for_token(token, '127.0.0.1')['scopes'], 'embedding')
+                        self.assertNotEqual(token, hub.app.auth.local_token('analysis'))
+                        self.assertNotEqual(token, hub.app.auth.local_token('read'))
+                        from qnaplibrary.auth import Auth
+                        self.assertIsNone(Auth(hub.app.config, hub.app.store).device_for_token(token, '127.0.0.1'))
+                        hub.app.config.update({'auth': {'local_auto_connect': False}})
+                        self.assertIsNone(hub.app.auth.device_for_token(token, '127.0.0.1'))
+                        with self.assertRaises(OSError): connect(hub.httpd.server_port, 'embedding')
+                    finally: endpoint.close()
+        finally: hub.close()

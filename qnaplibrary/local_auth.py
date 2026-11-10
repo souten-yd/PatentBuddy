@@ -13,7 +13,7 @@ def peer_uid(sock):
 
 
 def socket_path(port, scope="read"):
-    if scope not in ("read", "analysis", "pdf_import"):
+    if scope not in ("read", "analysis", "pdf_import", "embedding"):
         raise OSError("unsupported local scope")
     if not hasattr(socket, 'SO_PEERCRED') or os.getuid() == 0:
         raise OSError('local authentication requires an unprivileged Linux user')

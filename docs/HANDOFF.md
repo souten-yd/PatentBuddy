@@ -237,3 +237,13 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - 実登録モデルはQwen3.8-27B LLMのみと確認。既存role-presets APIからBGE-M3（job04d5b26334e3）/Qwen3-Reranker-4B（job6a49ba113107）を通常導入中。前者は直近API succeeded、後者running。helperPID480692、exec26005、logs /tmp/pb-retrieval-model-install2.log/.err。初回helperがjob_id応答をidと誤読したが、作成済みjobをDBで特定して再投入せず監視を引継いだ。
 - 導入済みrootは /data1tb/LLM、二つのpreset directory。既存モデルは変更しない。ダウンロード中のHost再起動を避ける。helper終了時は一時ユーザー/sessionを除去（進行中ならinactiveとして保持）し監査/jobsは保持する設計。成功/cleanupは次turnで実確認が必要。
 - 次: 残りpreset導入の実handleを再確認→Host PR351最終review/mergeと既存dirty passkey変更を保持した限定反映→実retrieval APIと取消/モデル指紋確認→正本vector索引のscoped保存/版・モデル空間・再構築→keyword/vector/graph/rerank→人手review UI。文章生成のモデル版記録、性能/配布、P2/PR-Gも引き続き未完。本番PatentBuddy/RDHは0.5.10のまま、goal active。
+
+## Host検索AIの実反映・ベクトル保存（2026-11-11・最新）
+
+- 前turnはprogress（PB d017a12 / Host PR351 6e49086 push）。今回job/helper実PIDを確認して待機を継続し、BGE/Reranker両preset導入succeeded、一時user除去まで確認（/tmp/pb-retrieval-model-install2.log）。同じdownloadを再実行していない。
+- Host PR351をmain8296974へmerge。live routerがpre-change5e1dde7とbyte一致、新retrieval_ai.pyが存在しないこと、active queued/running Jobsゼロを確認して当該2ファイルだけ反映。既存dirty passkey等の全ファイルhashを保持し、正規./deck.shで正常再起動（PID486674、/api/v1/health200）。restart後も既存変更hash不変。/api/healthを最初に誤指定して404だったが正規pathで確認済み。
+- 実Host scoped API→HostSession.retrievalでBGEの2文/1024次元、Rerankerの2文/関連文上位が成功。execution_policy=local_only/model_ref確認。cold観測10.30秒/11.33秒、性能保証ではない。/tmp/pb-host-retrieval-live.log。一時addon/user/session除去、audit/Host Jobs履歴保持。
+- 正本serverにhost_vector_spaces/host_vectorsを追加（旧vectorsを上書きしない）。最大8モデル空間/バッチ32/8192次元。chunk text SHAとdocument revisionを送信前後で検証して原子的保存、異なる結果上書き拒否、無変更再送write0。本文/source変更triggerとchunk FKで除去。専用embeddingと新research_analysis scope、独立同一UID qle_ credential/socketを追加。旧pdf_analysisには権限追加なし。
+- pending readは最大32/cursor、space削除adminのみ。一般CRUD/admin/publicとのscope分離、無効数/float32 overflow/重複id・モデル分離・改変/削除・batchrollback・Unixsocket再起動失効を検証。関連8 tests成功3.463秒（その後embedding socket test追加）、全160 tests成功48.414秒（/tmp/pb-host-vector-verify.log）。diff末尾空行のみ全test後に修正。
+- 実Hostの埋め込み2件を一時RDHへembedding tokenで保存し、再送unchanged2/DB変更0を確認。warm観測0.11秒（保存往復含む）/rerank1.79秒、synthetic2件のみ。/tmp/pb-host-vector-storage-live.log。実client→Host→model→canonical serverの結合成功。一時RDH/addon/user/sessionを除去、本番文献DB不変。
+- 次はこの正本vectorのbounded検索/索引・再構築Host Jobsを実装し、keyword→vector→graph→rerankと画面へ接続。現在chart生成はkeyword/graphのみで、vector/rerank未実装表示を残している。推論モデル版保存/人手review UI/graph管理/性能I/O/配布も未完。PR23 Draft、本番PatentBuddy/RDHは0.5.10のまま。Host docsの実機前記録はPR351時点の履歴で、最新live結果は本節。P2/PR-Gを含めgoal active。

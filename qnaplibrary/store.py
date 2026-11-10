@@ -149,6 +149,8 @@ class Store:
         self.db.executescript(GRAPH_SCHEMA)
         from .chart_storage import SCHEMA as CHART_SCHEMA
         self.db.executescript(CHART_SCHEMA)
+        from .host_vectors import SCHEMA as HOST_VECTOR_SCHEMA
+        self.db.executescript(HOST_VECTOR_SCHEMA)
         self.fts = self._init_fts()
         self.vector_version = 0  # bumped on vector change; vector cache invalidation
         self.on_change = None    # callback after documents were added/updated (auto-embedding)

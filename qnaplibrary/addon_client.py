@@ -105,10 +105,10 @@ class AddonClient:
 
     def data(self, method, path, body=None):
         config = self.settings()
-        if config.get('auth_method') == 'local_peer' and method == 'POST' and (path.endswith('/analyses') or path == '/api/v1/pdf-imports'):
+        if config.get('auth_method') == 'local_peer' and method == 'POST' and (path.endswith('/analyses') or path in ('/api/v1/pdf-imports', '/api/v1/host-vectors')):
             from .local_auth import connect
             try:
-                config = connect(17871, 'pdf_import' if path == '/api/v1/pdf-imports' else 'analysis')
+                config = connect(17871, 'embedding' if path == '/api/v1/host-vectors' else 'pdf_import' if path == '/api/v1/pdf-imports' else 'analysis')
             except (OSError, ValueError):
                 raise AddonError(503, 'ResearchDataHubの保存用認証を利用できません') from None
         token = config.get('server_token')

@@ -660,7 +660,7 @@ async function settingsView(main) {
         h("button", { class: "btn", onclick: guard(async () => { await api("POST", "/api/auth/logout", {}); S.me = null; render(); }) }, "ログアウト")));
   } else if (tab === "devices") {
     const d = await api("GET", "/api/devices");
-    const pc = h("input", { type: "password", placeholder: "8文字以上" }), dn = h("input", { placeholder: "デバイス名" }), out = h("div", {}), scope = sel([["published", "外部AI用・公開資料のみ"], ["ro", "全データの読み取り"], ["pdf_analysis", "PDF取り込み・分析結果保存"], ["pdf_import", "PDF取り込みのみ"], ["analysis", "分析結果保存のみ"], ["rw", "全データの読み書き"]], "published");
+    const pc = h("input", { type: "password", placeholder: "8文字以上" }), dn = h("input", { placeholder: "デバイス名" }), out = h("div", {}), scope = sel([["published", "外部AI用・公開資料のみ"], ["ro", "全データの読み取り"], ["research_analysis", "PDF・分析・ベクトル保存"], ["embedding", "ベクトル保存のみ"], ["pdf_analysis", "PDF取り込み・分析結果保存"], ["pdf_import", "PDF取り込みのみ"], ["analysis", "分析結果保存のみ"], ["rw", "全データの読み書き"]], "published");
     body.append(h("div", { class: "card" }, h("h2", {}, "LAN ペアリング用パスコード"), h("p", { class: "small muted" }, "別PC・AI アシスタント・ControlDeck が POST /api/v1/pair {\"passcode\":\"…\",\"name\":\"…\"} で長期トークンを取得します（LAN / Tailscale からのみ、取得後は無制限に利用可）。"),
       h("p", {}, "状態: ", h("span", { class: "tag " + (d.pairing_enabled ? "ok" : "warn") }, d.pairing_enabled ? "有効" : "未設定")),
       h("div", { class: "row" }, pc, h("button", { class: "btn primary", onclick: guard(async () => { await api("PUT", "/api/devices/pairing", { passcode: pc.value }); toast("設定しました"); render(); }) }, "設定"),

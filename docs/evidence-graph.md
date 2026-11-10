@@ -26,3 +26,11 @@ PR-F作業中。既存PR10の行別引用検証を参考にするが、その旧
 モデルの行欠落/重複/未知ラベル・他行の引用・肯定判定の根拠欠落を全体拒否。正本保存時も請求項原文/各根拠の版・文字範囲を再検証。analysis_dependenciesとanalysis_reviewsを同一transactionで保存し、根拠の改変・削除時は不可逆にstale/未確認へ戻す。レビューAPIは現在admin専用。画面からの承認と狭いHost認可は後続実装。
 
 合成請求項と対比文献について実ControlDeckローカルLLMで生成/保存、1280/320pxで引用表示・横溢れ/JSエラーなしを確認。一時ユーザー/addon/DB/grantは除去済み。本番文献/接続は変更していない。スクリーンショットはページ上部のみでありチャート領域の目視受入は未完。自動DOM検証と区別する。
+
+## Host検索AIとベクトル正本（未配布）
+
+ControlDeck PR351のlocal-only埋め込み/再順位付けAPIを実Hostへ反映し、BGE-M3とQwen3-Reranker-4Bの既存プリセットで実推論を検証。モデルのopaque file-metadata revisionを座標空間の識別子として扱う（内容hashとは区別）。文献チャンクの本文hash/原文revisionを往復してから最大32件のfloat32ベクトルを正本SQLiteへ原子的に保存する。旧vectors表を上書きしない専用host_vectors/host_vector_spacesを使い、最大8モデル空間。古い空間の削除はadminの明示操作。
+
+原文変更時とチャンク削除時に派生ベクトルを除去。同一チャンク/モデルへ異なる結果を上書きせず明示再構築を要求し、同一結果の再送は書込みゼロ。途中で1件でも版/hash/次元/有限数の検証が失敗すれば空間作成も含め全体rollback。GET pendingは最大32件のcursor形式で全本文を一括転送しない。
+
+embedding scopeはベクトル保存だけ、research_analysisはPDF/分析/ベクトル保存の明示的な新scope。既存pdf_analysis等の権限は増やさない。同一UID自動認証は独立qle_ tokenと専用Unix socket、loopback限定、再起動で失効。検索用のベクトル走査/索引と、アドオンからの再構築Jobs・graph/rerankへの接続は次の実装。
