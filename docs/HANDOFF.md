@@ -63,3 +63,6 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 
 - 最終全verify93 tests成功（22.189秒）、Linux/QPKGビルド・payload検査成功。Hostのrelease-bundle20 tests成功。既存publisher鍵でv0.5.5 Featureを署名・自己検証し、Hostの実_load_packageとtrusted public keyで署名/能力/identity検証成功。新しい鍵は生成していない。Host登録PRは https://github.com/souten-yd/ControlDeck/pull/348 （Draft）。
 - ResearchDataHub初期管理者設定はユーザーにより完了したことをhealthで確認。パスワードを読んだり変更していない。アドオン接続の読み取りtokenは未設定、ユーザーにファイル保存/画面入力の希望を非同期確認中。
+
+- iframeのX-Frame-OptionsをアドオンモードのみSAMEORIGINへ変更し、standaloneサーバーはDENYを維持。Host proxyがXFOを引き継ぐ実コードを確認して修正。最終verify93 tests成功22.424秒、全配布物再build/署名済み。
+- Chrome 1280/390/320pxで、合成Host proxy+実Addon+実ResearchDataHub APIを通してbridge handshake→接続状態→検索→本文表示を確認。横溢れ/JSエラー0、`.data/addon-ui.json`/screenshots。これは稼働ControlDeckの実ブラウザ受入ではなく、その受入は導入後に行う。

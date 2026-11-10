@@ -289,10 +289,12 @@ class Handler(BaseHTTPRequestHandler):
     def _security_headers(self):
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
-        self.send_header("X-Frame-Options", "DENY")
+        addon = self.server.app.addon_mode
+        self.send_header("X-Frame-Options", "SAMEORIGIN" if addon else "DENY")
+        ancestors = "'self'" if addon else "'none'"
         self.send_header("Content-Security-Policy",
                          "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; "
-                         "connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+                         "connect-src 'self'; frame-ancestors " + ancestors + "; base-uri 'none'; form-action 'self'")
         # No HSTS on purpose: plain http on the LAN must keep working for the same host name.
 
     def send_json(self, status, data, headers=None):
