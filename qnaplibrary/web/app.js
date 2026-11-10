@@ -331,7 +331,8 @@ async function dataView(main) {
   const file = h("input", { type: "file", accept: ".ndjson,.json,.jsonl,.csv,.txt,.md" });
   file.addEventListener("change", async () => { const f = file.files[0]; if (!f) return; if (f.size > 90e6) return toast("90MB 以下のファイルにしてください"); data.value = await f.text();
     if (/\.csv$/i.test(f.name)) fmt.value = "csv"; else if (/\.json$/i.test(f.name)) fmt.value = "json"; else if (/\.(txt|md)$/i.test(f.name)) fmt.value = "text"; else fmt.value = "ndjson"; });
-  card.append(h("details", {}, h("summary", {}, "取り込み（貼り付け / ファイル）"), h("div", { class: "row" }, fmt, file), data,
+  card.append(h("details", {}, h("summary", {}, "取り込み（貼り付け / ファイル）"), h("div", { class: "row" }, fmt, file,
+      c.kind === "standard" ? h("a", { class: "btn", href: "/api/v1/templates/standards.csv" }, "規格CSVテンプレート") : null), data,
     h("div", { class: "row end" }, h("button", { class: "btn primary", onclick: guard(async () => { const r = await api("POST", "/api/v1/collections/" + c.id + "/import", { format: fmt.value, data: data.value }); toast("追加 " + r.added + " / 更新 " + r.updated + " / 変更なし " + r.unchanged); data.value = ""; render(); }) }, "取り込む"))));
   const q = h("input", { placeholder: "タイトル/ID で絞り込み", value: S.docQ || "" });
   const list = await api("GET", "/api/v1/collections/" + c.id + "/documents?limit=50&offset=" + (S.docOffset || 0) + "&q=" + encodeURIComponent(S.docQ || ""));
@@ -420,6 +421,7 @@ async function chatView(main) {
 async function collectView(main) {
   await loadCollections();
   const cs = (await api("GET", "/api/v1/connectors")).connectors;
+  await researchCard(main);
   main.append(h("h1", {}, "収集（外部データ源）"),
     h("p", { class: "muted small" }, "公式 API・フィードのみ利用します。キーが必要なものは 設定 > 外部キー で登録してください。別PCからは REST API / MCP で直接投入できます。"));
   cs.forEach(c => {
@@ -435,6 +437,23 @@ async function collectView(main) {
           out.textContent = r.collection + ": 取得 " + r.fetched + " / 追加 " + r.added + " / 更新 " + r.updated + "（" + r.ms + "ms）"; } finally { e.target.disabled = false; } }) }, "実行"))));
   });
   main.append(h("datalist", { id: "colls" }, S.collections.map(c => h("option", { value: c.name }))));
+}
+
+async function researchCard(main) {
+  const [jobs, providers] = await Promise.all([api("GET", "/api/v1/research"), api("GET", "/api/llm/providers")]);
+  const q = h("textarea", { placeholder: "調査したいこと（例: 全固体電池の硫化物系電解質について、主要出願人と最近の技術課題・規格動向を整理して）" });
+  const prov = sel(providers.providers.map(x => [x.id, x.label || x.id]), providers.default_provider), news = h("input", { type: "checkbox" }), picker = collectionPicker([]);
+  const out = h("div", {});
+  const show = guard(async (id) => { const j = await api("GET", "/api/v1/research/" + id); const r = j.result;
+    clear(out).append(h("div", { class: "card" }, h("div", { class: "row" }, h("strong", {}, j.params.question), h("span", { class: "tag " + (j.status === "done" ? "ok" : j.status === "failed" ? "bad" : "warn") }, r.step || j.status)),
+      r.sub_questions ? h("details", {}, h("summary", {}, "サブ質問 " + r.sub_questions.length), h("ul", {}, r.sub_questions.map(x => h("li", {}, x)))) : null,
+      r.error ? h("p", { class: "tag bad" }, r.error) : null, r.report ? md(r.report) : null,
+      r.sources ? h("div", { class: "small muted" }, "根拠: ", r.sources.map(x => h("a", { href: "#", onclick: e => { e.preventDefault(); openDoc(x.doc_id); } }, "[" + x.n + "] " + (x.ext_id || x.title) + " "))) : null));
+    if (j.status === "running") setTimeout(() => S.view === "collect" && show(id), 4000); });
+  main.append(h("h1", {}, "調査ジョブ"), h("div", { class: "card" }, h("p", { class: "small muted" }, "質問をサブ質問に分け、ライブラリ（と任意で世界ニュース）を検索して根拠付きレポートを作り、reports コレクションに保存します。1 件ずつ実行します。"),
+    q, h("div", { class: "row" }, prov, h("label", {}, news, " 世界ニュース（GDELT）も調べる"), h("span", { class: "spacer" }),
+      h("button", { class: "btn primary", onclick: guard(async () => { const j = await api("POST", "/api/v1/research", { question: q.value, provider: prov.value, use_news: news.checked, collections: picker.values() }); show(j.id); }) }, "調査開始")), picker,
+    jobs.jobs.length ? h("table", {}, jobs.jobs.slice(0, 10).map(j => h("tr", { class: "click", onclick: () => show(j.id) }, h("td", {}, j.question), h("td", {}, h("span", { class: "tag" }, j.status)), h("td", { class: "small muted" }, fmtDate(j.created))))) : null), out);
 }
 
 // ---------- settings ----------
@@ -478,6 +497,9 @@ async function settingsView(main) {
   } else if (tab === "keys") {
     const s = await api("GET", "/api/settings");
     const labels = { openrouter_api_key: "OpenRouter API キー", epo_ops_key: "EPO OPS Consumer Key", epo_ops_secret: "EPO OPS Consumer Secret", jpo_username: "JPO 特許情報取得API ID", jpo_password: "JPO 特許情報取得API パスワード", uspto_api_key: "USPTO ODP API キー", openai_api_key: "OpenAI 互換 API キー（任意）", smtp_password: "SMTP パスワード（通知メール）", qdrant_api_key: "Qdrant API キー（任意）", estat_app_id: "e-Stat アプリケーションID", edinet_api_key: "EDINET API キー" };
+    const ua = h("input", { class: "wide", value: (s.settings.connectors || {}).sec_user_agent || "", placeholder: "例: Taro Yamada taro@example.com" });
+    body.append(h("div", { class: "card" }, h("h2", {}, "SEC EDGAR の User-Agent（キーではありません）"), field("名前とメールアドレス", ua),
+      h("button", { class: "btn", onclick: guard(async () => { await api("PUT", "/api/settings", { connectors: { sec_user_agent: ua.value } }); toast("保存しました"); }) }, "保存")));
     body.append(h("div", { class: "card" }, h("p", { class: "small muted" }, "キーは secrets.json（権限 0600）に保存され、画面・API・デバッグ出力には表示されません。"),
       h("table", {}, Object.entries(labels).map(([k, l]) => { const inp = h("input", { type: "password", placeholder: s.secrets[k].configured ? "設定済み（" + s.secrets[k].fingerprint + "）" : "未設定" });
         return h("tr", {}, h("td", {}, l), h("td", {}, inp), h("td", {}, h("button", { class: "btn", onclick: guard(async () => { await api("PUT", "/api/secrets/" + k, { value: inp.value }); toast("保存しました"); render(); }) }, "保存"),

@@ -109,7 +109,7 @@ class Watches:
         status = ""
         new_hits = 0
         try:
-            docs = connectors.run(w["connector"], w["params"], self.app.config.secret)
+            docs = connectors.run(w["connector"], w["params"], self.app.config.secret, self.app.config.get("connectors", default={}))
             coll = self.store.ensure_collection(w["collection"] or "%s-%s" % (spec["kind"], w["connector"]), spec["kind"])
             res = self.store.add_documents(coll["id"], docs, actor="watch:%d" % w["id"])
             new_hits = self._score(w, coll, res["added_ids"])

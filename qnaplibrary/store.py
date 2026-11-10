@@ -316,7 +316,7 @@ class Store:
                     added += 1
                     added_ids.append(doc_id)
                 ids.append(doc_id)
-                title_tok = textproc.index_text(title)
+                title_tok = textproc.index_text((ext_id or "") + " " + title)
                 for ord_, (section, text) in enumerate(self._sections(doc, c["kind"])):
                     cur = db.execute("INSERT INTO chunks(doc_id,collection_id,ord,section,text) VALUES(?,?,?,?,?)",
                                      (doc_id, c["id"], ord_, section, text))

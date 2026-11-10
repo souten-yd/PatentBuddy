@@ -679,6 +679,34 @@ def watch_hit_set(req):
     return req.app.watches.set_hit(req.params["hid"], b.get("status"), b.get("category"))
 
 
+# research jobs -------------------------------------------------------------------
+@route("POST", "/api/v1/research", "user")
+def research_start(req):
+    """Start a bounded research job: {question, collections?, provider?, use_news?}."""
+    b = req.json()
+    return req.app.research.start(b.get("question"), b.get("collections") or None, b.get("provider"), b.get("use_news"))
+
+
+@route("GET", "/api/v1/research", "read")
+def research_list(req):
+    return {"jobs": req.app.research.list()}
+
+
+@route("GET", "/api/v1/research/{jid}", "read")
+def research_get(req):
+    return req.app.research.get(req.params["jid"])
+
+
+STANDARDS_TEMPLATE = ("id,title,date,status,org,ics,intl,url,body\n"
+                      "JIS B 1194,六角穴付き皿ボルト,2006-01-20,有効,JIS,21.060.10,ISO 10642:2004 (MOD),,メモ（本文は正規に入手したものだけを取り込む）\n")
+
+
+@route("GET", "/api/v1/templates/standards.csv", "read")
+def standards_template(req):
+    return req.h.send_bytes(200, ("\ufeff" + STANDARDS_TEMPLATE).encode("utf-8"), "text/csv; charset=utf-8",
+                            {"Content-Disposition": "attachment; filename=standards-template.csv"})
+
+
 # notifications ------------------------------------------------------------------
 @route("POST", "/api/notify/test", "admin")
 def notify_test(req):
@@ -858,7 +886,7 @@ def connectors_run(req):
         raise _err(409, "%s は未登録（キー未設定）のため使えません。設定 > 外部キー で登録すると利用できます" % spec["label"])
     t0 = time.time()
     try:
-        docs = connectors.run(name, b.get("params") or {}, req.app.config.secret)
+        docs = connectors.run(name, b.get("params") or {}, req.app.config.secret, req.app.config.get("connectors", default={}))
     except connectors.ConnectorError as error:
         raise _err(502, str(error))
     coll = req.app.store.ensure_collection(b.get("collection") or ("%s-%s" % (spec["kind"], name)), spec["kind"])
