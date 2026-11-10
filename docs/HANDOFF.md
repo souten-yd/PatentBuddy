@@ -83,3 +83,13 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - ResearchDataHub Linux v0.5.4: http://192.168.68.200:17871/ （Web200・health ok）、Tailscale http://100.82.8.44:17871/ 。管理者初期設定済み。パスワードは読取/変更していない。
 - 接続tokenは未設定。実際の永続設定先は `/data1tb/ControlDeck/data/feature-data/patent-buddy/connection.json`、0600。server_urlは `http://127.0.0.1:17871`、server_tokenは管理Webで発行するreadonly token。tokenをチャットへ貼らない。Featureサービス稼働とサーバー接続完了を区別する。
 - v0.5.5は検索/本文閲覧のプレビュー。Host AI/Jobs/GraphRAGは未実装、PR-E全体完了ではない。PR-D以降の計画は継続。次のReleaseでもHost latest参照に対応する署名付きFeature三資産の公開が必要。
+
+## 同一ユーザーのローカル自動接続・実導入済み（最新）
+
+- ユーザーの追加要求に従いPR #18を実装・マージ。main `73ae466c4569f411bb3a44fbfc1b18fe28eb061b`、v0.5.6、Release run42820937291成功。別worktree `/data1tb/PatentBuddy-addon` のfeat/local-addon-auth。PR-Dはこの新mainへの整合が次に必要。
+- Linux同一UIDのUnix SO_PEERCREDで相互確認。0700 runtime directory/0600 socket、排他lock、RAM限定ro token、loopback限定、管理初期設定前は発行しない。再起動で失効。auth.local_auto_connect=falseで停止、manual connection.json優先。root/TLS専用/別ユーザー/独自ポート自動探索は対象外。同一OSユーザーは同じ信頼境界であり、特定実行ファイルの証明ではない。
+- 最終96 tests合格23.485秒、Linux/QPKG build/payload成功。実プロセスGET200/書込み403/再起動後旧token401/再取得200。別UID・管理API拒否、無効化、非ソケット拒否・排他も検証。`/tmp/pb-local-auth-verify-final2.log` / `/tmp/pb-local-auth-process.json`。
+- 公式Linux資産のSHA検証後、既存prefix/dataを指定しinstallerでv0.5.4→0.5.6更新。先に `/data1tb/ResearchDataHub/backups/pre-0.5.6` へSQLite backup/quick_checkと秘密ファイルcopy、設定/秘密の更新後一致を確認（settings.jsonは元から存在せずdefault、秘密内容を出力していない）。管理者設定を維持。
+- Featureは既存publisher鍵で署名、新規鍵生成なし。公開SHA `39db9a8ee1201c8c444134800d7bbd955b315db66b4f5514134715a9ec475f10`。稼働Host正規CLI updateでv0.5.5→0.5.6、installed/enabled/managed=true、healthy。署名三資産をRelease添付済み。
+- 実インストール済みAddonClientでauth_method=local_peer/server v0.5.6/reachable=true、読み取りAPI成功。connection.jsonなし。addon healthはhealthy/ready/setup=[]。全3ユーザーサービスactive。ユーザーのtoken手入力は不要となり、以前の接続設定待ちを解消。
+- URL: PatentBuddy https://souten-linux.tailc8e858.ts.net/x/patent-buddy/workspace / ResearchDataHub http://192.168.68.200:17871/ 。実Hostログイン後ブラウザ受入、AI/Jobs/GraphRAGとPR-D〜Gは引き続き未完。
