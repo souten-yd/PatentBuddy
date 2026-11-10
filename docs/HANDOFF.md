@@ -5,15 +5,15 @@
 ## 優先: ControlDeck PC Add-onへの転換（2026-11-10）
 
 - リポジトリは `souten-yd/QnapPatentBuddy`、mainは機密データ保護強化を含むv0.5.1。新規機能はControlDeck PC上の独立Add-onへ移行する。
-- **PR #14 Draft・未マージ**: contract v2 manifest、A0のloopbackモード、setup_required health、静的案内。旧ログイン/管理/文献APIをA0で遮断。Host認証・本格UI・NASバックアップ同期は未実装。
+- **PR #14 Draft・未マージ**: contract v2 manifest、A0のloopbackモード、setup_required health、静的案内。旧ログイン/管理/文献APIをA0で遮断。`control-deck-feature.json` と `scripts/build_cd_feature.py` で再現可能な**未署名**のPC向け配布バンドル作成を定義。`pb.sh doctor/serve/test`、manifest・バンドル回帰テストを追加。署名/公開/Host登録・認証・本格UI・NASバックアップ同期は未実装。
 - PR #10、#11、#13 は別スコープ。PR #12 の未公開発明の外部送信ブロックはmainにマージ済みで、移行後も維持する。
-- Ubuntu/ControlDeck実機・全テストは未実施。マージ前に `bash scripts/verify.sh` およびHost manifest登録とA0拒否テストが必要。
+- Ubuntu/ControlDeck実機・全テスト・Feature bundleスクリプトのローカル実行は未実施。マージ前に `bash scripts/verify.sh`、`python3 scripts/build_cd_feature.py`、ControlDeck Host manifest検証・A0拒否・再起動・サービス継続テストが必要。**未署名バンドルは本番インストール不可。**
 - NASネットワーク共有で稼働SQLiteを直接開かず、PC SSD稼働DBとNASの整合した復元可能バックアップを分離。GraphRAG特許関係をA5で段階導入。
 
 ## 現在のバージョン
 
-- **v0.5.0（直近公開済み）**: https://github.com/souten-yd/QnapLibrary/releases/tag/v0.5.0 — PR #8 マージ済み。手動 SQLite バックアップ、iOS ホーム画面アイコン、ホーム UI 改善と進行状況表示。
-- v0.4.0（直前）: https://github.com/souten-yd/QnapLibrary/releases/tag/v0.4.0
+- **v0.5.1（最新公開済み・NAS版）**: https://github.com/souten-yd/QnapPatentBuddy/releases/tag/v0.5.1 — 未公開発明の外部送信制限 PR #12 を反映。Add-on A0はまだリリースされていない。
+- v0.5.0（直前）: https://github.com/souten-yd/QnapPatentBuddy/releases/tag/v0.5.0
 - 履歴: v0.1.1（HTTPS 8443・OpenRouter 埋め込み）→ v0.2.0（ウォッチ・通知・分類・審査基準）→ v0.3.0（Qdrant・リランカー・分析・PC クライアント）→ v0.4.0（調査ジョブ・市場データ・規格）
 - ロードマップ v0.1〜v0.5 は完了。次の候補は `docs/roadmap.md` 末尾と `docs/proposals.md`（定期バックアップ・調査の自動化など）
 
