@@ -92,8 +92,12 @@ class Providers:
     def _request(self, p, path, body=None, timeout=120, stream=False, scope="confidential"):
         # Validate BEFORE creating the request or contacting the provider.
         # No caller-supplied task prompt is allowed to claim public scope.
-        if body is not None and scope != "public_reference" and not privacy.confidential_allowed(p, self.config):
-            raise LLMError("機密保護: この操作はローカルLLM限定です。外部AIへの送信を遮断しました")
+        if body is not None:
+            if scope == "public_reference":
+                if not privacy.fixed_public_request(path, body):
+                    raise LLMError("機密保護: 固定公開プロンプト以外は外部送信できません")
+            elif not privacy.confidential_allowed(p, self.config):
+                raise LLMError("機密保護: この操作はローカルLLM限定です。外部AIへの送信を遮断しました")
         url = p["base_url"].rstrip("/") + path
         data = json.dumps(body).encode() if body is not None else None
         req = urllib.request.Request(url, data=data, headers=self._headers(p), method="POST" if data is not None else "GET")
