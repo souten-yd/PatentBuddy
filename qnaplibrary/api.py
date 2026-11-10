@@ -1042,3 +1042,13 @@ def mcp_endpoint(req):
     if resp is None:
         return req.h.send_bytes(202, b"", "text/plain")
     return req.h.send_json(200, resp)
+
+
+@route("POST", "/api/v1/documents/{did}/analyses", "analysis")
+def analysis_save(req):
+    return req.app.store.save_analysis(int(req.params["did"]), req.json())
+
+
+@route("GET", "/api/v1/documents/{did}/analyses", "read")
+def analysis_list(req):
+    return req.app.store.list_analyses(int(req.params["did"]))

@@ -12,7 +12,9 @@ def peer_uid(sock):
     return struct.unpack('3i', sock.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))[1]
 
 
-def socket_path(port):
+def socket_path(port, scope="read"):
+    if scope not in ("read", "analysis"):
+        raise OSError("unsupported local scope")
     if not hasattr(socket, 'SO_PEERCRED') or os.getuid() == 0:
         raise OSError('local authentication requires an unprivileged Linux user')
     base = Path('/run/user') / str(os.getuid())
@@ -20,7 +22,7 @@ def socket_path(port):
     directory = base / 'researchdatahub'
     directory.mkdir(mode=0o700, exist_ok=True)
     check_private(directory, directory=True)
-    return directory / ('%d.sock' % port)
+    return directory / ('%d%s.sock' % (port, '-analysis' if scope == 'analysis' else ''))
 
 
 def check_private(path, directory=False):
@@ -31,10 +33,11 @@ def check_private(path, directory=False):
 
 
 class LocalAuthServer:
-    def __init__(self, auth, port):
+    def __init__(self, auth, port, scope="read"):
         self.auth = auth
         self.port = port
-        self.path = socket_path(port)
+        self.scope = scope
+        self.path = socket_path(port, scope)
         # A process lock prevents a second server from removing a live endpoint.
         import fcntl
         fd = os.open(str(self.path) + '.lock', os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
@@ -72,7 +75,7 @@ class LocalAuthServer:
                     conn.settimeout(1)
                     if peer_uid(conn) != os.getuid():
                         continue
-                    token = self.auth.local_token()
+                    token = self.auth.local_token(self.scope)
                     if token:
                         conn.sendall(json.dumps({'server_url': 'http://127.0.0.1:%d' % self.port,
                                                  'server_token': token}).encode() + b'\n')
@@ -87,8 +90,8 @@ class LocalAuthServer:
         self.lock.close()
 
 
-def connect(port):
-    path = socket_path(port)
+def connect(port, scope="read"):
+    path = socket_path(port, scope)
     check_private(path)
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
         sock.settimeout(2)

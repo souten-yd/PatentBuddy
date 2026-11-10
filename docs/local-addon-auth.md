@@ -11,3 +11,7 @@ Linuxの同一OSユーザーで動作するResearchDataHubとPatentBuddyを、Un
 HTTP loopbackの同一PC構成が対象。TLS専用サーバー、root、別OSユーザー、独自ポートの自動探索は対象外で、明示的な接続設定を利用する。
 
 ソケット/排他lockのみを作成し、認証の都度DBや秘密ファイルへ書き込まない。認証済みHost経由でのみアドオンの検索APIを利用できる。
+
+## 分析結果保存の限定権限
+
+読み取り用の既存ソケット/tokenは変更しない。分析結果を保存するときだけ、同じUID確認を行う `<port>-analysis.sock` から独立したRAM内認証を取得する。この権限は通常の読取と `POST /api/v1/documents/{id}/analyses` だけに使用でき、文献/案件の書換えや管理操作は許可しない。サーバー再起動・local_auto_connect=falseで停止する。別端末には自動適用しない。

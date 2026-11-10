@@ -112,3 +112,11 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - 実AddonClientからserver v0.5.7/local_peer自動認証と読取API成功、addon health healthy/ready。実Hostブラウザでのログイン後受入とAI/Jobs/GraphRAGはまだ未完。
 - 次はPR-E A3: Host capability-scoped AI/Jobs/Broker。稼働Hostのai_gatewayはllama.cpp/Ollama選択のみだが、capabilities応答はlocal-onlyを証明せずOllamaのremote/cloud設定を排除できない。機密入力の前にHostでlocal-only要求を検証する契約を追加し、Addonはその応答/拒否を使う必要がある。ローカルURLだけを証明にしない。
 - 稼働ControlDeck checkoutにはユーザーのpasskey作業が引き続き存在。触らない。Host側変更は隔離worktree/別PRで行う。PatentBuddyの独自永続文献DBは作らず、研究結果/案件の正本はResearchDataHubに保存。現在ro自動tokenの書込み権限を無条件rwへ広げない。
+
+## PR-E A3 / PR #19 作業中
+
+- Host PR #349 main `3913d167ca3497cd0b5ba9902c8daaf5202e8d94`。local_only厳密bool、Host管理llama.cpp/GGUF/loopback検証、GPU admission前後再検証、proxy/redirect禁止。52関連/全1225 tests（2skip）、frontend build成功。実Host service token→Broker→ローカルGGUF応答1.3秒/68文字。稼働Hostの製品3ファイルだけbase一致確認後反映、既存ユーザーpasskey変更保持。テストuser削除FK失敗はsession削除・監査FKのみNULL化で解消、監査6件保持。
+- PatentBuddyにHost AI/Jobs client、短期job credential/所有者/capability確認・更新、stream切断キャンセル、限定analysis権限の正本保存API、原文revisionと冪等結果ID、再起動interrupted/再実行/Host終端再送を実装中。アドオンは本文/回答/tokenを永続化せず、最大32件の再開メタデータだけ0600保存。同時2件/所有者1件、本文10万文字上限を明示し無断切詰めなし。
+- Chrome合成Host API/AI+実Addon/ResearchDataHubで1280/390/320pxの要約/請求項操作、320pxキャンセル/再実行成功。横溢れ/JSエラー0、`.data/addon-ai-ui.json`。これは実Hostブラウザ受入ではない。
+- キャンセルをfailed表示する回帰を修正しjobs5 tests成功。実socketでblocked SSEをabortしてpartial回答を採用しないことも確認。最終全verifyはこれから。
+- 実ControlDeck Host Jobs/AIと候補Addon clientを使う合成案件テスト `/tmp/pb-analysis-live.py` を実行中（session94450）。候補データはtempだけ。稼働サービスのPatentBuddy/ResearchDataHubはまだv0.5.7、PR19変更は未公開/未導入。

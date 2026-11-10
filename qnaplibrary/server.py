@@ -425,10 +425,25 @@ class Handler(BaseHTTPRequestHandler):
                     from .addon_client import AddonError
                     client = self.server.app.client
                     try:
-                        client.authenticate(self.headers)
+                        identity = client.authenticate(self.headers)
                         if method == "GET" and path == "/addon/v1/status":
                             result = client.status()
                             result["addon"]["version"] = VERSION
+                        elif method == "GET" and path == "/addon/v1/jobs":
+                            result = self.server.app.jobs.list(identity)
+                        elif method == "POST" and path == "/addon/v1/jobs":
+                            body = Request(self, method, path, {}, {}).json()
+                            if not isinstance(body, dict):
+                                raise AddonError(400, "分析条件を指定してください")
+                            result = self.server.app.jobs.start(self.headers, body.get("doc_id"), body.get("kind"), body.get("resume_id"))
+                        elif method == "POST" and re.fullmatch(r"/addon/v1/jobs/[a-f0-9]{32}/reconcile", path):
+                            Request(self, method, path, {}, {}).json()
+                            result = self.server.app.jobs.reconcile(self.headers, path.split('/')[-2])
+                        elif method == "POST" and re.fullmatch(r"/addon/v1/jobs/[a-f0-9]{32}/cancel", path):
+                            Request(self, method, path, {}, {}).json()
+                            result = self.server.app.jobs.cancel(path.split('/')[-2], identity)
+                        elif method == "GET" and re.fullmatch(r"/addon/v1/documents/[1-9][0-9]{0,17}/analyses", path):
+                            result = client.data("GET", "/api/v1/documents/" + path.split('/')[-2] + "/analyses")
                         elif method == "GET" and path == "/addon/v1/collections":
                             result = client.data("GET", "/api/v1/collections")
                         elif method == "POST" and path == "/addon/v1/search":
@@ -475,7 +490,7 @@ class Handler(BaseHTTPRequestHandler):
                     raise HTTPError(401, "認証が必要です")
                 if access == "admin" and req.actor != "admin":
                     raise HTTPError(403, "管理者のみ実行できます")
-                if req.device and method != "GET" and req.device["scopes"] != "rw" and access not in ("read", "published"):
+                if req.device and method != "GET" and req.device["scopes"] != "rw" and access not in ("read", "published") and not (access == "analysis" and req.device["scopes"] == "analysis"):
                     raise HTTPError(403, "読み取り専用デバイスです")
             if req.session and access != "public" and method not in ("GET", "HEAD"):
                 origin = self.headers.get("Origin")
@@ -521,8 +536,11 @@ class AddonShell:
         self.httpd = None
         from .addon_client import AddonClient
         self.client = AddonClient(self.data_dir)
+        from .addon_jobs import AnalysisJobs
+        self.jobs = AnalysisJobs(self.client, self.data_dir)
 
     def request_shutdown(self, exit_code=0):
+        self.jobs.close()
         self.exit_code = exit_code
         if self.httpd:
             threading.Thread(target=self.httpd.shutdown, daemon=True).start()
@@ -584,11 +602,12 @@ def main(argv=None):
         tls = None
     httpd = Server((bind, port), app, tls)
     app.httpd = httpd
-    local_auth = None
+    local_auth = []
     if not args.addon and not tls and app.config.get("auth", "local_auto_connect", default=True):
         from .local_auth import LocalAuthServer
         try:
-            local_auth = LocalAuthServer(app.auth, httpd.server_port)
+            local_auth.append(LocalAuthServer(app.auth, httpd.server_port))
+            local_auth.append(LocalAuthServer(app.auth, httpd.server_port, "analysis"))
         except OSError:
             LOG.warning("Local automatic authentication unavailable; explicit device authentication remains available")
 
@@ -606,8 +625,8 @@ def main(argv=None):
         httpd.serve_forever(poll_interval=1.0)
     finally:
         httpd.server_close()
-        if local_auth:
-            local_auth.close()
+        for local_server in local_auth:
+            local_server.close()
         if not args.addon:
             app.embedder.stop()
             app.scheduler.stop()

@@ -180,6 +180,7 @@ class Auth:
         self.limiter = RateLimiter()
         self._device_seen = {}
         self._local_token = "qll_" + secrets.token_urlsafe(32)
+        self._local_analysis_token = "qla_" + secrets.token_urlsafe(32)
 
     # admin --------------------------------------------------------------
     def admin_configured(self):
@@ -222,21 +223,22 @@ class Auth:
                                         (name, token_hash(token), scopes, time.time()))
         return {"id": cur.lastrowid, "name": name, "token": token, "scopes": scopes}
 
-    def local_token(self):
+    def local_token(self, scope="read"):
         if self.admin_configured() and self.config.get("auth", "local_auto_connect", default=True):
-            return self._local_token
+            return self._local_analysis_token if scope == "analysis" else self._local_token if scope == "read" else None
         return None
 
     def device_for_token(self, token, ip):
-        if token and token.startswith("qll_"):
+        if token and token.startswith(("qll_", "qla_")):
             import ipaddress
             try:
                 loopback = ipaddress.ip_address(ip).is_loopback
             except ValueError:
                 loopback = False
-            current = self.local_token()
+            analysis = token.startswith("qla_")
+            current = self.local_token("analysis" if analysis else "read")
             if loopback and current and secrets.compare_digest(token, current):
-                return {"id": 0, "name": "Local same-user client", "scopes": "ro"}
+                return {"id": 0, "name": "Local same-user client", "scopes": "analysis" if analysis else "ro"}
             return None
         if not token or not token.startswith("qlt_"):
             return None

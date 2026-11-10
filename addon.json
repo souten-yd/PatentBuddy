@@ -16,7 +16,9 @@
   "host_capabilities": [
     "context.read",
     "theme.read",
-    "route.open"
+    "route.open",
+    "ai.inference",
+    "jobs.write"
   ],
   "contributions": {
     "navigation": [
