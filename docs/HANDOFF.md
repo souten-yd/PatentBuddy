@@ -74,3 +74,12 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - `bench_datahub_restart.py`の設定ファイル名を実物のsettings.jsonへ修正し、秘密・非default RP ID/session期限・syntheticパスキーの明示照合を追加。旧結果ではsettings保持を証明できていなかった。修正版の全6ケース成功、`.data/bench/restart-v2-*.json` / `/tmp/rdh-restart-v2.log`。これは実パスキー署名ではない。
 - ディスク上限でSQLITE_FULLを起こしたところ自動rollback後の二重rollbackで本来のエラーが隠れる問題を再現。transaction cleanupを修正。またBEGIN IMMEDIATE失敗時にPython lockを解放する。scale12 tests成功（容量不足後の既存内容保持/再開、別writer競合後のlock解放）。
 - 直前の全verifyはREADMEのversion見出し規則で1件失敗。ユーザー向け更新対処をdocs/upgrade.mdへ移しREADMEからリンク、テスト規則は維持。修正後の全verify待ち。
+
+## 実導入確認（2026-11-10・最新）
+
+- PatentBuddy v0.5.5公開済み。PR #14 main統合 `9a267695391ada9aab8a45382bbf9c049d59ac53`、Release run42819243693成功。署名付きFeature資産を公開し、ControlDeck正規CLIでinstall/enable。稼働Host自身のstatusでinstalled=true/enabled=true/managed=true/version=0.5.5/health=healthyを再確認。
+- Host catalog PR #348はmain統合 `65272ebf09b9411415abc9e553d471325b1a030c`。稼働checkoutの他の未コミット作業を維持し、catalogのPatentBuddyエントリだけ反映してHostを再起動済み。ユーザーunit control-deck-web / cdapp-feature-patent-buddy / qnaplibrary は全てactive。
+- PatentBuddy URL: https://souten-linux.tailc8e858.ts.net/x/patent-buddy/workspace （HTTP200を確認。ログイン後の実Hostブラウザ操作は未検証、合成HostでのChrome検索/詳細表示は検証済み）。
+- ResearchDataHub Linux v0.5.4: http://192.168.68.200:17871/ （Web200・health ok）、Tailscale http://100.82.8.44:17871/ 。管理者初期設定済み。パスワードは読取/変更していない。
+- 接続tokenは未設定。実際の永続設定先は `/data1tb/ControlDeck/data/feature-data/patent-buddy/connection.json`、0600。server_urlは `http://127.0.0.1:17871`、server_tokenは管理Webで発行するreadonly token。tokenをチャットへ貼らない。Featureサービス稼働とサーバー接続完了を区別する。
+- v0.5.5は検索/本文閲覧のプレビュー。Host AI/Jobs/GraphRAGは未実装、PR-E全体完了ではない。PR-D以降の計画は継続。次のReleaseでもHost latest参照に対応する署名付きFeature三資産の公開が必要。
