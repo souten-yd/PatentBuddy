@@ -344,7 +344,7 @@ async function patentDetail(main, id) {
     const picker = collectionPicker(S.collections.filter(c => c.kind === "patent").map(c => c.name));
     const no = h("input", { type: "number", value: 1, min: 1, max: 999 });
     const cfg = await api("GET", "/api/llm/providers");
-    const prov = sel(cfg.providers.map(p => [p.id, p.label || p.id]), cfg.default_provider);
+    const prov = sel(cfg.providers.filter(p => p.type !== "openrouter" && p.local_only_verified === true).map(p => [p.id, p.label || p.id]), cfg.default_provider);
     const progress = h("div", { class: "small muted", role: "status", "aria-live": "polite" });
     const out = h("div", {});
     function showChart(chart) {
@@ -389,7 +389,7 @@ async function patentDetail(main, id) {
     const search = h("button", { class: "btn", onclick: guard(async () => run(false, search)) }, "候補を検索");
     const judge = h("button", { class: "btn primary", onclick: guard(async () => run(true, judge)) }, "AIで仮判定");
     body.append(h("div", { class: "card" }, h("h2", {}, "構成要件と根拠の照合"),
-      h("p", { class: "small muted" }, "AIは根拠断片から○（対応）/△（一部・不確か）/×（今回の断片に記載なし）/?（未判定）を提案します。法的な結論ではなく、自動保存もしません。"),
+      h("p", { class: "small muted" }, "未公開発明を保護するため、ローカル専用と確認済みのAIだけを利用します。根拠断片から○（対応）/△（一部・不確か）/×（今回の断片に記載なし）/?（未判定）を提案します。自動保存や法的確定判断はしません。"),
       h("div", { class: "row" }, field("請求項", no), field("AIプロバイダ", prov)),
       field("調査対象のコレクション", picker),
       h("div", { class: "row end" }, search, judge), progress), out);
