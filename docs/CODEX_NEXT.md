@@ -5,6 +5,7 @@
 ## 開始時に必ず読む
 1. `AGENTS.md`、`DEVELOPMENT_WORKFLOW.md`、`docs/HANDOFF.md`
 2. `docs/researchdatahub-plan.md`（**最新の役割・データの正本に関する決定**）
+   - **最優先のストレージ性能/低I/O受入契約:** `docs/researchdatahub-performance.md`。特許・規格・汎用DBすべてに適用する。
 3. `docs/privacy-boundary.md`、`docs/patent-feature-plan.md`
 4. ControlDeck本体 `souten-yd/ControlDeck` と `souten-yd/ControlDeckMediaForge`、`souten-yd/ControlDeckSonicForge` の**最新mainの実コード**。Addon v2 manifest, Host RBAC/introspection, Bridge, Feature bundleの仕様を必ず再読する。
 5. 進行PR #10 / #11 / #13 / #14 / #15 のdiffと競合状態（PR本文だけでなく実ファイル）。PR #12はmainへマージ済みのセキュリティ基準。
@@ -55,9 +56,10 @@ SMB/NFS経由で稼働中SQLite/WALを直接開かない。PCとNASで同じデ�
 - 非公開資料のテキストはOpenRouterの要求本文にもログにも混入しない。タイトル/公開番号/抜粋を**送信プレビュー**で全部確認できるようにする。自動クラウド送信なし。
 
 ### PR-D: 大規模取り込み/検索（既存PR #13を再検証）
+- **まず `docs/researchdatahub-performance.md` を読む。** 保存容量、物理ディスクI/O、大量APIのレイテンシ、復旧可能性を同時評価する。PR #13はDraftのためmainへの統合前にdiff/回帰テストを再評価する。
 - 外部IDの一括照合、内容ハッシュの冪等再投入、無変更の書込0、本文を取得しない一覧、Keyset/カーソルページングを完成させる。
 - 特許以外の規格識別子/改版/日付、出典とライセンスのメタデータも検索できる一般化を設計。新しいデータ収集元は公式API・RSS・許可済みサイトのみ。
-- 1千/1万/10万文献でP50/P95/スループット、CPU/RAM、WAL/ディスクI/O、同時APIリクエストを実測。大量データを全件RAMに置くことはしない。
+- 1千/1万/10万文献でP50/P95/P99・スループット・CPU/RSS・DB/WAL/SHM増分・物理デバイスread/write bytes・アイドル15分のI/O・再起動と復元を変更前後で実測。全件RAMロード・無制限索引・WAL/同期/監査の無効化をしない。性能を数値で保証するのは基準値を取得してから。
 
 ### PR-E: ControlDeck Add-onの安全なHost結合（既存PR #14を更新）
 - `addon.json` v2、Feature bundle、署名/認証/health、Host introspectionの権限分離、Cookieに頼らないsandbox UI、iPhone幅での動作。
