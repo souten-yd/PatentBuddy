@@ -72,6 +72,10 @@ class ScaleStoreTest(unittest.TestCase):
         b = self.store.list_documents(self.cid, cursor=a["next_cursor"], q="対象", limit=2)
         self.assertEqual(len(a["items"]) + len(b["items"]), 4)
         self.assertEqual(self.store.list_documents(self.cid, offset=2, limit=3)["total"], 7)
+        exact = self.store.list_documents(self.cid, ext_id="3")
+        self.assertEqual([d["ext_id"] for d in exact["items"]], ["3"])
+        self.assertIsNone(exact["total"])
+        self.assertEqual(self.store.list_documents(self.cid, ext_id="missing")["items"], [])
         indexes = {r["name"] for r in self.store.q(
             "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='documents'")}
         self.assertIn("documents_coll_id", indexes)
