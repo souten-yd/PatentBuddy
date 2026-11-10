@@ -429,6 +429,20 @@ class Handler(BaseHTTPRequestHandler):
                         if method == "GET" and path == "/addon/v1/status":
                             result = client.status()
                             result["addon"]["version"] = VERSION
+                        elif path == "/addon/v1/embedding-jobs" and method == "GET":
+                            result = self.server.app.embedding_jobs.list(identity)
+                        elif path == "/addon/v1/embedding-jobs" and method == "POST":
+                            body = Request(self, method, path, {}, {}).json()
+                            if not isinstance(body, dict) or set(body) - {'resume_id'}:
+                                raise AddonError(400, '索引構築条件が不正です')
+                            result = self.server.app.embedding_jobs.start(self.headers, body.get('resume_id'))
+                        elif re.fullmatch(r"/addon/v1/embedding-jobs/[a-f0-9]{32}", path) and method == "DELETE":
+                            result = self.server.app.embedding_jobs.forget(path.rsplit('/', 1)[1], identity)
+                        elif re.fullmatch(r"/addon/v1/embedding-jobs/[a-f0-9]{32}/(cancel|reconcile)", path) and method == "POST":
+                            Request(self, method, path, {}, {}).json()
+                            identifier = path.split('/')[-2]
+                            result = (self.server.app.embedding_jobs.cancel(identifier, identity) if path.endswith('/cancel')
+                                      else self.server.app.embedding_jobs.reconcile(self.headers, identifier))
                         elif path == "/addon/v1/pdf-jobs" and method == "GET":
                             result = self.server.app.pdf_jobs.list(identity)
                         elif path == "/addon/v1/pdf-jobs" and method == "POST":
@@ -566,10 +580,13 @@ class AddonShell:
         self.jobs = AnalysisJobs(self.client, self.data_dir)
         from .addon_pdf_jobs import PDFJobs
         self.pdf_jobs = PDFJobs(self.client, self.data_dir)
+        from .addon_embedding_jobs import EmbeddingJobs
+        self.embedding_jobs = EmbeddingJobs(self.client, self.data_dir)
 
     def request_shutdown(self, exit_code=0):
         self.jobs.close()
         self.pdf_jobs.close()
+        self.embedding_jobs.close()
         self.exit_code = exit_code
         if self.httpd:
             threading.Thread(target=self.httpd.shutdown, daemon=True).start()

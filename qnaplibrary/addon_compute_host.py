@@ -17,6 +17,7 @@ class ComputeHostSession(HostSession):
         self.request_id = None
         self.lease_id = None
         self._last_progress = None
+        self.resource_changed = lambda: None
 
     def progress(self, phase, completed, total):
         # Host external Jobs allow at most 2Hz; fast worker batches can
@@ -45,6 +46,7 @@ class ComputeHostSession(HostSession):
         if not isinstance(identifier, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', identifier):
             raise AddonError(502, 'Host資源要求を確認できません')
         self.request_id = identifier
+        self.resource_changed()
         deadline = time.monotonic() + 65
         while True:
             if self.aborted.is_set():
@@ -56,6 +58,7 @@ class ComputeHostSession(HostSession):
                 if not isinstance(lease, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', lease):
                     raise AddonError(502, 'Host資源leaseを確認できません')
                 self.lease_id = lease
+                self.resource_changed()
                 if value.get('device_id') != 'host' or (type(value.get('granted_bytes')) is not int or value['granted_bytes'] < HOST_BYTES):
                     raise AddonError(503, 'CPU用のHost資源を確保できません')
                 active = self.call('POST', '/resources/leases/' + lease + '/activate', {})

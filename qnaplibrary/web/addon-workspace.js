@@ -27,6 +27,7 @@ async function load() {
       s.setup_required ? 'ResearchDataHubの管理Webで初期設定を完了してください。' : 'ResearchDataHubの接続トークン設定が必要です。';
     el('submit').disabled = !ready;
     el('import-pdf').disabled = !ready;
+    el('build-index').disabled = !ready;
   } catch (error) { el('message').textContent = error.message; }
 }
 window.addEventListener('message', event => {
@@ -154,6 +155,7 @@ async function loadJobs() {
       knownJobs.set(job.id, job.status);
     }
     await loadPDFJobs();
+    await loadEmbeddingJobs();
   } catch (error) { el('jobs').textContent = error.message; }
   finally { polling = false; }
 }
@@ -267,6 +269,43 @@ async function loadPDFJobs() {
         if (['failed', 'canceled'].includes(job.status)) button('PDFを再選択して実行', () => startPDF(job.id));
         button('履歴から除外（資料は保持）', () => api('pdf-jobs/' + job.id, undefined, 'DELETE'));
       }
+    }
+    box.append(row);
+  }
+}
+
+
+async function startIndex(resumeId) {
+  await api('embedding-jobs', {resume_id: resumeId || null});
+  el('message').textContent = '検索索引の構築を開始しました。';
+}
+el('build-index').onclick = async () => {
+  el('build-index').disabled = true;
+  try { await startIndex(); }
+  catch (error) { el('message').textContent = error.message; }
+  finally { await loadEmbeddingJobs(); }
+};
+async function loadEmbeddingJobs() {
+  const data = await api('embedding-jobs');
+  const box = el('embedding-jobs'); box.replaceChildren();
+  el('build-index').disabled = data.items.some(job => ['queued', 'running'].includes(job.status) || job.host_sync_pending);
+  for (const job of data.items) {
+    const row = document.createElement('div'); row.className = 'job'; row.dataset.status = job.status;
+    const label = document.createElement('p'); label.textContent = job.message; row.append(label);
+    function button(title, action) {
+      const b = document.createElement('button'); b.textContent = title;
+      b.onclick = async () => {
+        b.disabled = true;
+        try { await action(); } catch (error) { el('message').textContent = error.message; }
+        finally { await loadEmbeddingJobs(); }
+      };
+      row.append(b);
+    }
+    if (['queued', 'running'].includes(job.status)) button('索引構築を中断', () => api('embedding-jobs/' + job.id + '/cancel', {}));
+    else if (job.host_sync_pending) button('索引ジョブのHost状態を確認', () => api('embedding-jobs/' + job.id + '/reconcile', {}));
+    else {
+      if (['failed', 'canceled', 'interrupted'].includes(job.status)) button('索引構築を再開', () => startIndex(job.id));
+      button('索引履歴から除外（索引は保持）', () => api('embedding-jobs/' + job.id, undefined, 'DELETE'));
     }
     box.append(row);
   }

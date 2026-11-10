@@ -11,13 +11,20 @@ from .addon_client import AddonError
 from .retrieval_contract import validate_result
 
 
-def build(client, host):
+def model_reference(host):
     caps = host.call('GET', '/ai/retrieval/capabilities').get('text.embed', {})
     model = caps.get('model_ref')
     if (caps.get('available') is not True or caps.get('execution_policy') != 'local_only'
             or caps.get('revision_kind') != 'host_file_metadata_v1'
             or not isinstance(model, str) or not re.fullmatch('[a-f0-9]{64}', model)):
         raise AddonError(503, 'Hostのローカル埋め込みモデルを利用できません')
+    return model
+
+
+def build(client, host, expected_model=None, progress=None):
+    model = model_reference(host)
+    if expected_model is not None and model != expected_model:
+        raise AddonError(409, '埋め込みモデルが変更されました。新しい索引構築を開始してください')
     after = completed = 0
     dimensions = None
 
@@ -46,6 +53,8 @@ def build(client, host):
         completed += len(rows)
         # Total is intentionally unknown while the corpus may be changing.
         host.progress('embedding', completed, None)
+        if progress:
+            progress(completed)
 
     while True:
         check_cancel()

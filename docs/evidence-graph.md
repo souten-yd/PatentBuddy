@@ -50,3 +50,9 @@ embedding scopeはベクトル保存だけ、research_analysisはPDF/分析/ベ�
 `embedding_build.build`はHostのlocal-only/model_refを固定し、正本pendingを32件ずつ取得する。入力は各8192文字・合計UTF-8 64KiB以内に分割し、本文hashと原文revisionを検証してから推論/正本保存する。モデル・次元の変更は拒否。PCに本文やジョブ用ベクトルを永続化せず、正本にコミットされた行を再開地点とする。取消や保存応答消失後も再実行で保存済み行を除外する。カーソルより前の原文更新を最後のpending再照合で検出し、完了扱いせず再開を要求する。
 
 CPU/RAM lease・更新・解放と進捗の頻度制御をComputeHostSessionへ共通化。PDFの既存権限は維持。workerの呼出元にHost Job/lease/heartbeat/terminal照合の責任があり、製品のEmbeddingJobs/開始ボタンはまだ未接続。実HostのJob/CPU leaseとBGE-M3で合成2文の構築・無変更再実行DB更新0・cache検索・Qwen3 rerankを確認。初回の進捗phase日本語によるHTTP422は、Host契約の英数字phaseへ直して再検証済み。
+
+## 索引ジョブと画面（未配布）
+
+EmbeddingJobsを追加し、独立した「検索索引を構築・更新」ボタンから全資料を対象に起動する。Host Job/CPU lease・5秒heartbeat・モデル固定・取消・保存済みからの再開・所有者分離を接続。request/lease IDは取得直後に0600の最大32件メタデータへ保存し、再起動後はHost解放/terminal照合が済むまで新規実行を止める。完了照合失敗は未同期として保持。履歴除外は索引を削除しない。モデル変更後は旧ジョブ再開を拒否し、新規構築を要求する。
+
+進捗メタデータの書込みは最大5秒に1回と状態遷移時。本文/ベクトル/資格情報はジョブファイルに含めない。この書込みは再開と資源解放・Host終了照合に必要。新しいvector保存先は作らない。実ControlDeckブラウザ1280pxで合成2文のBGE索引構築・Host終了同期、320pxで再実行0チャンク、横溢れ/JS例外なしを確認。スクリーンショットでは構築ボタンを目視確認し、完了状態はDOM/API照合で確認した。チャートのvector/graph/rerank結合は引き続き未接続。

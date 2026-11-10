@@ -264,3 +264,12 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - 実HostのJob+CPU lease下でBGE-M3 2文/1024次元のworker構築成功、再実行DB更新0、cache検索関連文上位/再同期manifestのみ、Qwen3-Reranker実推論成功。`/tmp/pb-embedding-build-live.log`、err空。一時addon/user/session/DB/cacheは除去済み、Host Job/auditは保持。初回は日本語phaseがHostの英数字契約に反しHTTP422、修正して同試験成功。fixture `/tmp/pb-embedding-build-live.py` は終了済み。
 - 次はこのworkerを製品EmbeddingJobsへ接続（所有者/取消/再開/heartbeat/再起動・terminal照合/CPU lease）、構築ボタンとvector→graph→rerank chart接続。worker単独の完成を画面機能の完成としない。推論モデル版/人手レビュー/大規模性能/PR-F残/P2/PR-Gは引き続き未完。本番0.5.10は不変、PR23 Draft、goal active。
 - 最終全verify **169 tests成功51.036秒**（`/tmp/pb-embedding-build-verify-final.log`）。新增5 testsはUTF-8分割/無変更無推論・書込み0/取消再開/model変更・本文hash不正/カーソル前更新/commit応答消失後再開を確認。PDF lease回帰4 testsも成功。配布ビルド・リリースはPR23の残機能完成後。
+
+## 索引構築の製品Jobs・画面接続（2026-11-11）
+
+- 前turnはworker実装/実Host検証/8bf2efe pushのprogress。今回は`EmbeddingJobs`と`/addon/v1/embedding-jobs`、独立した構築・更新ボタン/取消/再開/Host照合/履歴除外を実装。全資料が対象で、選択文献に依存しない。owner分離、最大32件、同時実行1、未同期があれば先に照合。
+- ComputeHostSessionのrequest/lease ID取得直後にメタデータを保存。再起動後はinterruptedとして資源解放→terminal照合。heartbeatはlease activate後に開始し、部分activate状態をrenewしない。モデルをジョブへ固定し、再開時モデル変更は拒否。書込みは資源/状態遷移・5秒ごとの小さな進捗だけ、本文/ベクトル/tokenはPCジョブJSONへ保存しない。
+- 全verify **172 tests成功55.036秒**（`/tmp/pb-embedding-jobs-verify.log`）。その後HTTP認証・不正body/任意model/URL拒否の回帰を既存testへ追加し、関連12 tests成功3.032秒。JS構文成功。所有者越境/取消→Host失敗→照合→再開/モデル変更拒否/再起動資源照合/履歴除外後vector保持を検証。
+- 実Host UI fixture `/tmp/pb-index-ui-fixture.py` で一時ResearchDataHub+research_analysis scopeを使用。1280pxで実BGEモデル2文/1024次元の索引構築、320pxで再実行0件、両方succeeded/host_sync_pending=false、横溢れ/JS例外0（`/tmp/pb-index-ui-browser.log`）。`.data/index-320.png`で構築ボタンの目視確認。完了ジョブはスクリーンショットの下方外なので状態はDOM/API検証と区別。
+- fixture PID494273をSIGINTで正常cleanup、一時addon/user/session/grants/DBとsecret除去。末尾KeyboardInterruptは待機解除の終了で、cleanup完了行を確認。Host Job/auditは保持。本番の接続/DB/0.5.10は変更していない。
+- 次はクレームチャートへkeyword→vector→bounded graph→Host rerankを接続する。exact chunk read API、CPU lease/cache利用、原文/model revisionの保存が必要。人手承認UI/graph提案権限・管理/生成モデル版/大量検索性能/PR-F残/P2/PR-Gは未完。PR23 Draft、goal active。
