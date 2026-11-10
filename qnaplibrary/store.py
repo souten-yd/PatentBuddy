@@ -145,6 +145,8 @@ class Store:
                        "wal_autocheckpoint=2000", "busy_timeout=30000"):
             self.db.execute("PRAGMA " + pragma)
         self.db.executescript(SCHEMA)
+        from .evidence_graph import SCHEMA as GRAPH_SCHEMA
+        self.db.executescript(GRAPH_SCHEMA)
         self.fts = self._init_fts()
         self.vector_version = 0  # bumped on vector change; vector cache invalidation
         self.on_change = None    # callback after documents were added/updated (auto-embedding)

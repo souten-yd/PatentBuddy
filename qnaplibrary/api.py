@@ -1120,3 +1120,46 @@ def pdf_image(req):
     from . import pdf_store
     return req.h.send_bytes(200, pdf_store.image_for(req.app.store, int(req.params['did']), int(req.params['iid'])),
                             'image/png', {'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff'})
+
+
+@route('POST', '/api/v1/graph/edges', 'admin')
+def graph_save(req):
+    from . import evidence_graph
+    return evidence_graph.save(req.app.store, req.json(limit=32 * 1024), req.actor)
+
+
+@route('POST', '/api/v1/graph/edges/{eid}/review', 'admin')
+def graph_review(req):
+    from . import evidence_graph
+    body = req.json()
+    if not isinstance(body, dict):
+        raise _err(400, '確認内容を指定してください')
+    return evidence_graph.review(req.app.store, req.params['eid'], body.get('status'), req.actor)
+
+
+@route('GET', '/api/v1/graph/edges/{eid}', 'read')
+def graph_edge(req):
+    row = req.app.store.one('SELECT * FROM graph_edges WHERE id=?', (req.params['eid'],))
+    if row is None:
+        raise _err(404, '関係がありません')
+    return dict(row)
+
+
+@route('GET', '/api/v1/graph/documents/{did}', 'read')
+def graph_document(req):
+    return {'nodes': [dict(row) for row in req.app.store.q(
+        'SELECT * FROM graph_nodes WHERE doc_id=? LIMIT 1', (int(req.params['did']),))]}
+
+
+@route('GET', '/api/v1/graph/expand', 'read')
+def graph_expand(req):
+    from . import evidence_graph
+    seeds = str(req.arg('seeds', '')).split(',')
+    if len(seeds) > 20 or any(not re.fullmatch(r'[1-9][0-9]{0,17}', seed) for seed in seeds):
+        raise _err(400, '開始ノードを1〜20件指定してください')
+    inferred = req.arg('include_inferred', 'false')
+    if inferred not in ('true', 'false'):
+        raise _err(400, 'include_inferredはtrue/falseで指定してください')
+    return evidence_graph.expand(req.app.store, [int(x) for x in seeds],
+        hops=int(req.arg('hops', '1')), max_nodes=int(req.arg('max_nodes', '50')),
+        max_edges=int(req.arg('max_edges', '100')), include_inferred=inferred == 'true')

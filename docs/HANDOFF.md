@@ -209,3 +209,12 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - 請求項分析も保存成功。正本DBは文献1件・原本1件・画像参照13件・要約3775文字/請求項確認6510文字を保持、quick_check成功。15ページのうち直接抽出10、直接抽出+OCR5。OCR/AIの内容精度は人手未承認。請求項ブラウザ試験初回は既存要約の表示完了前の件数取得で誤判定したため、再生成せず「請求項の確認」の表示待ちに修正して成功（/tmp/pb-pdf-installed-claims-recheck.log）。
 - 一時ユーザー/session/grantと試験ジョブ履歴を正常除去（remaining_jobs=0）。原本・抽出結果・分析は本番正本に保持。利用者は文献検索で「JPA」などから開ける。connection.jsonなし、同一UID自動認証を維持。
 - docs-only追記の全verifyも143 tests成功39.361秒。古いガイド記載のtest_docs_rulesは存在せずimport失敗、実際のtest_updater_docs 7 testsと全verifyで検証した。PR-F/P2/PR-Gは未完了、全体goalはactive。
+
+## PR-F 根拠付き関係データの基盤（2026-11-11・作業中）
+
+- 前turnはprogress: PDF/OCR v0.5.10を公開/導入、指定PDFの保存と実Host LLM要約/請求項確認まで完了。今回もgoal active。最新main193f53aとopen PR10の実diffを確認し、旧chart_aiには行別引用検証はあるがHost Jobs・永続根拠の版/人手承認が不足していると判断。
+- 新worktree `/data1tb/PatentBuddy-graph`、branch `feat/evidence-graph`、Draft PR23。`docs/evidence-graph.md`がPR-Fの作業契約。PR10はまだ未マージ。今回のサーバー基盤を旧サーバーLLM経路へ接続していない。
+- graph_nodes/graph_edgesを単一正本DBに追加。引用範囲と原文revisionの一致、取得日時/抽出法/モデル版/信頼度、factual/inferredの固定区別、人手reviewを保存。原文・sourceまたは文献ノード変更でtriggerによりstale・承認失効、元へ戻しても復活なし。FK削除・rollback・snapshot復元を検証。
+- 同じID同内容の再投入と探索はDB変更ゼロ。状態/承認/種別を含む隣接索引で出方向1〜2hop、seed20/ノード100/関係200以内。未承認・stale除外、推測は明示指定時のみ、上限はtruncated。API mutation/reviewは現在admin限定、private read可・published拒否。
+- 関連5 tests成功5.369秒、全verify148 tests成功42.363秒（/tmp/pb-graph-tests2.log、/tmp/pb-graph-verify.log）。EXPLAINでadjacency索引利用を確認。GraphRAG実LLM、性能/索引write bytes測定、アドオンUI、scope付きproposal、逆方向探索、検索→vector→graph→rerank、クレームチャート/確認操作は未完。本番v0.5.10へ未反映、版変更/公開なし。
+- 次はこの基盤をアドオンのHost Jobsと根拠付きクレームチャートへ接続する。PR-F完了後もP2汎用メタデータ検索とPR-G NAS移行を残す。現行データ/接続/サービスを維持する。
