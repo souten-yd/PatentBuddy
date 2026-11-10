@@ -265,6 +265,14 @@ class Patents:
                                        "ext_id": h["ext_id"], "section": h["section"], "snippet": h["snippet"]} for h in hits]})
         return {"claim_no": int(claim_no), "claim": claim, "rows": rows}
 
+    def assess_claim_chart(self, pid, collections=None, claim_no=1, provider=None):
+        """Manual, ephemeral AI matching of retrieved evidence to each claim element."""
+        from .chart_ai import assess_chart
+        chart = self.claim_chart(pid, collections, claim_no)
+        if self.providers is None:
+            raise ValueError("AI プロバイダが設定されていません")
+        return assess_chart(chart, self.providers, provider)
+
     def assist(self, pid, task, collections=None, provider=None, extra=""):
         """Run a structured AI task with retrieved evidence. Returns {prompt, answer, evidence}."""
         if task not in PROMPTS:
