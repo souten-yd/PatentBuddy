@@ -289,10 +289,10 @@ class Store:
             existing = {}
             for n in range(0, len(identifiers), 400):
                 batch = identifiers[n:n + 400]
-                sql = "SELECT ext_id, id, hash FROM documents WHERE collection_id=? AND ext_id IN (%s)" % (
+                sql = "SELECT ext_id, id, hash, source FROM documents WHERE collection_id=? AND ext_id IN (%s)" % (
                     ",".join("?" * len(batch)))
                 for found in db.execute(sql, [c["id"]] + batch):
-                    existing[found["ext_id"]] = {"id": found["id"], "hash": found["hash"]}
+                    existing[found["ext_id"]] = {"id": found["id"], "hash": found["hash"], "source": found["source"]}
             for doc in docs:
                 title = str(doc.get("title") or "")[:1000]
                 body = str(doc.get("body") or "")
@@ -307,10 +307,16 @@ class Store:
                 if len(body_view) > 20_000_000:
                     raise StoreError("document too large (max 20MB text)")
                 ext_id = str(doc.get("id") or doc.get("ext_id") or "") or None
-                digest = hashlib.sha256(json.dumps([title, body_view, meta, doc.get("url"), doc.get("date")],
+                # Preserve legacy digests for ordinary documents. Explicit sections
+                # can drive chunks independently of body and must participate.
+                digest_fields = [title, body_view, meta, doc.get("url"), doc.get("date")]
+                if sections and body:
+                    digest_fields.append(list(sections.items()))
+                digest = hashlib.sha256(json.dumps(digest_fields,
                                                    ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+                source = str(doc.get("source") or "")
                 row = existing.get(ext_id) if ext_id else None
-                if row and row["hash"] == digest:
+                if row and row["hash"] == digest and row["source"] == source:
                     unchanged += 1
                     ids.append(row["id"])
                     continue
@@ -332,7 +338,7 @@ class Store:
                 ids.append(doc_id)
                 if ext_id:
                     # Keep sequential upsert semantics for repeated external IDs in a batch.
-                    existing[ext_id] = {"id": doc_id, "hash": digest}
+                    existing[ext_id] = {"id": doc_id, "hash": digest, "source": source}
                 title_tok = textproc.index_text((ext_id or "") + " " + title)
                 for ord_, (section, text) in enumerate(self._sections(doc, c["kind"])):
                     cur = db.execute("INSERT INTO chunks(doc_id,collection_id,ord,section,text) VALUES(?,?,?,?,?)",

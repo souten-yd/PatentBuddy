@@ -44,9 +44,16 @@ PR-Bでは未読POST本文が次のHTTP/1.1要求に混ざり501になること�
 ## 次の一手 / 未完了
 
 1. PR-C配布・更新まで完了。PR-D #13へ移行。mainとの競合は最新計画/引継ぎを維持して解消、merge commit `3c8d82e`。既存scale 4 tests合格。
-2. PR-D #13: 実diffと性能仕様を読みP0計測に着手。比較用の変更前checkout `/data1tb/PatentBuddy-baseline-054` はdetached `b7816cf`。既存bench_patents.pyは物理I/O・API分位点・再起動/復元・15分idleが不足するため汎用bench_datahub.pyへ拡張する。まだ計測結果はない。1千/1万/10万、P50/P95/P99、CPU/RSS、物理I/O/DB/WAL、15分idle、再起動/復元を変更前後比較。無変更書込み0、一覧本文なし、カーソルを検証。100万件対応は未実測。
+2. PR-D #13: 実diffと性能仕様を読みP0計測に着手。比較用の変更前checkout `/data1tb/PatentBuddy-baseline-054` はdetached `b7816cf`。既存bench_patents.pyは物理I/O・API分位点・再起動/復元・15分idleが不足するため汎用bench_datahub.pyへ拡張する。初期1千/1万件比較を `.data/bench/*-{1000,10000}.json` に保存。1万件無変更再投入: baseline 50行/204800 process write bytes、候補0行/0 bytes。出典/明示sections訂正の取りこぼしを追加修正したため最終候補の小規模再測定が必要。1千/1万/10万、P50/P95/P99、CPU/RSS、物理I/O/DB/WAL、15分idle、再起動/復元を変更前後比較。無変更書込み0、一覧本文なし、カーソルを検証。100万件対応は未実測。
 3. PR-E #14: ControlDeck/MediaForge/SonicForge最新mainの実契約を再読しHost権限/Jobs/Broker/Feature/署名/UIを結合。PC側に別正本文献DBを作らない。まだ未着手。
 4. PR-F #10等: 確定/推測エッジ分離、根拠・版・人手承認、bounded GraphRAG、ローカルLLMのみ。まだ未着手。
 5. PR-G: **最後**にPC→QNAPのdry-run/backup/hash/quick_check/件数/秘密・認証確認/停止・単一書込み切替/ロールバック。QNAP既存領域の上書き・削除禁止。未着手。
 
 QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/publisher登録、NAS HDD性能、実案件の法的品質・審査状態は未検証。過去詳細はgit履歴と各Release/PR参照。goalはactive。
+
+## PR-D P0/P1 作業中（2026-11-10追記）
+
+- `scripts/bench_datahub.py`: temp合成DBの認証HTTP APIを計測。API分位点・docs/s・MiB/s・CPU/RSS・SQL execute/fetch時間・total_changes・DB/WAL/SHM・proc I/O・device counters・dbstat容量・backup/Store再open/復元・検索一致を記録。schedulerは開始しない。device countersは他プロセスの活動を含むため専有I/Oとは呼ばない。サービスプロセス再起動時間は別途必要。
+- baseline 10万件+900秒idle→candidate同条件を直列実行中。**exec session57856**、shell PID65806、baseline Python PID66329（この時点で生存を確認）。ログ `/tmp/rdh-{baseline,candidate}-100000.log`、最終JSON `.data/bench/{baseline,candidate}-100000.json`。再開時はハンドル/psを再確認し、観測timeoutだけで再実行しない。
+- スケール回帰8 tests: 並行batch整合、途中例外の全体rollback、cursor途中削除、コミット直前の子プロセスkill→WAL復旧/再送を追加。source訂正がunchangedとして捨てられる失敗を再現・修正。本文がある文献の明示sections変更/順序もdigestへ含める。通常文献の既存digestは維持し全件再構築を避ける。
+- 現時点のControlDeck LLM: 前回の8097 listener/llama-serverは今回存在しない。既存の成功記録は履歴として保持するが今回実行したと扱わない。Host管理経由の現在のruntime選択をPR-E結合時に確認する。直接モデルを勝手に起動していない。

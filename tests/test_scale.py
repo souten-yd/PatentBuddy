@@ -1,5 +1,9 @@
 """Large-ingestion regression checks without a network or AI dependency."""
 import os
+import concurrent.futures
+import selectors
+import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -81,7 +85,93 @@ class ScaleStoreTest(unittest.TestCase):
         self.assertIn("documents_coll_id", indexes)
         plan = self.store.q("EXPLAIN QUERY PLAN SELECT id FROM documents "
                             "WHERE collection_id=? AND id<? ORDER BY id DESC LIMIT 10", (self.cid, 9999))
-        self.assertTrue(plan)
+        self.assertTrue(any("documents_coll_id" in row[3] for row in plan), [tuple(r) for r in plan])
+
+    def test_source_and_explicit_sections_are_not_silently_skipped(self):
+        doc = {"id": "provenance", "body": "原本本文", "source": "first",
+               "sections": {"要約": "旧索引"}}
+        self.store.add_documents(self.cid, [doc])
+        changed_source = dict(doc, source="corrected")
+        self.assertEqual(self.store.add_documents(self.cid, [changed_source])["updated"], 1)
+        self.assertEqual(self.store.one("SELECT source FROM documents WHERE ext_id='provenance'")[0], "corrected")
+        changed_sections = dict(changed_source, sections={"要約": "新索引"})
+        self.assertEqual(self.store.add_documents(self.cid, [changed_sections])["updated"], 1)
+        self.assertEqual(self.store.fts_search("旧索引"), [])
+        self.assertEqual(len(self.store.fts_search("新索引")), 1)
+        before = self.store.db.total_changes
+        self.assertEqual(self.store.add_documents(self.cid, [changed_sections])["unchanged"], 1)
+        self.assertEqual(self.store.db.total_changes, before)
+
+    def test_concurrent_batches_keep_body_chunks_and_index_consistent(self):
+        def write(i):
+            return self.store.add_documents(self.cid, [
+                {"id": "shared", "body": "電池 alpha%d" % i},
+                {"id": "shared", "body": "電池 omega%d" % i}])
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+            results = list(pool.map(write, range(12)))
+        self.assertEqual(sum(r["added"] for r in results), 1)
+        row = self.store.one("SELECT id,body FROM documents WHERE ext_id='shared'")
+        chunks = self.store.q("SELECT text FROM chunks WHERE doc_id=?", (row["id"],))
+        self.assertEqual([r["text"] for r in chunks], [row["body"]])
+        self.assertEqual(len(self.store.fts_search(row["body"].split()[-1])), 1)
+        self.assertEqual(self.store.one("PRAGMA quick_check")[0], "ok")
+
+    def test_batch_failure_is_atomic_and_cursor_survives_delete(self):
+        first = self.store.add_documents(self.cid, [{"id": str(i), "body": "本文"} for i in range(6)])
+        page = self.store.list_documents(self.cid, cursor="start", limit=2)
+        # The second record fails JSON serialization after the first update.
+        with self.assertRaises(TypeError):
+            self.store.add_documents(self.cid, [
+                {"id": "0", "body": "変更してはいけない"},
+                {"id": "bad", "body": "無効", "meta": {"bad": object()}}])
+        self.assertEqual(self.store.get_document(first["ids"][0])["body"], "本文")
+        self.assertEqual(self.store.fts_search("変更してはいけない"), [])
+        with self.store.tx() as db:
+            db.execute("DELETE FROM documents WHERE id=?", (page["next_cursor"],))
+        remaining = self.store.list_documents(self.cid, cursor=page["next_cursor"], limit=10)
+        self.assertEqual(len(remaining["items"]), 4)
+        self.assertFalse(remaining["has_more"])
+
+    def test_crash_before_commit_preserves_previous_batch(self):
+        path = os.path.join(self.tmp.name, "crash.sqlite3")
+        initial = Store(path)
+        cid = initial.create_collection("crash")["id"]
+        initial.add_documents(cid, [{"id": "stable", "body": "確定した電池"}])
+        initial.close()
+        code = """
+import sys, threading
+from qnaplibrary.store import Store
+s = Store(sys.argv[1])
+def trace(sql):
+    if sql == 'COMMIT':
+        print('before-commit', flush=True)
+        threading.Event().wait(30)
+s.db.set_trace_callback(trace)
+s.add_documents(int(sys.argv[2]), [{'id':'stable','body':'未確定'}, {'id':'partial','body':'未確定'}])
+"""
+        child = subprocess.Popen([sys.executable, "-c", code, path, str(cid)], stdout=subprocess.PIPE,
+                                 stderr=subprocess.PIPE, text=True)
+        try:
+            with selectors.DefaultSelector() as selector:
+                selector.register(child.stdout, selectors.EVENT_READ)
+                self.assertTrue(selector.select(10), "child did not reach commit")
+                self.assertEqual(child.stdout.readline().strip(), "before-commit")
+            child.kill()
+            child.wait(timeout=10)
+        finally:
+            if child.poll() is None:
+                child.kill()
+            child.communicate(timeout=10)
+        recovered = Store(path)
+        try:
+            self.assertEqual(recovered.one("PRAGMA quick_check")[0], "ok")
+            self.assertEqual(recovered.one("SELECT COUNT(*) FROM documents")[0], 1)
+            self.assertEqual(recovered.one("SELECT body FROM documents")[0], "確定した電池")
+            self.assertEqual(len(recovered.fts_search("電池")), 1)
+            self.assertEqual(recovered.fts_search("未確定"), [])
+            self.assertEqual(recovered.add_documents(cid, [{"id":"stable", "body":"確定した電池"}])["unchanged"], 1)
+        finally:
+            recovered.close()
 
 
 class ScaleApiTest(unittest.TestCase):
