@@ -18,6 +18,7 @@ curl -X POST http://NAS:17871/api/v1/pair -H 'Content-Type: application/json' \
 | POST | `/api/v1/collections` | 作成 `{name, kind, description}` |
 | POST | `/api/v1/collections/{name|id}/documents` | 文書追加/上書き `{documents:[...]}`（最大5000件/回） |
 | GET | `/api/v1/collections/{c}/documents?cursor=start&limit=100` | 件数が多い場合のメタデータ一覧。返された `next_cursor` を次回の `cursor` に渡す。従来の `offset` も使用可 |
+| GET | `/api/v1/collections/{c}/documents?ext_id=JP2024-123456A` | 公開番号などの**完全一致**ID検索（既存の複合UNIQUE索引を使用）。該当文献のメタデータのみ返す |
 | POST | `/api/v1/collections/{c}/import` | `{format: ndjson|json|csv|text, data}` |
 | GET | `/api/v1/collections/{c}/export` | NDJSON ストリーム |
 | POST | `/api/v1/search` | `{q, collections, limit, mode: hybrid|keyword|vector, vector?, include_text?}` |
