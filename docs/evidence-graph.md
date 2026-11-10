@@ -44,3 +44,9 @@ embedding scopeはベクトル保存だけ、research_analysisはPDF/分析/ベ�
 キャッシュは1ファイル2GiB/100万vector以内、完成済み最大2ファイル（構築中に追加の一時領域が必要）。通常の検索時はmanifest照合だけで、全vectorを再転送しない。PC上で128行ずつ読み、cosine exact top-kを固定サイズheapで集計する。最大30秒の時間制限でtruncatedを返す。これはANNではない。大量データの時間/物理I/O/RSS、Host CPU leaseとの製品Jobs接続とスマホUIは未完。
 
 実Host CPU/RAM lease下で、実BGEの2vectorを一時RDHへ保存→cache同期→query embedding→cosine検索・関連文上位、再同期manifestのみを確認。cache20,480 bytes。これは合成2文の結合試験で、大量検索性能の保証ではない。
+
+## 再開可能な索引構築worker（未配布）
+
+`embedding_build.build`はHostのlocal-only/model_refを固定し、正本pendingを32件ずつ取得する。入力は各8192文字・合計UTF-8 64KiB以内に分割し、本文hashと原文revisionを検証してから推論/正本保存する。モデル・次元の変更は拒否。PCに本文やジョブ用ベクトルを永続化せず、正本にコミットされた行を再開地点とする。取消や保存応答消失後も再実行で保存済み行を除外する。カーソルより前の原文更新を最後のpending再照合で検出し、完了扱いせず再開を要求する。
+
+CPU/RAM lease・更新・解放と進捗の頻度制御をComputeHostSessionへ共通化。PDFの既存権限は維持。workerの呼出元にHost Job/lease/heartbeat/terminal照合の責任があり、製品のEmbeddingJobs/開始ボタンはまだ未接続。実HostのJob/CPU leaseとBGE-M3で合成2文の構築・無変更再実行DB更新0・cache検索・Qwen3 rerankを確認。初回の進捗phase日本語によるHTTP422は、Host契約の英数字phaseへ直して再検証済み。

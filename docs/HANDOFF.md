@@ -256,3 +256,11 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - 関連7 tests成功4.162秒、全164 tests成功51.563秒（/tmp/pb-vector-cache-tests.log、/tmp/pb-vector-cache-verify.log）。snapshot途中変更の拒否、削除/rollback/epoch再生成、warm転送なし、private API、取消/time limit、cacheが本文を持たないことを確認。
 - 実Hostの2GiB CPU/RAM leaseとlocal-only BGEを使い、2文を一時RDHへ保存→PCcache同期→query embedding→関連文上位を確認。warm syncはGET manifest1回のみ、cache20,480 bytes。/tmp/pb-vector-cache-live.log。一時addon/user/session/DB/cacheを除去、audit/Jobs履歴保持。これは2件の機能受入で、タイミングは性能保証ではない。
 - 本番PatentBuddy/RDHは0.5.10のまま。PR23 Draft。次はEmbeddingJobs（全資料の版検証・小バッチ・取消/再開/Host CPU lease/Model ref保持）と構築ボタン、vector/graph/Host rerankへのchart接続。cacheの大規模物理I/O/CPU/RSS、source更新競合・応答消失の復旧、generation model provenance、人手承認UI、PR-F残、P2/PR-Gも未完、goal active。
+
+## 索引構築workerと共通Host資源管理（2026-11-11）
+
+- 前turnのOCR回答は状態確認のみでgoalのコード進捗なし。今回PR23で`ComputeHostSession`を抽出し、PDF既存権限を変えずCPU/RAM lease/heartbeat/release/進捗頻度制御を共有化。
+- `embedding_build.build`: 全コーパスpendingのkeyset、32件/8192文字/UTF-8 64KiB分割、原文hash/版/model_ref/次元照合、保存済みを再計算しない再開、カーソル前の更新検出、取消/応答消失後の再開。PC本文DBやworker中間vectorファイルは追加しない。既存正本vector保存以外の永続書込みなし。
+- 実HostのJob+CPU lease下でBGE-M3 2文/1024次元のworker構築成功、再実行DB更新0、cache検索関連文上位/再同期manifestのみ、Qwen3-Reranker実推論成功。`/tmp/pb-embedding-build-live.log`、err空。一時addon/user/session/DB/cacheは除去済み、Host Job/auditは保持。初回は日本語phaseがHostの英数字契約に反しHTTP422、修正して同試験成功。fixture `/tmp/pb-embedding-build-live.py` は終了済み。
+- 次はこのworkerを製品EmbeddingJobsへ接続（所有者/取消/再開/heartbeat/再起動・terminal照合/CPU lease）、構築ボタンとvector→graph→rerank chart接続。worker単独の完成を画面機能の完成としない。推論モデル版/人手レビュー/大規模性能/PR-F残/P2/PR-Gは引き続き未完。本番0.5.10は不変、PR23 Draft、goal active。
+- 最終全verify **169 tests成功51.036秒**（`/tmp/pb-embedding-build-verify-final.log`）。新增5 testsはUTF-8分割/無変更無推論・書込み0/取消再開/model変更・本文hash不正/カーソル前更新/commit応答消失後再開を確認。PDF lease回帰4 testsも成功。配布ビルド・リリースはPR23の残機能完成後。
