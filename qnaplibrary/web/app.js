@@ -130,21 +130,108 @@ function collectionPicker(selected = []) {
 // ---------- home ----------
 async function homeView(main) {
   main.append(h("h1", {}, "ホーム"));
-  const [st, pats, upd] = await Promise.all([api("GET", "/api/v1/stats"), api("GET", "/api/v1/patents"), api("GET", "/api/update/status")]);
+  const activity = h("section", { class: "card home-activity", "aria-live": "polite" },
+    h("h2", {}, "処理状況"), h("p", { class: "small muted" }, "状態を確認しています…"));
+  main.append(activity);
+
+  const [st, pats] = await Promise.all([
+    api("GET", "/api/v1/stats"), api("GET", "/api/v1/patents")
+  ]);
+  if (!main.isConnected || S.view !== "home") return;
   const s = st.store;
-  main.append(h("div", { class: "grid" },
-    [["コレクション", s.collections], ["文書", s.documents], ["チャンク", s.chunks], ["ベクトル", s.vectors], ["特許案件", s.patents], ["DB サイズ", (s.db_bytes / 1048576).toFixed(1) + " MB"]]
-      .map(([l, v]) => h("div", { class: "card" }, h("div", { class: "muted small" }, l), h("div", { class: "stat" }, v)))));
-  const dl = pats.projects.filter(p => p.next_deadline).sort((a, b) => a.next_deadline.due.localeCompare(b.next_deadline.due));
-  main.append(h("div", { class: "card" }, h("h2", {}, "特許の期限（目安）"),
-    dl.length ? h("table", {}, h("tr", {}, h("th", {}, "案件"), h("th", {}, "期限"), h("th", {}, "内容")),
-      dl.slice(0, 10).map(p => h("tr", { class: "click", onclick: () => { S.view = "patents"; S.patentId = p.id; render(); } },
-        h("td", {}, p.title), h("td", {}, p.next_deadline.due, " ", h("span", { class: "tag " + (p.next_deadline.days_left < 14 ? "bad" : p.next_deadline.days_left < 60 ? "warn" : "") }, "あと" + p.next_deadline.days_left + "日")),
-        h("td", { class: "small" }, p.next_deadline.label)))) : h("p", { class: "muted" }, "期限のある案件はありません。")));
-  main.append(h("div", { class: "card" }, h("h2", {}, "システム"),
-    h("dl", { class: "dl" }, h("dt", {}, "バージョン"), h("dd", {}, "v" + S.health.version + "（" + upd.mode + "）"),
-      h("dt", {}, "更新"), h("dd", {}, upd.message || "未確認"), h("dt", {}, "全文検索"), h("dd", {}, s.fts5 ? "FTS5（日本語2-gram）" : "LIKE（FTS5なし）"),
-      h("dt", {}, "ベクトル"), h("dd", {}, st.vectors.vectors + " 件 / " + (st.vectors.dim || "-") + " 次元 / RAM " + st.vectors.ram_mb + "MB" + (st.vectors.numpy ? "（numpy）" : "")))));
+  const cards = [["文書", s.documents], ["コレクション", s.collections], ["特許案件", s.patents]];
+  const kpis = h("div", { class: "home-kpis" });
+  cards.forEach(([label, val]) => kpis.append(h("div", { class: "card home-kpi" },
+    h("div", { class: "muted small" }, label),
+    h("div", { class: "home-stat-value" }, Number(val || 0).toLocaleString("ja-JP")))));
+  main.append(kpis);
+
+  const deadlines = pats.projects.filter(p => p.next_deadline)
+    .sort((a, b) => a.next_deadline.due.localeCompare(b.next_deadline.due));
+  if (deadlines.length) {
+    const table = h("table", {}, h("tr", {},
+      h("th", {}, "案件"), h("th", {}, "期限"), h("th", {}, "内容")));
+    deadlines.slice(0, 5).forEach(p => {
+      const left = p.next_deadline.days_left;
+      const badge = h("span", { class: "tag " + (left < 14 ? "bad" : left < 60 ? "warn" : "") },
+        left < 0 ? "期限経過" : "あと" + left + "日");
+      table.append(h("tr", { class: "click", onclick: () => {
+        S.view = "patents"; S.patentId = p.id; render();
+      } }, h("td", {}, p.title), h("td", {}, p.next_deadline.due, " ", badge),
+      h("td", { class: "small" }, p.next_deadline.label)));
+    });
+    main.append(h("section", { class: "card" },
+      h("h2", {}, "特許の期限（目安）"), h("div", { class: "scrollx" }, table)));
+  }
+
+  const info = h("dl", { class: "dl" },
+    h("dt", {}, "チャンク"), h("dd", {}, String(s.chunks)),
+    h("dt", {}, "ベクトル"), h("dd", {}, String(s.vectors)),
+    h("dt", {}, "DB 容量"), h("dd", {}, (s.db_bytes / 1048576).toFixed(1) + " MB"),
+    h("dt", {}, "全文検索"), h("dd", {}, s.fts5 ? "FTS5（日本語2-gram）" : "LIKE（FTS5なし）"),
+    h("dt", {}, "検索用ベクトル索引"), h("dd", {}, st.vectors.vectors + " 件 / RAM " + st.vectors.ram_mb + " MB"));
+  main.append(h("details", { class: "card home-technical" },
+    h("summary", {}, "技術情報を表示"), info));
+  main.append(h("p", { class: "small muted home-version" }, "QnapLibrary v" + S.health.version));
+
+  const live = () => main.isConnected && S.view === "home";
+  let lastActivity = null;
+  async function refreshActivity() {
+    if (!live()) return;
+    try {
+      const [emb, research, upd, backend] = await Promise.all([
+        api("GET", "/api/llm/embedding"), api("GET", "/api/v1/research"),
+        api("GET", "/api/update/status"), api("GET", "/api/vectors/backend")
+      ]);
+      if (!live()) return;
+      const tasks = [];
+      const e = emb.status || {};
+      if (e.running) {
+        tasks.push(["ベクトル化中", e.pending == null ? "検索用データを作成しています" :
+          "残り " + Number(e.pending).toLocaleString("ja-JP") + " 件", "running"]);
+      } else if (e.last_error && e.enabled) {
+        tasks.push(["ベクトル化でエラー", e.last_error, "error"]);
+      } else if (e.enabled && e.pending > 0) {
+        tasks.push(["ベクトル化待ち", "未処理 " + Number(e.pending).toLocaleString("ja-JP") +
+          " 件" + (e.auto === false ? "・自動実行オフ" : ""), "waiting"]);
+      }
+      const activeResearch = (research.jobs || []).filter(j => j.status === "running").slice(0, 3);
+      if (activeResearch.length) {
+        const jobs = await Promise.all(activeResearch.map(j => api("GET", "/api/v1/research/" + j.id)));
+        if (!live()) return;
+        jobs.forEach(j => tasks.push(["調査中: " + j.params.question,
+          j.result && j.result.step || "処理中", "running"]));
+      }
+      const sync = backend.sync || {};
+      if (sync.running) tasks.push(["検索索引を同期中", "Qdrantへ同期しています", "running"]);
+      else if (sync.error) tasks.push(["検索索引の同期エラー", String(sync.error), "error"]);
+      if (upd.phase && !["idle", "ready"].includes(upd.phase)) {
+        tasks.push(["アップデート", upd.message || upd.phase, upd.error ? "error" : "running"]);
+      } else if (upd.error) {
+        tasks.push(["アップデートでエラー", String(upd.error), "error"]);
+      }
+      const key = JSON.stringify(tasks);
+      if (key !== lastActivity) {
+        lastActivity = key;
+        const children = [h("h2", {}, "処理状況")];
+        if (!tasks.length) {
+          children.push(h("p", { class: "small muted home-idle" }, "現在、実行中の処理はありません。"));
+        } else {
+          tasks.forEach(([title, detail, status]) => children.push(
+            h("div", { class: "home-activity-item" },
+              h("span", { class: "home-activity-dot " + status, "aria-hidden": "true" }),
+              h("div", {}, h("strong", {}, title), h("div", { class: "small muted" }, detail)))));
+        }
+        clear(activity).append(...children);
+      }
+    } catch (error) {
+      if (live()) clear(activity).append(h("h2", {}, "処理状況"),
+        h("p", { class: "small muted" }, "状態を取得できませんでした: " + error.message));
+    } finally {
+      if (live()) setTimeout(() => { if (live()) refreshActivity(); }, 20000);
+    }
+  }
+  refreshActivity();
 }
 
 // ---------- search ----------
