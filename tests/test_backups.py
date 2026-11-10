@@ -75,6 +75,12 @@ class BackupApiTest(unittest.TestCase):
             self.assertEqual(st, 200)
             admin.csrf = login["csrf"]
             self.assertEqual(admin.call("GET", "/api/backups")[1]["snapshots"], [])
+            st, device = admin.call("POST", "/api/devices", {"name": "backup-test-device", "scopes": "rw"})
+            self.assertEqual(st, 200)
+            paired = Client(srv.base)
+            paired.token = device["token"]
+            self.assertEqual(paired.call("GET", "/api/backups")[0], 403)
+            self.assertEqual(paired.call("POST", "/api/backups", {})[0], 403)
             st, created = admin.call("POST", "/api/backups", {})
             self.assertEqual(st, 200, created)
             self.assertEqual(len(admin.call("GET", "/api/backups")[1]["snapshots"]), 1)
