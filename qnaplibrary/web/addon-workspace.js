@@ -77,8 +77,14 @@ async function loadAnalyses(id) {
   for (const item of data.items) {
     const box = document.createElement('div'); box.className = 'analysis';
     const title = document.createElement('h3');
-    title.textContent = (item.kind === 'claims' ? '請求項の確認' : '要約') + (item.stale ? ' — 原文が更新されています' : ' — 未確認');
-    const text = document.createElement('pre'); text.textContent = item.content;
+    title.textContent = (item.kind === 'chart' ? 'クレームチャート' : item.kind === 'claims' ? '請求項の確認' : '要約') + (item.stale ? ' — 根拠が更新・削除されています' : item.review_status === 'approved' ? ' — 確認済み' : item.review_status === 'rejected' ? ' — 却下' : ' — 未確認');
+    const text = document.createElement('pre');
+    if (item.kind === 'chart') {
+      const chart = JSON.parse(item.content);
+      text.textContent = `請求項${chart.claim_no} · ${item.review_status === 'approved' ? '確認済み' : '未確認'}\n` +
+        chart.rows.map(row => `${row.element.label}: ${row.element.text}\n${row.assessment.judgment} ${row.assessment.reason}\n引用: ${row.assessment.citations.join(', ') || 'なし'}\n候補の根拠:\n` +
+          row.evidence.map(e => `${e.ref} · 文献${e.doc_id} [${e.start},${e.end})\n${e.quote}`).join('\n')).join('\n\n');
+    } else { text.textContent = item.content; }
     box.append(title, text); el('analyses').append(box);
   }
 }
@@ -86,7 +92,7 @@ el('analyze').onclick = async () => {
   if (!currentDoc) return;
   el('analyze').disabled = true;
   try {
-    await api('jobs', {doc_id: currentDoc, kind: el('analysis-kind').value});
+    await api('jobs', {doc_id: currentDoc, kind: el('analysis-kind').value, claim_no: Number(el('claim-no').value)});
     el('message').textContent = 'ローカルAIの分析を開始しました。';
     await loadJobs();
   } catch (error) { el('message').textContent = error.message; }
@@ -101,7 +107,7 @@ async function loadJobs() {
     if (!data.items.length) el('jobs').textContent = '実行中の分析はありません。';
     for (const job of data.items) {
       const row = document.createElement('div'); row.className = 'job'; row.dataset.status = job.status;
-      const label = document.createElement('p'); label.textContent = `${job.kind === 'claims' ? '請求項の確認' : '要約'} · 文献 ${job.doc_id} — ${job.message}`;
+      const label = document.createElement('p'); label.textContent = `${job.kind === 'chart' ? 'クレームチャート' : job.kind === 'claims' ? '請求項の確認' : '要約'} · 文献 ${job.doc_id} — ${job.message}`;
       row.append(label);
       if (['queued', 'running'].includes(job.status)) {
         const cancel = document.createElement('button'); cancel.textContent = 'キャンセル';
@@ -116,7 +122,7 @@ async function loadJobs() {
         const rerun = document.createElement('button'); rerun.textContent = '現在の原文で再実行';
         rerun.onclick = async () => {
           rerun.disabled = true;
-          try { await api('jobs', {doc_id: job.doc_id, kind: job.kind, resume_id: job.id}); }
+          try { await api('jobs', {doc_id: job.doc_id, kind: job.kind, resume_id: job.id, claim_no: job.claim_no || 1}); }
           catch (error) { el('message').textContent = error.message; }
           finally { await loadJobs(); }
         };

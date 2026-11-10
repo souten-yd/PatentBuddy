@@ -461,7 +461,7 @@ class Handler(BaseHTTPRequestHandler):
                             body = Request(self, method, path, {}, {}).json()
                             if not isinstance(body, dict):
                                 raise AddonError(400, "分析条件を指定してください")
-                            result = self.server.app.jobs.start(self.headers, body.get("doc_id"), body.get("kind"), body.get("resume_id"))
+                            result = self.server.app.jobs.start(self.headers, body.get("doc_id"), body.get("kind"), body.get("resume_id"), body.get("claim_no", 1))
                         elif method == "POST" and re.fullmatch(r"/addon/v1/jobs/[a-f0-9]{32}/reconcile", path):
                             Request(self, method, path, {}, {}).json()
                             result = self.server.app.jobs.reconcile(self.headers, path.split('/')[-2])

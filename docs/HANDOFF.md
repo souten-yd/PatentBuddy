@@ -218,3 +218,12 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - 同じID同内容の再投入と探索はDB変更ゼロ。状態/承認/種別を含む隣接索引で出方向1〜2hop、seed20/ノード100/関係200以内。未承認・stale除外、推測は明示指定時のみ、上限はtruncated。API mutation/reviewは現在admin限定、private read可・published拒否。
 - 関連5 tests成功5.369秒、全verify148 tests成功42.363秒（/tmp/pb-graph-tests2.log、/tmp/pb-graph-verify.log）。EXPLAINでadjacency索引利用を確認。GraphRAG実LLM、性能/索引write bytes測定、アドオンUI、scope付きproposal、逆方向探索、検索→vector→graph→rerank、クレームチャート/確認操作は未完。本番v0.5.10へ未反映、版変更/公開なし。
 - 次はこの基盤をアドオンのHost Jobsと根拠付きクレームチャートへ接続する。PR-F完了後もP2汎用メタデータ検索とPR-G NAS移行を残す。現行データ/接続/サービスを維持する。
+
+## PR23 クレームチャートのHost接続（2026-11-11・作業中）
+
+- 前turnはprogress（根拠グラフ基盤99820cf push）。今回 `/data1tb/PatentBuddy-graph` のclean状態と実コードを確認して継続。claim_chart.py/chart_storage.pyを追加、AnalysisJobsにchart/claim_noを追加。
+- 原文の請求項見出しと説明文境界を検証し、最大16行・行別3根拠・引用650字でbounded化。構成要件の欠落/重複/別行引用を原子的に拒否。正本saveでも原文/根拠revisionと文字範囲を検証。review/dependency表で根拠改変/削除の承認を不可逆失効。
+- 既存Host Jobs・local_only推論・取消・再実行に接続し、請求項番号も再実行一致を検証。取得進捗は1Hz以下。検索はkeyword/rerank=falseを明示しサーバーLLMを呼ばない。最大3seedの2hop承認済みgraph候補も取得。vector/rerankは未実装として結果に明記し、代替済み/全体完成としない。
+- 関連9 tests成功5.438秒、最終全verify152 tests成功44.949秒（/tmp/pb-chart-verify.log）。その後UIの確認状態文言と採用引用の明示だけを修正、Node構文チェックは追記後に実施。
+- 実Host一時addon pb-chart-ui-acceptance/一時RDHを使い、合成請求項と対比文献でControlDeckの実ローカルLLM生成・保存・1280/320pxの引用表示DOM検証が成功、横溢れ/JSエラーなし（/tmp/pb-chart-ui-browser.log）。スクリーンショットは上部でチャート本体が画角外のため、チャートの目視受入とは呼ばない。fixtureをSIGINTで正常終了、一時addon/user/session/grants/DB除去を確認（/tmp/pb-chart-ui-fixture.log）。本番v0.5.10は不変。
+- 次: vector/Host rerank接続、モデル版の保存、狭い提案/人手承認scopeとUI、関係管理UI/逆方向、実根拠の誤判定・取消/応答消失の復旧・性能I/O・配布受入を継続。PR10未マージ、PR23 Draft。P2汎用索引とPR-G NAS移行も未完。goal active。

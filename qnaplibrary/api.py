@@ -1163,3 +1163,12 @@ def graph_expand(req):
     return evidence_graph.expand(req.app.store, [int(x) for x in seeds],
         hops=int(req.arg('hops', '1')), max_nodes=int(req.arg('max_nodes', '50')),
         max_edges=int(req.arg('max_edges', '100')), include_inferred=inferred == 'true')
+
+
+@route('POST', '/api/v1/analyses/{aid}/review', 'admin')
+def chart_review(req):
+    from .chart_storage import review
+    body = req.json()
+    if not isinstance(body, dict):
+        raise _err(400, '確認内容を指定してください')
+    return review(req.app.store, req.params['aid'], body.get('status'), req.actor)
