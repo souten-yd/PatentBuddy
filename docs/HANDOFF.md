@@ -4,11 +4,9 @@
 
 ## 現在のバージョン
 
-- v0.4.0: PR（調査ジョブ・e-Stat/EDINET/SEC・規格番号の正規化と CSV テンプレート・自然文検索の改善）
-- v0.3.0（リリース済み）: PR（Qdrant 任意バックエンド・リランカー・日付フィルタ・分析画面・PC クライアント）
-- v0.2.0（リリース済み）: PR（特許ウォッチ・通知・分類辞書・審査基準連携）。所有者の指示「順次確認不要で計画を最後まで」により v0.3 → v0.4 まで連続で進める
-- **v0.1.1（リリース済み）**: https://github.com/souten-yd/QnapLibrary/releases/tag/v0.1.1
-- v0.1.0 は PR #1 でマージしたがリリースなし（開発環境からはタグ push / API でのタグ作成 / workflow_dispatch がプロキシで禁止。リリースは main マージ時の release.yml が作る）
+- **v0.4.0（リリース済み・最新）**: https://github.com/souten-yd/QnapLibrary/releases/tag/v0.4.0
+- 履歴: v0.1.1（HTTPS 8443・OpenRouter 埋め込み）→ v0.2.0（ウォッチ・通知・分類・審査基準）→ v0.3.0（Qdrant・リランカー・分析・PC クライアント）→ v0.4.0（調査ジョブ・市場データ・規格）
+- ロードマップ v0.1〜v0.4 は完了。次の候補は `docs/roadmap.md` 末尾と `docs/proposals.md`（バックアップ機能など）
 
 ## 状態（2026-11-10）
 
@@ -33,6 +31,10 @@
 - release.yml（main マージでバージョン変更時）: v0.1.1 で成功（テスト→Linux→QPKG（payload 検査込み）→リリース作成）。
 - 見つけた不具合: ランチャーを `qnaplibrary/` フォルダのあるディレクトリから起動すると `python -m` がそちらを読み込む。
   `fix/launcher-cwd` で修正（Linux ランチャーと QPKG ランナーが自分のインストール先へ cd）。**次の版に含まれる**（既存の Linux 導入はランチャーが install.sh で作られるため、次版の install.sh を再実行するまで旧ランチャーのまま。systemd 経由なら cwd は / なので実害なし）。
+
+## 複数版をまたぐ自己更新の確認（2026-11-10）
+
+- Linux 版 v0.1.1 → v0.4.0 を管理 API から一度で更新。新しいテーブル（watches / watch_hits / notify_log）は起動時に自動作成され、既存データは保持。`versions/` に 0.1.0・0.1.1・0.4.0 が残り（直近3版）、`current` は 0.4.0。
 
 ## 次の一手
 
