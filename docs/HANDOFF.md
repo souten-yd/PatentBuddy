@@ -142,3 +142,15 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 
 - 隔離worktree `/data1tb/PatentBuddy-pdf`、feat/pdf-ocr-import。計画は `docs/pdf-ocr-plan.md`。まず上限/キャンセル付きのページ単位ローカル抽出とテスト、その後Host Files/Jobs/CPU lease・限定保存認証・原本snapshot・UIを結合する。
 - Host画面修正PR20はmain6963a54へ統合、v0.5.9 Release42829063808成功。署名Featureを実更新済み、実ブラウザ受入中。サーバーはv0.5.8（healthのみのAddon修正と区別）。
+
+## v0.5.9実画面受入とPDFコア（最新）
+
+- PR20 main6963a54924551d12debf7af56b2c0de470f9b8f3 / v0.5.9 / Release42829063808成功。署名Feature SHA1d3022e466778b97dca26b60637440040abc1f244aad3823e1d2cc4b5e9db849、実update成功。公式0.5.8→0.5.9自己更新でcookie/CSRF/文献・分析結果保持成功（/tmp/pb-autoupdate-059.json）。
+- 実Host HTTPSログイン/Bridge/導入済みAddon/実local-only LLMで1280px要約・320px請求項分析とキャンセル成功、横溢れ/JSエラーなし。合成資料のtemp ResearchDataHubだけを接続して隔離検証（実本番文献の受入ではない）。証拠 `/data1tb/PatentBuddy-addon/.data/installed-ai-browser.json`。enable要求の初回403は試験scriptのCSRF header漏れ、正規X-Requested-With付与後成功。
+- Host正規enable APIで既存3capにai.inference/jobs.writeを明示追加。テストconnection.jsonを撤去し、実サーバー17871/v0.5.8/local_peerへの自動接続復帰確認。temp user/session/job metadata削除、監査・Host job履歴保持、remaining_job_count=0。全3ユーザーサービスactive、pre0.5.8から秘密保持確認。旧合成UI試験プロセスも停止。
+- PR21 PDFコア `qnaplibrary/pdf_extract.py` を追加中。Linux別processでCPU/AS/file-size上限、子process group停止、入力50MiB/200page/100万字上限、固定tool argv・shellなし・ページ長辺2400pixel。新依存は追加せず任意既存Poppler/Tesseractを使用。まだAPI/UI/Host lease/保存には未接続。
+- 指定PDFの初回native抽出は15ページ1.83秒だが、表紙の出願人等の画像部分を取りこぼすことを確認。pdfimages一覧で画像入りページを検出し、表紙と12〜15ページだけOCRするよう改善。再試験15ページ6.86秒（直接CPUの候補module試験、Host Jobではない）、native10/OCR併用5。原本hash/ページ/nativeとOCR本文/エンジン版/単語信頼度を保持。表紙OCRは29低信頼単語があり品質完了とはしない。
+- 任意tool有無/入力サイズ/偽PDF/取消/リンク拒否/実child停止/実native/強制OCR/画像混在PDFを4 testsで確認。画像混在回帰込み3.433秒成功。`.data/pdf-extract-user.json`はローカル試験データでgit追跡しない。初回edit scriptの構文エラーはコード変更前に失敗、修正して再実行済み。
+- 次: コア最終tests・コードreview後push。Host Files grant・Jobs/CPU lease・狭いimport認証・原本blob/ページ根拠の正本保存/復元・UIを実装する。PDF原本/抽出資料をAddon永続文献DBへ保存しない。PR21はDraftでリリース未実施。PR-F/P2/PR-Gも未完。
+
+- PDFコア最終全verify126 tests成功（/tmp/pb-pdf-extract-verify-final.log）。低信頼単語の行/段落を最大1000件残し、超過時は省略flagを明示。実際のOCR取り込み画面・Host Job/Broker・原本保存は引き続き未実装。次回は `/data1tb/PatentBuddy-pdf` のPR21から続ける。
