@@ -21,6 +21,7 @@ from urllib.parse import parse_qs, urlsplit
 from . import APP_NAME, DEFAULT_PORT, VERSION, api, debuglog, webauthn
 from .auth import Auth
 from .config import Config
+from .embedworker import EmbedWorker
 from .llm import Providers
 from .patents import Patents
 from .search import Searcher
@@ -48,7 +49,9 @@ class App:
         self.store = Store(self.data_dir / "library.sqlite3")
         self.auth = Auth(self.config, self.store)
         self.providers = Providers(self.config)
-        self.searcher = Searcher(self.store, self.config, self._embedder)
+        self.searcher = Searcher(self.store, self.config, self._embedder, self._vector_model)
+        self.embedder = EmbedWorker(self.store, self.providers, self.config)
+        self.store.on_change = self.embedder.kick
         self.patents = Patents(self.store, self.searcher, self.providers)
         self.challenges = webauthn.Challenges()
         self.exit_code = 0
@@ -62,6 +65,9 @@ class App:
             return None
         return self.providers.embed(texts, query=query)
 
+    def _vector_model(self):
+        return self.providers.embedding_tag() if self.providers.embedding_enabled() else None
+
     def request_shutdown(self, code=0):
         self.exit_code = code
         if self.httpd:
@@ -72,6 +78,7 @@ class App:
             "version": VERSION, "app": APP_NAME, "data_dir": str(self.data_dir),
             "install_mode": self.updater.mode, "update": self.updater.status(),
             "store": self.store.stats(), "vectors": self.searcher.vectors.info(),
+            "embedding": self.embedder.info(), "vector_models": self.store.vector_models(),
             "settings": self.config.all(),
             "secrets": {k: self.config.secret_status(k) for k in api.SECRET_NAMES},
             "llm_providers": [{"id": p["id"], "type": p["type"], "base_url": p["base_url"], "model": p.get("model")}
@@ -144,8 +151,20 @@ class Request:
                     raise HTTPError(400, "JSON が不正です")
         return self._body
 
+    def is_https(self):
+        """Direct TLS, or Tailscale Serve / a local reverse proxy terminating TLS on this host.
+
+        X-Forwarded-Proto is trusted only from loopback peers (Serve connects from 127.0.0.1).
+        """
+        if self.h.server.tls:
+            return True
+        if self.ip not in ("127.0.0.1", "::1", "::ffff:127.0.0.1"):
+            return False
+        host = (self.h.headers.get("Host") or "").rsplit(":", 1)[0].lower()
+        return (self.h.headers.get("X-Forwarded-Proto") or "").lower() == "https" or host.endswith(".ts.net")
+
     def origin(self):
-        scheme = "https" if self.h.server.tls else "http"
+        scheme = "https" if self.is_https() else "http"
         host = self.h.headers.get("Host", "")
         return "%s://%s" % (scheme, host)
 
@@ -193,8 +212,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Security-Policy",
                          "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; "
                          "connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
-        if self.server.tls:
-            self.send_header("Strict-Transport-Security", "max-age=31536000")
+        # No HSTS on purpose: plain http on the LAN must keep working for the same host name.
 
     def send_json(self, status, data, headers=None):
         raw = json.dumps(data, ensure_ascii=False, separators=(",", ":"), default=str).encode("utf-8")
@@ -383,11 +401,14 @@ def main(argv=None):
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
     app.updater.start_background()
+    app.embedder.start()
+    app.embedder.kick()
     LOG.warning("%s %s listening on %s://%s:%d (data: %s)", APP_NAME, VERSION, "https" if tls else "http", bind, port, args.data)
     try:
         httpd.serve_forever(poll_interval=1.0)
     finally:
         httpd.server_close()
+        app.embedder.stop()
         app.store.close()
     return app.exit_code
 

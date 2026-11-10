@@ -47,7 +47,7 @@ def _err(status, message):
 def health(req):
     a = req.app
     return {"app": "QnapLibrary", "version": VERSION, "ok": True, "setup_required": not a.auth.admin_configured(),
-            "pairing": a.auth.pairing_enabled(), "tls": req.h.server.tls, "uptime_s": round(time.time() - a.started)}
+            "pairing": a.auth.pairing_enabled(), "https": req.is_https(), "https_url": a.config.get("server", "https_url", default=""), "uptime_s": round(time.time() - a.started)}
 
 
 @route("GET", "/api/auth/me", "public")
@@ -56,12 +56,22 @@ def me(req):
             "csrf": req.session["csrf"] if req.session else None,
             "setup_required": not req.app.auth.admin_configured(),
             "passkeys": req.app.store.one("SELECT COUNT(*) FROM passkeys")[0],
-            "secure_context": req.h.server.tls or req.ip in ("127.0.0.1", "::1")}
+            "https": req.is_https(), "https_url": req.app.config.get("server", "https_url", default=""),
+            "passkey_ready": _passkey_host_ok(req)}
+
+
+def _passkey_host_ok(req):
+    host = req.rp_id()
+    return req.is_https() and "." in host and not re.fullmatch(r"[0-9.]+|\[?[0-9a-f:]+\]?", host)
 
 
 def _login_response(req, via):
     sid, session = req.app.auth.sessions.create(via)
-    secure = "; Secure" if req.h.server.tls else ""
+    secure = "; Secure" if req.is_https() else ""
+    if req.is_https() and _passkey_host_ok(req):
+        url = req.origin()
+        if req.app.config.get("server", "https_url") != url:  # remember once (written only on change)
+            req.app.config.update({"server": {"https_url": url}})
     cookie = "ql_session=%s; Path=/; HttpOnly; SameSite=Strict%s; Max-Age=%d" % (sid, secure, req.app.auth.sessions.ttl)
     req.app.store.audit("admin", "login", via + " " + req.ip)
     return req.h.send_json(200, {"ok": True, "csrf": session["csrf"]}, {"Set-Cookie": cookie})
@@ -114,6 +124,8 @@ def _passkey_rows(app):
 @route("POST", "/api/auth/passkey/register/options", "admin")
 def passkey_register_options(req):
     app = req.app
+    if not _passkey_host_ok(req):
+        raise _err(400, "パスキーは https://<名前>（例: Tailscale の *.ts.net）で開いたときだけ登録できます")
     rp_id, origin = req.rp_id(), req.origin()
     challenge = app.challenges.issue("create", req.session["hash"], rp_id, origin)
     handle = app.config.secret("passkey_user_handle")
@@ -152,6 +164,8 @@ def passkey_register_verify(req):
 @route("POST", "/api/auth/passkey/login/options", "public")
 def passkey_login_options(req):
     app = req.app
+    if not _passkey_host_ok(req):
+        raise _err(400, "パスキーは https の名前付きアドレスで開いたときだけ使えます")
     rows = _passkey_rows(app)
     if not rows:
         raise _err(404, "パスキーが登録されていません")
@@ -274,6 +288,7 @@ def secret_put(req):
         raise _err(400, "invalid value")
     req.app.config.set_secret(name, (value or "").strip())
     req.app.store.audit("admin", "secret.set", name)
+    req.app.embedder.kick()
     return req.app.config.secret_status(name)
 
 
@@ -379,32 +394,50 @@ def vectors_put(req):
 
 @route("GET", "/api/v1/collections/{cid}/pending-chunks", "read")
 def vectors_pending(req):
-    """Chunks that still need an embedding (for an external embedding worker)."""
+    """Chunks that still need an embedding (for an external embedding worker). ?model=<tag>"""
     c = req.app.store.get_collection(req.params["cid"])
-    rows = req.app.store.chunks_missing_vectors(c["id"], min(int(req.arg("limit", 256)), 2000))
+    rows = req.app.store.chunks_missing_vectors(c["id"], min(int(req.arg("limit", 256)), 2000), model=req.arg("model"))
     return {"chunks": [{"chunk_id": r["id"], "title": r["title"], "section": r["section"], "text": r["text"]} for r in rows]}
 
 
 @route("POST", "/api/v1/collections/{cid}/embed", "user")
 def vectors_embed(req):
-    """Embed up to N missing chunks with the configured embedding provider (synchronous, bounded)."""
-    app = req.app
-    if not app.providers.embedding_enabled():
-        raise _err(409, "埋め込みプロバイダが未設定です（設定 > AI > 埋め込み）")
-    c = app.store.get_collection(req.params["cid"])
-    limit = min(int(req.json().get("limit", 256)), 2000)
-    batch = int(app.config.get("llm", "embedding", "batch", default=32) or 32)
-    done = 0
-    model = app.config.get("llm", "embedding", "model")
-    while done < limit:
-        rows = app.store.chunks_missing_vectors(c["id"], min(batch, limit - done))
-        if not rows:
-            break
-        vecs = app.providers.embed([(r["title"] + "\n" + r["text"]) for r in rows])
-        app.store.put_vectors([(r["id"], v) for r, v in zip(rows, vecs)], model)
-        done += len(rows)
-    remaining = len(app.store.chunks_missing_vectors(c["id"], 1))
-    return {"embedded": done, "more": bool(remaining)}
+    """Embed up to N missing chunks now with the configured embedding provider (bounded)."""
+    c = req.app.store.get_collection(req.params["cid"])
+    try:
+        done = req.app.embedder.run_once(min(int(req.json().get("limit", 256)), 2000), c["id"])
+    except LLMError as error:
+        raise _err(502, str(error))
+    more = bool(req.app.store.chunks_missing_vectors(c["id"], 1, model=req.app.providers.embedding_tag()))
+    return {"embedded": done, "more": more}
+
+
+@route("DELETE", "/api/v1/collections/{cid}/vectors", "admin")
+def vectors_delete(req):
+    """Delete vectors of a collection (e.g. after changing the embedding model)."""
+    c = req.app.store.get_collection(req.params["cid"])
+    return {"deleted": req.app.store.delete_vectors(c["id"])}
+
+
+@route("GET", "/api/llm/embedding", "admin")
+def embedding_status(req):
+    return {"status": req.app.embedder.info(), "vector_models": req.app.store.vector_models()}
+
+
+@route("POST", "/api/llm/embedding/run", "admin")
+def embedding_run(req):
+    req.app.embedder.kick()
+    if not req.app.providers.embedding_enabled():
+        raise _err(409, "埋め込みが無効です（プロバイダのキーを設定してください）")
+    return req.app.embedder.info()
+
+
+@route("GET", "/api/llm/embedding-models", "admin")
+def embedding_models(req):
+    try:
+        return {"models": req.app.providers.embedding_models(req.arg("provider"))}
+    except LLMError as error:
+        raise _err(502, str(error))
 
 
 # search ----------------------------------------------------------------------
@@ -424,7 +457,8 @@ def search(req):
 
 @route("GET", "/api/v1/stats", "read")
 def stats(req):
-    return {"store": req.app.store.stats(), "vectors": req.app.searcher.vectors.info(), "version": VERSION}
+    return {"store": req.app.store.stats(), "vectors": req.app.searcher.vectors.info(), "version": VERSION,
+            "embedding": req.app.embedder.info()}
 
 
 @route("GET", "/api/v1/schema", "read")
@@ -546,6 +580,7 @@ def llm_providers_put(req):
         if b.get("rag_top_k"):
             llm["rag_top_k"] = max(1, min(int(b["rag_top_k"]), 30))
         req.app.config.replace_section("llm", llm)
+    req.app.embedder.kick()
     return llm_providers(req)
 
 
@@ -684,6 +719,8 @@ def connectors_run(req):
     spec = next((c for c in connectors.CATALOG if c["id"] == name), None)
     if not spec:
         raise _err(404, "unknown connector")
+    if spec["key"] and not all(req.app.config.secret(k) for k in spec["key"]):
+        raise _err(409, "%s は未登録（キー未設定）のため使えません。設定 > 外部キー で登録すると利用できます" % spec["label"])
     t0 = time.time()
     try:
         docs = connectors.run(name, b.get("params") or {}, req.app.config.secret)

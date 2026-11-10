@@ -103,6 +103,7 @@ class Store:
         self.db.executescript(SCHEMA)
         self.fts = self._init_fts()
         self.vector_version = 0  # bumped on vector change; vector cache invalidation
+        self.on_change = None    # callback after documents were added/updated (auto-embedding)
         with self.lock:
             self.db.execute("INSERT OR IGNORE INTO meta(key,value) VALUES('schema_version',?)", (str(SCHEMA_VERSION),))
 
@@ -308,6 +309,8 @@ class Store:
             db.execute("UPDATE collections SET updated=? WHERE id=?", (t, c["id"]))
         if added or updated:
             self.vector_version += 1
+            if self.on_change:
+                self.on_change()
             self.audit(actor, "documents.add", "%s +%d ~%d" % (c["name"], added, updated))
         return {"added": added, "updated": updated, "unchanged": unchanged, "ids": ids}
 
@@ -417,17 +420,43 @@ class Store:
             self.vector_version += 1
         return n
 
-    def chunks_missing_vectors(self, cid, limit=64):
-        return self.q("SELECT c.id, c.section, c.text, d.title FROM chunks c JOIN documents d ON d.id=c.doc_id "
-                      "LEFT JOIN vectors v ON v.chunk_id=c.id WHERE c.collection_id=? AND v.chunk_id IS NULL ORDER BY c.id LIMIT ?",
-                      (int(cid), int(limit)))
+    def chunks_missing_vectors(self, cid=None, limit=64, model=None):
+        """Chunks without a vector (of `model` when given). cid=None: any collection."""
+        join = "LEFT JOIN vectors v ON v.chunk_id=c.id" + (" AND v.model=?" if model else "")
+        args = [model] if model else []
+        where = "v.chunk_id IS NULL"
+        if cid is not None:
+            where += " AND c.collection_id=?"
+            args.append(int(cid))
+        return self.q("SELECT c.id, c.section, c.text, d.title FROM chunks c JOIN documents d ON d.id=c.doc_id " + join +
+                      " WHERE " + where + " ORDER BY c.id LIMIT ?", args + [int(limit)])
 
-    def load_vectors(self, collection_ids=None):
-        sql, args = "SELECT chunk_id, collection_id, model, dim, vec FROM vectors", []
-        if collection_ids:
-            sql += " WHERE collection_id IN (%s)" % ",".join("?" * len(collection_ids))
-            args = list(collection_ids)
-        return self.q(sql, args)
+    def load_vectors(self, model=None):
+        if model:
+            return self.q("SELECT chunk_id, collection_id, model, dim, vec FROM vectors WHERE model=?", (model,))
+        return self.q("SELECT chunk_id, collection_id, model, dim, vec FROM vectors")
+
+    def count_missing_vectors(self, model=None):
+        if model:
+            return self.one("SELECT COUNT(*) FROM chunks c LEFT JOIN vectors v ON v.chunk_id=c.id AND v.model=? "
+                            "WHERE v.chunk_id IS NULL", (model,))[0]
+        return self.one("SELECT COUNT(*) FROM chunks c LEFT JOIN vectors v ON v.chunk_id=c.id WHERE v.chunk_id IS NULL")[0]
+
+    def vector_models(self):
+        return [dict(r) for r in self.q("SELECT model, dim, COUNT(*) AS n FROM vectors GROUP BY model, dim")]
+
+    def delete_vectors(self, cid=None, model=None):
+        sql, args = "DELETE FROM vectors WHERE 1=1", []
+        if cid is not None:
+            sql += " AND collection_id=?"
+            args.append(int(cid))
+        if model:
+            sql += " AND model=?"
+            args.append(model)
+        with self.lock:
+            n = self.db.execute(sql, args).rowcount
+        self.vector_version += 1
+        return n
 
     # stats --------------------------------------------------------------
     def stats(self):

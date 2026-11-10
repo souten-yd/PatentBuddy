@@ -142,5 +142,45 @@ class ApiTest(unittest.TestCase):
             connectors.rss("http://127.0.0.1:1/feed")
 
 
+    def test_12_https_via_tailscale_serve(self):
+        anon = Client(self.srv.base)
+        st, h = anon.call("GET", "/api/health")
+        self.assertFalse(h["https"])
+        st, h = anon.call("GET", "/api/health", headers={"X-Forwarded-Proto": "https", "Host": "nas.tail1234.ts.net:8443"})
+        self.assertTrue(h["https"])  # loopback peer + forwarded https
+        st, me = anon.call("GET", "/api/auth/me", headers={"Host": "nas.tail1234.ts.net:8443"})
+        self.assertTrue(me["passkey_ready"])
+        st, me = anon.call("GET", "/api/auth/me", headers={"Host": "192.168.1.5:17871", "X-Forwarded-Proto": "https"})
+        self.assertFalse(me["passkey_ready"])  # IP addresses cannot be WebAuthn RP IDs
+        self.assertEqual(self.c.call("POST", "/api/auth/passkey/register/options", {})[0], 400)  # plain http
+        st, r = self.c.call("POST", "/api/auth/passkey/register/options", {},
+                            headers={"Host": "nas.tail1234.ts.net:8443", "Origin": "https://nas.tail1234.ts.net:8443"})
+        self.assertEqual(st, 200, r)
+        self.assertEqual(r["publicKey"]["rp"]["id"], "nas.tail1234.ts.net")
+
+    def test_13_connector_requires_registration(self):
+        st, r = self.c.call("POST", "/api/v1/connectors/jpo/run", {"params": {"application_number": "2024-000001"}})
+        self.assertEqual(st, 409)
+        self.assertIn("未登録", r["error"])
+
+    def test_14_embedding_default_openrouter_needs_key(self):
+        app = self.srv.app
+        app.config.set_secret("openrouter_api_key", "")
+        self.assertFalse(app.providers.embedding_enabled())
+        self.assertEqual(app.providers.embedding_tag(), "qwen/qwen3-embedding-8b@1024")
+        app.config.set_secret("openrouter_api_key", "sk-test")
+        self.assertTrue(app.providers.embedding_enabled())
+        self.c.call("POST", "/api/v1/collections", {"name": "emb", "kind": "generic"})
+        self.c.call("POST", "/api/v1/collections/emb/documents", {"documents": [{"id": "e1", "title": "t", "body": "埋め込みテスト"}]})
+        with mock.patch.object(app.providers, "_embed_raw", side_effect=lambda cfg, texts, q: [[1.0] * 2048 for _ in texts]):
+            n = app.embedder.run_once()
+            self.assertGreaterEqual(n, 1)
+            res = app.searcher.search("埋め込みテスト", ["emb"])
+            self.assertTrue(any(s["stage"] == "vector" for s in res["trace"]["stages"]))
+        dims = {m["dim"] for m in app.store.vector_models()}
+        self.assertEqual(dims, {1024})
+        app.config.set_secret("openrouter_api_key", "")
+
+
 if __name__ == "__main__":
     unittest.main()

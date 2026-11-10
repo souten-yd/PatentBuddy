@@ -11,7 +11,7 @@ from pathlib import Path
 
 DEFAULTS = {
     "server": {"bind": "0.0.0.0", "port": 17871, "tls_cert": "", "tls_key": "",
-               "allow_remote_devices": False, "trusted_networks": ["tailscale"]},
+               "allow_remote_devices": False, "trusted_networks": ["tailscale"], "https_url": ""},
     "auth": {"session_hours": 12, "rp_id": ""},
     "update": {"channel": "stable", "auto_check": True, "auto_apply": False},
     "search": {"default_limit": 20, "hybrid": True, "rrf_k": 60},
@@ -27,7 +27,10 @@ DEFAULTS = {
             {"id": "ollama", "type": "openai", "label": "Ollama / OpenAI互換 (別PC)",
              "base_url": "http://192.168.1.10:11434/v1", "model": "", "secret": ""},
         ],
-        "embedding": {"provider": "", "model": "", "dimensions": None, "batch": 32},
+        # Default: OpenRouter qwen/qwen3-embedding-8b (multilingual, low cost). Used only once the
+        # OpenRouter key is set. Vectors are truncated to 1024 dims (Matryoshka) to save RAM.
+        "embedding": {"provider": "openrouter", "model": "qwen/qwen3-embedding-8b", "dimensions": None,
+                      "truncate_dim": 1024, "batch": 32, "auto": True, "query_prefix": "", "doc_prefix": ""},
         "rag_top_k": 8,
     },
     "connectors": {"epo_ops": {"enabled": False}, "jpo": {"enabled": False, "base_url": "https://ip-data.jpo.go.jp"},
