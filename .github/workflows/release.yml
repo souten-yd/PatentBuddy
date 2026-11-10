@@ -1,0 +1,66 @@
+name: release
+
+# The ONLY workflow in this repository (DEVELOPMENT_WORKFLOW.md §2: keep GitHub Actions cost minimal).
+# Runs on a version tag push or manual dispatch. No push/PR CI: tests run locally before merge.
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to (re)build, e.g. v0.1.0"
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 1
+
+      - name: Version check
+        id: v
+        run: |
+          tag="${{ inputs.tag || github.ref_name }}"
+          ver=$(python3 -c "import qnaplibrary; print(qnaplibrary.VERSION)")
+          [ "v$ver" = "$tag" ] || { echo "tag $tag != app version $ver" >&2; exit 1; }
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Tests (fast, stdlib only)
+        run: python3 -m unittest discover -s tests -t . -q
+
+      - name: Build Linux package
+        run: bash scripts/build-linux.sh dist
+
+      - name: Build QPKG (QDK pinned)
+        run: |
+          command -v rsync >/dev/null || sudo apt-get install -y --no-install-recommends rsync
+          bash scripts/build-qpkg.sh dist
+
+      - name: Release notes from CHANGELOG
+        run: |
+          awk -v v="## v${{ steps.v.outputs.version }}" '$0==v {on=1; next} /^## v/ && on {exit} on' CHANGELOG.md > dist/notes.md
+          printf '\n---\nアセット: QPKG（QNAP x86_64）/ Linux tar.gz。SHA-256 は各 .sha256 と GitHub の digest で確認できます。\n' >> dist/notes.md
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${{ steps.v.outputs.tag }}"
+          files=(dist/*.qpkg dist/*.qpkg.sha256 dist/*.tar.gz dist/*.tar.gz.sha256)
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "${files[@]}" --clobber
+          else
+            gh release create "$tag" "${files[@]}" --title "QnapLibrary $tag" --notes-file dist/notes.md --verify-tag
+          fi

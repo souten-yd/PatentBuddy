@@ -1,0 +1,18 @@
+[Unit]
+Description=QnapLibrary strategic database server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=@PREFIX@/bin/qnaplibrary --data @DATA@
+# exit code 75 = restart after self-update; Restart=always also recovers from crashes
+Restart=always
+RestartSec=2
+SuccessExitStatus=75
+NoNewPrivileges=yes
+PrivateTmp=yes
+@HARDEN@
+
+[Install]
+WantedBy=@WANTED@
