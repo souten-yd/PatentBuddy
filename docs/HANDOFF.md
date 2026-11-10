@@ -96,3 +96,5 @@
 - PR-Bの最終verify/配布ビルド/リリースは進行中。PR-C〜Gは未完了。次は公開資料API #15の実diffと権限分離検証。
 
 - PR-B候補: `scripts/verify.sh` **67 tests＋全静的検査合格**。旧版v0.5.1→ローカル候補v0.5.3の手動更新で管理者/コレクション保持、新入口4 smoke tests合格。Linux/QPKG最終ビルドを実施中。全体目標は継続中で、PR-C以降を完了と扱わない。
+
+- v0.5.3最終Linux/QPKGビルドとpayload検査成功。QPKGをLinux一時領域へ展開しstart/status/health(0.5.3)/stop合格。ローカル確認済み、QTS実機は未実施。
