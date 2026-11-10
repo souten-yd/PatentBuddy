@@ -438,6 +438,27 @@ class Handler(BaseHTTPRequestHandler):
             debuglog.note_request(method, path, status, (time.time() - t0) * 1000, req.actor if req else None)
 
 
+class AddonShell:
+    """Safe A0 ControlDeck shell. QNAP remains the only data authority.
+
+    No local SQLite, secrets, user sessions, model client or jobs are started.
+    Host identity and scoped NAS HTTPS API support arrive in A1/A2.
+    """
+    addon_mode = True
+    exit_code = 0
+
+    def __init__(self, data_dir):
+        self.data_dir = Path(data_dir)
+        self.started = time.time()
+        self.static = StaticCache(WEB_DIR)
+        self.httpd = None
+
+    def request_shutdown(self, exit_code=0):
+        self.exit_code = exit_code
+        if self.httpd:
+            threading.Thread(target=self.httpd.shutdown, daemon=True).start()
+
+
 class Server(ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_address = True
@@ -483,7 +504,7 @@ def main(argv=None):
     else:
         data_dir = args.data or os.environ.get("QNAPLIBRARY_DATA", "./.data")
     debuglog.setup(args.log_level)
-    app = App(data_dir, addon_mode=args.addon)
+    app = AddonShell(data_dir) if args.addon else App(data_dir)
     if not args.addon:
         cfg = app.config.get("server")
         bind = args.bind or os.environ.get("QNAPLIBRARY_BIND") or cfg.get("bind") or "0.0.0.0"
@@ -512,7 +533,8 @@ def main(argv=None):
         if not args.addon:
             app.embedder.stop()
             app.scheduler.stop()
-        app.store.close()
+        if not args.addon:
+            app.store.close()
     return app.exit_code
 
 
