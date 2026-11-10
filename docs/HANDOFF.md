@@ -4,7 +4,7 @@
 
 ## 現在地
 
-- Repo: `souten-yd/PatentBuddy`。最新公開 **v0.5.4**、main `b7816cf`。
+- Repo: `souten-yd/PatentBuddy`。最新公開 **v0.5.6**、main `73ae466`。
 - 作業ブランチ **feat/scale-document-ingestion-pagination**、Draft **PR #13 / PR-D**。PR-C #15はマージ・v0.5.4公開・自動更新確認済み。
 - ユーザー目標は計画全体の完了。**PR-D〜G、QNAP実機は未完了**。勝手にPR-Cだけを全体完了としない。
 - 内部package `qnaplibrary`、QPKG ID `QnapLibrary`、port17871、Cookie/パスキーRP ID、Release資産名を維持する。ResearchDataHubは唯一の正本、PatentBuddyはPC上のControlDeck Add-on。SQLiteをSMB/NFSで共有・同時二重書込みしない。
@@ -45,7 +45,7 @@ PR-Bでは未読POST本文が次のHTTP/1.1要求に混ざり501になること�
 
 1. PR-C配布・更新まで完了。PR-D #13へ移行。mainとの競合は最新計画/引継ぎを維持して解消、merge commit `3c8d82e`。既存scale 4 tests合格。
 2. PR-D #13: 実diffと性能仕様を読みP0計測に着手。比較用の変更前checkout `/data1tb/PatentBuddy-baseline-054` はdetached `b7816cf`。既存bench_patents.pyは物理I/O・API分位点・再起動/復元・15分idleが不足するため汎用bench_datahub.pyへ拡張する。初期1千/1万件比較を `.data/bench/*-{1000,10000}.json` に保存。1万件無変更再投入: baseline 50行/204800 process write bytes、候補0行/0 bytes。出典/明示sections訂正の取りこぼしを追加修正したため最終候補の小規模再測定が必要。1千/1万/10万、P50/P95/P99、CPU/RSS、物理I/O/DB/WAL、15分idle、再起動/復元を変更前後比較。無変更書込み0、一覧本文なし、カーソルを検証。100万件対応は未実測。
-3. PR-E #14: ControlDeck/MediaForge/SonicForge最新mainの実契約を再読しHost権限/Jobs/Broker/Feature/署名/UIを結合。PC側に別正本文献DBを作らない。まだ未着手。
+3. PR-E: #14/#18の検索閲覧プレビューとローカル自動認証は公開・実導入済み。Host AI/Jobs/Brokerと特許調査操作の統合は残る。PC側に別正本文献DBを作らない。
 4. PR-F #10等: 確定/推測エッジ分離、根拠・版・人手承認、bounded GraphRAG、ローカルLLMのみ。まだ未着手。
 5. PR-G: **最後**にPC→QNAPのdry-run/backup/hash/quick_check/件数/秘密・認証確認/停止・単一書込み切替/ロールバック。QNAP既存領域の上書き・削除禁止。未着手。
 
@@ -93,3 +93,7 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - Featureは既存publisher鍵で署名、新規鍵生成なし。公開SHA `39db9a8ee1201c8c444134800d7bbd955b315db66b4f5514134715a9ec475f10`。稼働Host正規CLI updateでv0.5.5→0.5.6、installed/enabled/managed=true、healthy。署名三資産をRelease添付済み。
 - 実インストール済みAddonClientでauth_method=local_peer/server v0.5.6/reachable=true、読み取りAPI成功。connection.jsonなし。addon healthはhealthy/ready/setup=[]。全3ユーザーサービスactive。ユーザーのtoken手入力は不要となり、以前の接続設定待ちを解消。
 - URL: PatentBuddy https://souten-linux.tailc8e858.ts.net/x/patent-buddy/workspace / ResearchDataHub http://192.168.68.200:17871/ 。実Hostログイン後ブラウザ受入、AI/Jobs/GraphRAGとPR-D〜Gは引き続き未完。
+
+## PR-D再開
+
+最新main v0.5.6を統合。HANDOFF競合はPR-D測定履歴と実導入の最新記録を保持して解消。10万件測定は両方完了、候補commit eb6354d、無変更再投入DB更新/process write/device writeすべて0。最終比較文書・一般メタデータ設計・全verify・公開/更新を続ける。

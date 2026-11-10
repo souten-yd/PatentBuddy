@@ -47,7 +47,8 @@ class HTTPError(Exception):
 
 
 class App:
-    def __init__(self, data_dir):
+    def __init__(self, data_dir, addon_mode=False):
+        self.addon_mode = bool(addon_mode)
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.config = Config(self.data_dir)
@@ -288,10 +289,12 @@ class Handler(BaseHTTPRequestHandler):
     def _security_headers(self):
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
-        self.send_header("X-Frame-Options", "DENY")
+        addon = self.server.app.addon_mode
+        self.send_header("X-Frame-Options", "SAMEORIGIN" if addon else "DENY")
+        ancestors = "'self'" if addon else "'none'"
         self.send_header("Content-Security-Policy",
                          "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; "
-                         "connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+                         "connect-src 'self'; frame-ancestors " + ancestors + "; base-uri 'none'; form-action 'self'")
         # No HSTS on purpose: plain http on the LAN must keep working for the same host name.
 
     def send_json(self, status, data, headers=None):
@@ -398,6 +401,55 @@ class Handler(BaseHTTPRequestHandler):
             if len(lengths) > 1 or (lengths and (not lengths[0].isascii() or not lengths[0].isdigit())):
                 self.close_connection = True
                 raise HTTPError(400, "Invalid Content-Length")
+            if self.server.app.addon_mode:
+                if method == "GET" and path == "/addon/v1/health":
+                    from .addon import health_report
+                    try:
+                        client = getattr(self.server.app, 'client', None)
+                        local_connected = bool(client and client.settings().get('auth_method') == 'local_peer')
+                    except ValueError:
+                        local_connected = False
+                    status = self.send_json(200, health_report(local_connected))
+                    return
+                if method == "GET" and path in ("/addon/workspace", "/addon/style.css", "/addon/icon.svg", "/addon/workspace.js", "/addon/workspace.css"):
+                    entry = {
+                        "/addon/workspace": "/addon-workspace.html",
+                        "/addon/style.css": "/style.css",
+                        "/addon/icon.svg": "/icon.svg",
+                        "/addon/workspace.js": "/addon-workspace.js",
+                        "/addon/workspace.css": "/addon-workspace.css",
+                    }[path]
+                    status = self._static(entry)
+                    return
+                if path.startswith("/addon/v1/") and hasattr(self.server.app, "client"):
+                    from .addon_client import AddonError
+                    client = self.server.app.client
+                    try:
+                        client.authenticate(self.headers)
+                        if method == "GET" and path == "/addon/v1/status":
+                            result = client.status()
+                            result["addon"]["version"] = VERSION
+                        elif method == "GET" and path == "/addon/v1/collections":
+                            result = client.data("GET", "/api/v1/collections")
+                        elif method == "POST" and path == "/addon/v1/search":
+                            body = Request(self, method, path, {}, {}).json()
+                            if not isinstance(body, dict) or not isinstance(body.get("q"), str) or len(body["q"]) > 180:
+                                raise AddonError(400, "検索語は180文字以内で指定してください")
+                            result = client.data("POST", "/api/v1/search", {"q": body["q"], "mode": "keyword", "limit": 20})
+                        elif method == "GET" and re.fullmatch(r"/addon/v1/documents/[1-9][0-9]{0,17}", path):
+                            result = client.data("GET", "/api/v1/documents/" + path.rsplit("/", 1)[1])
+                        else:
+                            raise AddonError(404, "操作がありません")
+                        status = self.send_json(200, result)
+                        return
+                    except AddonError as error:
+                        raise HTTPError(error.status, str(error)) from None
+                # The existing REST/MCP/auth endpoints are deliberately NOT
+                # mapped to Host proxy principals in the A0 bootstrap slice.
+                raise HTTPError(404, "addon endpoint not available")
+            if path.startswith("/addon/"):
+                raise HTTPError(404, "not found")
+
             if method == "GET" and not path.startswith(("/api/", "/mcp")):
                 status = self._static(path)
                 return
@@ -453,6 +505,29 @@ class Handler(BaseHTTPRequestHandler):
             debuglog.note_request(method, path, status, (time.time() - t0) * 1000, req.actor if req else None)
 
 
+class AddonShell:
+    """ControlDeck client shell; ResearchDataHub is the only data authority.
+
+    No local document SQLite or standalone user sessions are started.
+    Host introspection and scoped server HTTP clients enforce the boundary.
+    """
+    addon_mode = True
+    exit_code = 0
+
+    def __init__(self, data_dir):
+        self.data_dir = Path(data_dir)
+        self.started = time.time()
+        self.static = StaticCache(WEB_DIR)
+        self.httpd = None
+        from .addon_client import AddonClient
+        self.client = AddonClient(self.data_dir)
+
+    def request_shutdown(self, exit_code=0):
+        self.exit_code = exit_code
+        if self.httpd:
+            threading.Thread(target=self.httpd.shutdown, daemon=True).start()
+
+
 class Server(ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_address = True
@@ -472,8 +547,9 @@ class Server(ThreadingHTTPServer):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(prog="qnaplibrary", description="ResearchDataHub server (qnaplibrary compatible)")
-    parser.add_argument("--data", default=os.environ.get("QNAPLIBRARY_DATA", "./.data"), help="persistent data directory")
+    parser = argparse.ArgumentParser(prog="qnaplibrary", description="ResearchDataHub server / PatentBuddy Add-on")
+    parser.add_argument("--data", default=None, help="persistent data directory")
+    parser.add_argument("--addon", action="store_true", help="ControlDeck PatentBuddy loopback mode")
     parser.add_argument("--bind", default=None)
     parser.add_argument("--port", type=int, default=None)
     parser.add_argument("--tls-cert", default=None)
@@ -484,32 +560,59 @@ def main(argv=None):
     if args.version:
         print(VERSION)
         return 0
+    if args.addon:
+        data_dir = args.data or os.environ.get("PATENT_BUDDY_DATA_DIR")
+        if not data_dir:
+            parser.error("--addon requires --data or PATENT_BUDDY_DATA_DIR")
+        bind = args.bind or "127.0.0.1"
+        if bind not in ("127.0.0.1", "::1"):
+            parser.error("--addon requires a loopback --bind")
+        if args.tls_cert or args.tls_key:
+            parser.error("--addon is loopback HTTP behind the ControlDeck TLS endpoint")
+        port = args.port if args.port is not None else 9150
+    else:
+        data_dir = args.data or os.environ.get("QNAPLIBRARY_DATA", "./.data")
     debuglog.setup(args.log_level)
-    app = App(args.data)
-    cfg = app.config.get("server")
-    bind = args.bind or os.environ.get("QNAPLIBRARY_BIND") or cfg.get("bind") or "0.0.0.0"
-    port = args.port or int(os.environ.get("QNAPLIBRARY_PORT") or 0) or int(cfg.get("port") or DEFAULT_PORT)
-    cert, key = args.tls_cert or cfg.get("tls_cert"), args.tls_key or cfg.get("tls_key")
-    tls = (cert, key) if cert and key else None
+    app = AddonShell(data_dir) if args.addon else App(data_dir)
+    if not args.addon:
+        cfg = app.config.get("server")
+        bind = args.bind or os.environ.get("QNAPLIBRARY_BIND") or cfg.get("bind") or "0.0.0.0"
+        port = args.port or int(os.environ.get("QNAPLIBRARY_PORT") or 0) or int(cfg.get("port") or DEFAULT_PORT)
+        cert, key = args.tls_cert or cfg.get("tls_cert"), args.tls_key or cfg.get("tls_key")
+        tls = (cert, key) if cert and key else None
+    else:
+        tls = None
     httpd = Server((bind, port), app, tls)
     app.httpd = httpd
+    local_auth = None
+    if not args.addon and not tls and app.config.get("auth", "local_auto_connect", default=True):
+        from .local_auth import LocalAuthServer
+        try:
+            local_auth = LocalAuthServer(app.auth, httpd.server_port)
+        except OSError:
+            LOG.warning("Local automatic authentication unavailable; explicit device authentication remains available")
 
     def stop(signum, _frame):
         app.request_shutdown(0)
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
-    app.updater.start_background()
-    app.embedder.start()
-    app.embedder.kick()
-    app.scheduler.start()
-    LOG.warning("%s %s listening on %s://%s:%d (data: %s)", APP_NAME, VERSION, "https" if tls else "http", bind, port, args.data)
+    if not args.addon:
+        app.updater.start_background()
+        app.embedder.start()
+        app.embedder.kick()
+        app.scheduler.start()
+    LOG.warning("%s %s listening on %s://%s:%d (data: %s)", APP_NAME, VERSION, "https" if tls else "http", bind, port, data_dir)
     try:
         httpd.serve_forever(poll_interval=1.0)
     finally:
         httpd.server_close()
-        app.embedder.stop()
-        app.scheduler.stop()
-        app.store.close()
+        if local_auth:
+            local_auth.close()
+        if not args.addon:
+            app.embedder.stop()
+            app.scheduler.stop()
+        if not args.addon:
+            app.store.close()
     return app.exit_code
 
 

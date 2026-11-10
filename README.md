@@ -102,3 +102,9 @@ python3 -m researchdatahub --data /path/to/pc-data --bind 127.0.0.1 --port 17871
 配布smokeです。全開発検査は `bash scripts/verify.sh` を使用します。
 Linux tar.gzに同梱し、インストール後は `<prefix>/current/rdh.sh` から使用できます。
 既存の `<prefix>/bin/qnaplibrary-run` とsystemdサービスは引き続き利用できます。
+
+## PatentBuddy（ControlDeckの特許アドオン）
+
+ResearchDataHubは資料の保存・収集・検索サーバーです。別のPatentBuddyアドオンはControlDeckのオプション機能として管理し、サーバーの認証APIへ接続して文献を検索・閲覧します。アドオン内に文献の正本DBは作りません。画面には各サービスの役割・接続先・バージョンを表示します。接続は [アドオン設定](docs/controldeck-addon-plan.md) を参照してください。
+
+同じLinuxユーザーで稼働するPatentBuddyとResearchDataHubは、トークン入力なしで読み取り専用接続を確立します。[ローカル自動認証の条件](docs/local-addon-auth.md)を参照してください。

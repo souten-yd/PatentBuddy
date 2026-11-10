@@ -1,0 +1,62 @@
+{
+  "api_version": "2",
+  "id": "patent-buddy",
+  "name": "PatentBuddy",
+  "version": "0.5.6",
+  "description": "ResearchDataHubへ接続する特許調査・分析アドオン",
+  "publisher": "souten-yd",
+  "requires": {
+    "addon_contract": ">=2.0 <3.0"
+  },
+  "runtime": {
+    "kind": "external-service",
+    "base_url": "http://127.0.0.1:9150",
+    "health_path": "/addon/v1/health"
+  },
+  "host_capabilities": [
+    "context.read",
+    "theme.read",
+    "route.open"
+  ],
+  "contributions": {
+    "navigation": [
+      {
+        "id": "workspace",
+        "label": {
+          "ja": "特許",
+          "en": "Patents"
+        },
+        "route": "/x/patent-buddy/workspace",
+        "icon": "book-open",
+        "permission": "apps.view"
+      }
+    ],
+    "embedded_views": [
+      {
+        "id": "workspace",
+        "label": "PatentBuddy",
+        "route": "/x/patent-buddy/workspace",
+        "path": "/addon/workspace",
+        "mobile": "embedded",
+        "permission": "apps.view"
+      }
+    ],
+    "commands": [],
+    "quick_actions": [],
+    "settings": [],
+    "workflow_executors": [],
+    "agent_tools": [],
+    "device_relays": [],
+    "context_actions": [],
+    "setup_checklist": [
+      {
+        "id": "integration",
+        "label": {
+          "ja": "ControlDeck連携",
+          "en": "ControlDeck integration"
+        },
+        "permission": "settings.manage"
+      }
+    ]
+  }
+}
