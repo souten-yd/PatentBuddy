@@ -49,7 +49,7 @@ def _err(status, message):
 @route("GET", "/api/health", "public")
 def health(req):
     a = req.app
-    return {"app": "QnapLibrary", "version": VERSION, "ok": True, "setup_required": not a.auth.admin_configured(),
+    return {"app": "QnapPatentBuddy", "version": VERSION, "ok": True, "setup_required": not a.auth.admin_configured(),
             "pairing": a.auth.pairing_enabled(), "https": req.is_https(), "https_url": a.config.get("server", "https_url", default=""), "uptime_s": round(time.time() - a.started)}
 
 
@@ -116,6 +116,7 @@ def change_password(req):
     if not req.app.auth.check_admin_password(body.get("current", "")):
         raise _err(401, "現在のパスワードが違います")
     req.app.auth.set_admin_password(body.get("password", ""))
+    req.app.auth.sessions.clear()  # Revoke old credentials after a password change.
     return {"ok": True}
 
 
@@ -137,8 +138,8 @@ def passkey_register_options(req):
         handle = webauthn.b64url_encode(_s.token_bytes(16))
         app.config.set_secret("passkey_user_handle", handle)
     return {"publicKey": {
-        "challenge": challenge, "rp": {"id": rp_id, "name": "QnapLibrary"},
-        "user": {"id": handle, "name": "admin", "displayName": "QnapLibrary 管理者"},
+        "challenge": challenge, "rp": {"id": rp_id, "name": "QnapPatentBuddy"},
+        "user": {"id": handle, "name": "admin", "displayName": "QnapPatentBuddy 管理者"},
         "pubKeyCredParams": [{"type": "public-key", "alg": webauthn.ALG_ES256}, {"type": "public-key", "alg": webauthn.ALG_RS256}],
         "timeout": 120000, "attestation": "none",
         "authenticatorSelection": {"residentKey": "preferred", "userVerification": "required"},
@@ -171,7 +172,7 @@ def passkey_login_options(req):
         raise _err(400, "パスキーは https の名前付きアドレスで開いたときだけ使えます")
     rows = _passkey_rows(app)
     if not rows:
-        raise _err(404, "パスキーが登録されていません")
+        raise _err(404, "このNASの現在のデータ領域にパスキーがありません。更新後に表示された場合は旧データ領域の復元が必要か確認してください（新規登録前にバックアップを推奨）。")
     import secrets as _s
     bind = _s.token_urlsafe(16)
     challenge = app.challenges.issue("get", bind, req.rp_id(), req.origin())
@@ -191,7 +192,7 @@ def passkey_login_verify(req):
         raw_id = webauthn.b64url_decode(str(body.get("id", "")), webauthn.CREDENTIAL_ID_MAX)
         row = app.store.one("SELECT * FROM passkeys WHERE credential_id=?", (raw_id,))
         if not row:
-            raise webauthn.WebAuthnError("このパスキーは登録されていません")
+            raise webauthn.WebAuthnError("iPhoneが提示したパスキーは、このNASの登録情報と一致しません。登録時と同じHTTPSホスト名を使用しているか確認してください")
         count = webauthn.verify_assertion(
             app.challenges, str(body.get("bind", "")), req.rp_id(), req.origin(),
             {"public_key": row["public_key"], "sign_count": row["sign_count"]},
