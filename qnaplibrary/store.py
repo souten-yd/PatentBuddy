@@ -388,14 +388,15 @@ class Store:
             where += " AND (title LIKE ? OR ext_id LIKE ?)"
             args.extend(["%" + q + "%", "%" + q + "%"])
         if cursor is not None:
-            try:
-                point = int(cursor)
-            except (TypeError, ValueError):
-                raise StoreError("cursor must be a positive document ID")
-            if not 0 < point <= 9223372036854775807:
-                raise StoreError("cursor must be a positive document ID")
-            where += " AND id<?"
-            args.append(point)
+            if cursor not in ("start", "0"):
+                try:
+                    point = int(cursor)
+                except (TypeError, ValueError):
+                    raise StoreError("cursor must be 'start' or a positive document ID")
+                if not 0 < point <= 9223372036854775807:
+                    raise StoreError("cursor must be 'start' or a positive document ID")
+                where += " AND id<?"
+                args.append(point)
             rows = self.q("SELECT " + projection + " FROM documents WHERE " + where +
                           " ORDER BY id DESC LIMIT ?", args + [limit + 1])
             more = len(rows) > limit
