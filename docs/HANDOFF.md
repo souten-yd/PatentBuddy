@@ -303,3 +303,15 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - 最初のfixture生成コマンドはcwd誤りでFileNotFoundErrorとなり起動前に停止。絶対pathへ修正して実行。途中の新表示文言テストは起動済みStaticCacheの旧JSを参照してtimeout、文言変更を本差分から外して既存根拠変更表示で再検証成功。状態変更の不具合ではない。
 - fixture PID504352をSIGINTで終了し一時addon/user/session/grants/DB/secret除去を確認、Host jobs/audit保持。本番0.5.10は不変。remote main193f53aを再確認し、HANDOFF冒頭の旧作業branch表記を現PR23へ訂正。
 - 次は生成LLMのmodel versionのHost attestationと保存、人手レビュー/graph提案・管理UI。検索traceの保存境界検証、graphの推測表示/逆方向要否、性能/物理I/O・配布更新、P2一般メタデータ、PR-G最終NAS移行は未完。goal active、PR23 Draft。
+
+## 生成モデル版のHost API実装・実導入（2026-11-11）
+
+- 前turnはgraph承認依存d84b63a pushのprogress。今回はHostの独立worktree `/data1tb/ControlDeck-generation-provenance`、branch `feat/addon-generation-provenance`、PR352を作成しmain **2c951d7**へ統合。実装commit2a828a4。Host本体のAGENTS/statusと実ai_gateway/llama/systemdを確認。
+- 新要求 `require_provenance:true` はlocal_only必須/strict bool。capabilities.request_options.require_provenance.supported=true。complete応答のprovenance、stream正常終了直前の `{type:'provenance',provenance:{...}}` → done を追加。既定falseの既存呼出は互換。証明はexecution_policy=local_only、revision_kind=host_process_file_metadata_v1、model_ref/runtime_ref各SHA256 64hexだけ。
+- Host helperは選択モデル/補助mmproj・draft/実行binaryのstat（path/dev/inode/size/mtime/ctime）を指紋化。admission/ensure_ready後にsystemd MainPID、同一UID、実exe/argvのmodel/alias/port/host、LISTEN所有者、ファイルがprocess開始後に変わっていないことを確認。推論後も同じmodel/runtime指紋の場合だけ証明を返す。変化/取消時はstreamに証明/doneを返さない。stat/process readはasyncio.to_thread。重み内容hashや完全な数値再現性の証明ではない。秘密/alias/path/PID/argvは応答しない。
+- 関連61 tests成功3.29秒、frontend build17.98秒、全 **1253 passed/2 skipped/既存warning** 107.00秒（`/tmp/pb-provenance-host-full.log`）。補助draft被覆を追加後helper12 tests成功0.02秒。初回helper11 testsと既存API回帰、生成前/後差替え・strict opt-in・stream cancel/lease解放も確認。新CIや新依存なし。
+- ライブHost `/data1tb/ControlDeck/app` はactive jobs=0、ai.pyが変更前main8296974とbyte一致を確認。新mainのai.py/generation_provenance.py **2ファイルだけ**反映し通常`./deck.sh`再起動、health200。既存dirty/untracked **21ファイル**はhashを前後照合し保持（`/tmp/pb-host-generation-preserved.json`、backup `/tmp/pb-host-ai-pre-generation.py`、restart log `/tmp/pb-host-generation-restart.log`）。ユーザーpasskey作業を維持。Host checkout自体は切替えていない。
+- 実Host正規一時addon/Job/CPU leaseで実Qwen3.8生成、complete61文字とstream provenance→doneの両方を確認。helper前後のmodel_ref/runtime_refとも一致（`/tmp/pb-generation-provenance-api-live.log`、err空）。先行helper-only試験59文字は `/tmp/pb-generation-provenance-live.log`。一時addon/user/session削除、Host jobs/audit保持。全fixture終了済み。本番PatentBuddy/RDHは0.5.10のまま。
+- Host実機受入文書の追加commit b40989cをpushしdocs-only follow-up PRを作成。Host `.venv`/frontend/node_modules symlink、生成tsbuildinfoはstageしない。旧worktree `/data1tb/ControlDeck-retrieval-ai` のdirtyも不変。
+- **次の実装:** PB `/data1tb/PatentBuddy-graph` のHostSession.streamにopt-inを追加。要求前にcapabilities対応確認、provenance eventのpolicy/kind/64hex/重複・欠落・done順を厳密検証し、欠落時は原文を送らない/結果を保存しない。chart.generateから要求し、実際に生成した場合だけ検証済み生成版を正本chart JSONへ保存（候補なしでLLM未実行なら明示）。旧schemaの保存/閲覧互換と新schemaの検証を検討。既存HostSession/summary/claimsを暗黙に壊さない。Host新APIはすでに実導入済みなので再反映/再起動不要。
+- その後、人手レビュー/graph提案・管理UI、検索trace保存境界の検証、性能/配布、P2/PR-Gを続ける。goal active。
