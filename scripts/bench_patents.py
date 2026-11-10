@@ -11,7 +11,9 @@ import statistics
 import tempfile
 import time
 from pathlib import Path
+import sys
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from qnaplibrary.store import Store
 
 SAMPLE = ("固体電解質を含む蓄電装置において、正極および負極の間に"
