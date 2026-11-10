@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "feature_id": "patent-buddy",
+  "version": "0.5.5",
+  "platform": "linux",
+  "architecture": "x86_64",
+  "entrypoint": "pb.sh",
+  "addon_manifest": "addon.json",
+  "provision_args": [],
+  "smoke_args": [
+    "doctor"
+  ],
+  "service_args": [
+    "serve"
+  ],
+  "health_url": "http://127.0.0.1:9150/addon/v1/health"
+}

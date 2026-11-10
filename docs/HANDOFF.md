@@ -4,8 +4,8 @@
 
 ## 現在地
 
-- Repo: `souten-yd/PatentBuddy`。最新公開 **v0.5.3**、main `b14ed77`。
-- 作業ブランチ **feat/nas-public-patent-catalog**、Draft **PR #15 / PR-C**。v0.5.4候補。mainにはまだ公開資料APIはない。
+- Repo: `souten-yd/PatentBuddy`。最新公開 **v0.5.4**、main `b7816cf`。
+- 現在は **feat/control-deck-addon-foundation** / PR #14、v0.5.5候補。PR-C #15は公開済み。PR-D #13は別worktreeで計測中。
 - ユーザー目標は計画全体の完了。**PR-D〜G、QNAP実機は未完了**。勝手にPR-Cだけを全体完了としない。
 - 内部package `qnaplibrary`、QPKG ID `QnapLibrary`、port17871、Cookie/パスキーRP ID、Release資産名を維持する。ResearchDataHubは唯一の正本、PatentBuddyはPC上のControlDeck Add-on。SQLiteをSMB/NFSで共有・同時二重書込みしない。
 - 未公開情報は検証済みローカルLLMのみ。既存privacy gateを弱めない。NAS↔PCの認証/TLS通信とクラウドLLM送信は区別する。
@@ -50,3 +50,19 @@ PR-Bでは未読POST本文が次のHTTP/1.1要求に混ざり501になること�
 5. PR-G: **最後**にPC→QNAPのdry-run/backup/hash/quick_check/件数/秘密・認証確認/停止・単一書込み切替/ロールバック。QNAP既存領域の上書き・削除禁止。未着手。
 
 QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/publisher登録、NAS HDD性能、実案件の法的品質・審査状態は未検証。過去詳細はgit履歴と各Release/PR参照。goalはactive。
+
+## PR-E / ユーザー指定の実導入（2026-11-10）
+
+- 最新要求: PatentBuddyをControlDeckに導入して操作可能にし、ResearchDataHubをLinuxサービスとして導入。テスト/開発利用も許可。これに合わせPR-Eの操作可能なプレビュー導入を優先するが、計画全体の完了条件は縮めない。
+- ResearchDataHub公式v0.5.4をSHA検証後 `/data1tb/ResearchDataHub/app` / `data` に非root導入。systemd user `qnaplibrary` active。Webは http://192.168.68.200:17871/ / http://100.82.8.44:17871/。初回管理者設定はユーザー向けに残し、NASデータは変更していない。
+- このworktree `/data1tb/PatentBuddy-addon`、PR #14。main v0.5.4をmergeし、Host introspection→scope検証→ResearchDataHub検索/取得を追加。文献DBを作らない。workspaceはbridge nonceを使い、アドオン/サーバー役割・各version・URLを表示。
+- connection.jsonはFeature data内の0600ファイル（server_url/server_token）。defaultはloopback17871、遠隔HTTPは禁止。HostURLはloopback8765。初期接続設定はまだ未完。AI/Host Jobs/GraphRAGはこのプレビューには未実装。
+- ControlDeck側 `/data1tb/ControlDeck-patentbuddy-feature` の `feat/patentbuddy-option` でtrusted catalog entryを準備。既存SonicForge publisherの公開鍵を再利用し、新規鍵生成なし。署名・公開・実installは未実施。稼働Hostのユーザー作業を変更していない。
+- v0.5.5候補でbundle identity統一。addon/API/境界/配布12 tests成功。全verify/Host release-bundle tests実行中、実ブラウザ/署名/導入/更新はこれから。
+- PR-D計測は別worktree `/data1tb/PatentBuddy` のsession57856が継続。candidate PID119637で10万件+900秒idle中。PR-D全93 tests成功、まだ未release。こちらのブランチを切り替えて測定中コードを変えない。
+
+- 最終全verify93 tests成功（22.189秒）、Linux/QPKGビルド・payload検査成功。Hostのrelease-bundle20 tests成功。既存publisher鍵でv0.5.5 Featureを署名・自己検証し、Hostの実_load_packageとtrusted public keyで署名/能力/identity検証成功。新しい鍵は生成していない。Host登録PRは https://github.com/souten-yd/ControlDeck/pull/348 （Draft）。
+- ResearchDataHub初期管理者設定はユーザーにより完了したことをhealthで確認。パスワードを読んだり変更していない。アドオン接続の読み取りtokenは未設定、ユーザーにファイル保存/画面入力の希望を非同期確認中。
+
+- iframeのX-Frame-OptionsをアドオンモードのみSAMEORIGINへ変更し、standaloneサーバーはDENYを維持。Host proxyがXFOを引き継ぐ実コードを確認して修正。最終verify93 tests成功22.424秒、全配布物再build/署名済み。
+- Chrome 1280/390/320pxで、合成Host proxy+実Addon+実ResearchDataHub APIを通してbridge handshake→接続状態→検索→本文表示を確認。横溢れ/JSエラー0、`.data/addon-ui.json`/screenshots。これは稼働ControlDeckの実ブラウザ受入ではなく、その受入は導入後に行う。
