@@ -27,6 +27,7 @@ curl -X POST http://NAS:17871/api/v1/pair -H 'Content-Type: application/json' \
 | POST | `/api/v1/connectors/{id}/run` | 外部データ収集 |
 | GET | `/api/debug/bundle` | AI 向けデバッグ情報 |
 | GET | `/api/v1/schema` | 全ルート一覧（AI が自己発見に使う） |
+| GET / POST | `/api/backups` | 管理者専用。SQLite バックアップ一覧 / 手動作成（[手順](backup.md)） |
 | POST | `/mcp` | MCP（JSON-RPC 2.0）。tools: search, get_document, add_documents, patent_* , debug_bundle |
 
 文書の形式:

@@ -4,7 +4,8 @@
 
 ## 現在のバージョン
 
-- **v0.4.0（リリース済み・最新）**: https://github.com/souten-yd/QnapLibrary/releases/tag/v0.4.0
+- **ソース版 v0.5.0（PR #8）**: 手動 SQLite バックアップと iOS ホーム画面アイコン。GitHub Release と QNAP 実機更新はマージ後に確認が必要
+- **直近確認済みリリース v0.4.0**: https://github.com/souten-yd/QnapLibrary/releases/tag/v0.4.0
 - 履歴: v0.1.1（HTTPS 8443・OpenRouter 埋め込み）→ v0.2.0（ウォッチ・通知・分類・審査基準）→ v0.3.0（Qdrant・リランカー・分析・PC クライアント）→ v0.4.0（調査ジョブ・市場データ・規格）
 - ロードマップ v0.1〜v0.4 は完了。次の候補は `docs/roadmap.md` 末尾と `docs/proposals.md`（バックアップ機能など）
 
@@ -36,10 +37,17 @@
 
 - Linux 版 v0.1.1 → v0.4.0 を管理 API から一度で更新。新しいテーブル（watches / watch_hits / notify_log）は起動時に自動作成され、既存データは保持。`versions/` に 0.1.0・0.1.1・0.4.0 が残り（直近3版）、`current` は 0.4.0。
 
+## v0.5.0 引き継ぎ内容（PR #8）
+
+- SQLite 管理者専用の手動スナップショット（VACUUM INTO + quick_check、権限 0600、容量確認、Web 画面、API テスト）。
+- iOS ホーム画面向け 180×180 不透明 PNG アイコンとメタデータ、既存 SVG/QPKG アイコンの共通デザイン。
+- 本環境は GitHub ソースをローカルに clone できないため、全リポジトリの verify.sh / Linux / QPKG ビルドは **未実施**。未確認の工程を完了と記載しない。
+
 ## 次の一手
 
-2. ロードマップ v0.4 まで完了。次の候補は docs/roadmap.md 末尾と docs/proposals.md（バックアップ機能など）
-3. （旧）v0.4（規格メタデータ・e-Stat/EDINET/SEC・調査ジョブ・検索フィルタ）
+1. PR #8 の全 diff とローカル verify.sh を確認し、失敗時は修正してからマージ。版 0.5.0 の release.yml 成否と成果物のハッシュを確認する。
+2. TS-253Be 実機でインストール、ホーム画面アイコン、バックアップ生成と復元手順を確認。QNAP実機は未実施。
+3. 週次バックアップ、保存世代管理、設定・秘密を含めた完全バックアップ、定期調査とレポート差分を検討する。
 
 ## 既知の問題 / 未決事項
 
