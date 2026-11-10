@@ -66,3 +66,9 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 
 - iframeのX-Frame-OptionsをアドオンモードのみSAMEORIGINへ変更し、standaloneサーバーはDENYを維持。Host proxyがXFOを引き継ぐ実コードを確認して修正。最終verify93 tests成功22.424秒、全配布物再build/署名済み。
 - Chrome 1280/390/320pxで、合成Host proxy+実Addon+実ResearchDataHub APIを通してbridge handshake→接続状態→検索→本文表示を確認。横溢れ/JSエラー0、`.data/addon-ui.json`/screenshots。これは稼働ControlDeckの実ブラウザ受入ではなく、その受入は導入後に行う。
+
+## ローカル自動認証 / PR #18
+
+ユーザーの追加指示により、同一LinuxユーザーのUnix peer credentialsによる自動接続を実装中。v0.5.6候補、標準ライブラリのみ。RAM限定ro token、loopback以外拒否、初期設定前/無効化時発行停止、手動設定優先。新しいディスク書込みはソケットと排他lockのみ（内容/秘密の永続化なし）。検証・リリース・実更新は未完。
+
+- PR #18最終検証: 全96 tests成功（23.485秒）、Linux/QPKGビルドとpayload検査成功。実別プロセスでro GET200、書込み403、サーバー再起動後の旧token401/自動再取得200。`/tmp/pb-local-auth-verify-final2.log`、`/tmp/pb-local-auth-process.json`。別UID拒否、管理API拒否、無効化、偽/非ソケット、二重起動排他も回帰検証。実サービス更新は公開後に実施。

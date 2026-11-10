@@ -69,7 +69,11 @@ class AddonClient:
 
     def settings(self):
         if not self.path.exists():
-            return {'server_url': 'http://127.0.0.1:17871'}
+            from .local_auth import connect
+            try:
+                return dict(connect(17871), auth_method='local_peer')
+            except (OSError, ValueError):
+                return {'server_url': 'http://127.0.0.1:17871'}
         if self.path.is_symlink() or self.path.stat().st_mode & 0o077:
             raise AddonError(503, '接続設定は通常ファイル・権限0600で保存してください')
         try:
@@ -117,4 +121,5 @@ class AddonClient:
                 'server': {'name': 'ResearchDataHub', 'role': '資料保存・検索サーバー', 'url': url,
                            'version': health.get('version'), 'reachable': health.get('ok') is True,
                            'setup_required': health.get('setup_required', True),
-                           'token_configured': bool(config.get('server_token'))}}
+                           'token_configured': bool(config.get('server_token')),
+                           'auth_method': config.get('auth_method', 'manual')}}

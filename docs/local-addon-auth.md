@@ -8,4 +8,6 @@ Linuxの同一OSユーザーで動作するResearchDataHubとPatentBuddyを、Un
 - 同一OSユーザーのプロセスは同じ信頼境界。アドオンIDの自己申告だけでプロセスを識別できるとは主張しない。別ユーザー・Webからの接続は認めない。
 - サーバー設定 `auth.local_auto_connect=false` で無効化できる。
 
-実装・受入は進行中。
+HTTP loopbackの同一PC構成が対象。TLS専用サーバー、root、別OSユーザー、独自ポートの自動探索は対象外で、明示的な接続設定を利用する。
+
+ソケット/排他lockのみを作成し、認証の都度DBや秘密ファイルへ書き込まない。認証済みHost経由でのみアドオンの検索APIを利用できる。

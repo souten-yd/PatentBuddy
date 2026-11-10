@@ -404,7 +404,12 @@ class Handler(BaseHTTPRequestHandler):
             if self.server.app.addon_mode:
                 if method == "GET" and path == "/addon/v1/health":
                     from .addon import health_report
-                    status = self.send_json(200, health_report())
+                    try:
+                        client = getattr(self.server.app, 'client', None)
+                        local_connected = bool(client and client.settings().get('auth_method') == 'local_peer')
+                    except ValueError:
+                        local_connected = False
+                    status = self.send_json(200, health_report(local_connected))
                     return
                 if method == "GET" and path in ("/addon/workspace", "/addon/style.css", "/addon/icon.svg", "/addon/workspace.js", "/addon/workspace.css"):
                     entry = {
@@ -579,6 +584,13 @@ def main(argv=None):
         tls = None
     httpd = Server((bind, port), app, tls)
     app.httpd = httpd
+    local_auth = None
+    if not args.addon and not tls and app.config.get("auth", "local_auto_connect", default=True):
+        from .local_auth import LocalAuthServer
+        try:
+            local_auth = LocalAuthServer(app.auth, httpd.server_port)
+        except OSError:
+            LOG.warning("Local automatic authentication unavailable; explicit device authentication remains available")
 
     def stop(signum, _frame):
         app.request_shutdown(0)
@@ -594,6 +606,8 @@ def main(argv=None):
         httpd.serve_forever(poll_interval=1.0)
     finally:
         httpd.server_close()
+        if local_auth:
+            local_auth.close()
         if not args.addon:
             app.embedder.stop()
             app.scheduler.stop()
