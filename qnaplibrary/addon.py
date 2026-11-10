@@ -10,19 +10,20 @@ from . import VERSION
 def health_report():
     """Host Add-on v2 status: do not advertise an unimplemented workspace as ready."""
     return {
+        "app": "PatentBuddy", "version": VERSION, "service_role": "patent-addon",
         "status": "setup_required",
         "contract_version": "2.0",
         "reason_code": "setup_incomplete",
-        "message": "ControlDeck連携の初期設定が必要です。既存データの移行と認証連携は未実施です。",
+        "message": "ResearchDataHubの接続設定を確認してください。PatentBuddyは特許調査アドオンです。",
         "action": {"kind": "documentation"},
         "contributions": {
             "navigation:workspace": "available",
             "embedded_view:workspace": "available",
         },
         "setup": [{
-            "id": "integration", "label": "ControlDeck認証とデータの移行",
+            "id": "integration", "label": "ResearchDataHubへの接続",
             "state": "missing",
-            "detail": "A0: 登録/状態ページのみ。読み書き・AIは未公開。",
+            "detail": "文献の保存先サーバーと接続トークンを設定してください。",
             "action": {"kind": "documentation"},
         }],
     }

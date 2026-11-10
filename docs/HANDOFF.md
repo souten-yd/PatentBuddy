@@ -50,3 +50,13 @@ PR-Bでは未読POST本文が次のHTTP/1.1要求に混ざり501になること�
 5. PR-G: **最後**にPC→QNAPのdry-run/backup/hash/quick_check/件数/秘密・認証確認/停止・単一書込み切替/ロールバック。QNAP既存領域の上書き・削除禁止。未着手。
 
 QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/publisher登録、NAS HDD性能、実案件の法的品質・審査状態は未検証。過去詳細はgit履歴と各Release/PR参照。goalはactive。
+
+## PR-E / ユーザー指定の実導入（2026-11-10）
+
+- 最新要求: PatentBuddyをControlDeckに導入して操作可能にし、ResearchDataHubをLinuxサービスとして導入。テスト/開発利用も許可。これに合わせPR-Eの操作可能なプレビュー導入を優先するが、計画全体の完了条件は縮めない。
+- ResearchDataHub公式v0.5.4をSHA検証後 `/data1tb/ResearchDataHub/app` / `data` に非root導入。systemd user `qnaplibrary` active。Webは http://192.168.68.200:17871/ / http://100.82.8.44:17871/。初回管理者設定はユーザー向けに残し、NASデータは変更していない。
+- このworktree `/data1tb/PatentBuddy-addon`、PR #14。main v0.5.4をmergeし、Host introspection→scope検証→ResearchDataHub検索/取得を追加。文献DBを作らない。workspaceはbridge nonceを使い、アドオン/サーバー役割・各version・URLを表示。
+- connection.jsonはFeature data内の0600ファイル（server_url/server_token）。defaultはloopback17871、遠隔HTTPは禁止。HostURLはloopback8765。初期接続設定はまだ未完。AI/Host Jobs/GraphRAGはこのプレビューには未実装。
+- ControlDeck側 `/data1tb/ControlDeck-patentbuddy-feature` の `feat/patentbuddy-option` でtrusted catalog entryを準備。既存SonicForge publisherの公開鍵を再利用し、新規鍵生成なし。署名・公開・実installは未実施。稼働Hostのユーザー作業を変更していない。
+- v0.5.5候補でbundle identity統一。addon/API/境界/配布12 tests成功。全verify/Host release-bundle tests実行中、実ブラウザ/署名/導入/更新はこれから。
+- PR-D計測は別worktree `/data1tb/PatentBuddy` のsession57856が継続。candidate PID119637で10万件+900秒idle中。PR-D全93 tests成功、まだ未release。こちらのブランチを切り替えて測定中コードを変えない。

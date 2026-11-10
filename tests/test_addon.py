@@ -20,7 +20,7 @@ class AddonManifestTest(unittest.TestCase):
         self.assertEqual(value["requires"]["addon_contract"], ">=2.0 <3.0")
         self.assertEqual(value["runtime"]["base_url"], "http://127.0.0.1:9150")
         self.assertEqual(value["runtime"]["health_path"], "/addon/v1/health")
-        self.assertEqual(value["host_capabilities"], [])
+        self.assertEqual(value["host_capabilities"], ["context.read", "theme.read", "route.open"])
         view = value["contributions"]["embedded_views"][0]
         self.assertEqual(view["path"], "/addon/workspace")
         self.assertEqual(view["mobile"], "embedded")
@@ -48,8 +48,8 @@ class AddonModeTest(unittest.TestCase):
             self.assertEqual(status, 200)
             self.assertIn(b"PatentBuddy", page)
             self.assertNotIn(b"ql_session", page)
-            self.assertEqual(anon.call("GET", "/addon/style.css")[0], 200)
-            self.assertEqual(anon.call("GET", "/addon/icon.svg")[0], 200)
+            self.assertEqual(anon.call("GET", "/addon/style.css", raw=True)[0], 200)
+            self.assertEqual(anon.call("GET", "/addon/icon.svg", raw=True)[0], 200)
             for method, path, body in (
                 ("GET", "/api/health", None),
                 ("GET", "/api/v1/stats", None),

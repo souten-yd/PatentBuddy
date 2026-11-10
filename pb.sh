@@ -6,17 +6,20 @@ PY=${PATENT_BUDDY_PYTHON:-python3}
 CMD=${1:-doctor}
 case "$CMD" in
   doctor)
-    "$PY" - <<'PY'
+    "$PY" -I - "$ROOT" <<'PY'
 import json
 import sqlite3
 import sys
 from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+from qnaplibrary import VERSION
 
 print(json.dumps({
     "python": sys.version.split()[0],
     "sqlite": sqlite3.sqlite_version,
-    "mode": "A0 only: no Host authentication, no migrated documents",
-    "host_url": "http://127.0.0.1:9150/addon/v1/health",
+    "mode": "PatentBuddy: ResearchDataHub API client",
+    "version": VERSION,
+    "health_url": "http://127.0.0.1:9150/addon/v1/health",
 }, ensure_ascii=False, indent=2))
 PY
     ;;

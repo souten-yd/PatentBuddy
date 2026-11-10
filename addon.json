@@ -2,8 +2,8 @@
   "api_version": "2",
   "id": "patent-buddy",
   "name": "PatentBuddy",
-  "version": "0.5.1",
-  "description": "Local-first patent research and evidence library (ControlDeck add-on migration)",
+  "version": "0.5.5",
+  "description": "ResearchDataHubへ接続する特許調査・分析アドオン",
   "publisher": "souten-yd",
   "requires": {
     "addon_contract": ">=2.0 <3.0"
@@ -13,7 +13,11 @@
     "base_url": "http://127.0.0.1:9150",
     "health_path": "/addon/v1/health"
   },
-  "host_capabilities": [],
+  "host_capabilities": [
+    "context.read",
+    "theme.read",
+    "route.open"
+  ],
   "contributions": {
     "navigation": [
       {

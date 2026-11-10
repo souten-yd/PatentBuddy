@@ -404,14 +404,39 @@ class Handler(BaseHTTPRequestHandler):
                     from .addon import health_report
                     status = self.send_json(200, health_report())
                     return
-                if method == "GET" and path in ("/addon/workspace", "/addon/style.css", "/addon/icon.svg"):
+                if method == "GET" and path in ("/addon/workspace", "/addon/style.css", "/addon/icon.svg", "/addon/workspace.js", "/addon/workspace.css"):
                     entry = {
                         "/addon/workspace": "/addon-workspace.html",
                         "/addon/style.css": "/style.css",
                         "/addon/icon.svg": "/icon.svg",
+                        "/addon/workspace.js": "/addon-workspace.js",
+                        "/addon/workspace.css": "/addon-workspace.css",
                     }[path]
                     status = self._static(entry)
                     return
+                if path.startswith("/addon/v1/") and hasattr(self.server.app, "client"):
+                    from .addon_client import AddonError
+                    client = self.server.app.client
+                    try:
+                        client.authenticate(self.headers)
+                        if method == "GET" and path == "/addon/v1/status":
+                            result = client.status()
+                            result["addon"]["version"] = VERSION
+                        elif method == "GET" and path == "/addon/v1/collections":
+                            result = client.data("GET", "/api/v1/collections")
+                        elif method == "POST" and path == "/addon/v1/search":
+                            body = Request(self, method, path, {}, {}).json()
+                            if not isinstance(body, dict) or not isinstance(body.get("q"), str) or len(body["q"]) > 180:
+                                raise AddonError(400, "検索語は180文字以内で指定してください")
+                            result = client.data("POST", "/api/v1/search", {"q": body["q"], "mode": "keyword", "limit": 20})
+                        elif method == "GET" and re.fullmatch(r"/addon/v1/documents/[1-9][0-9]{0,17}", path):
+                            result = client.data("GET", "/api/v1/documents/" + path.rsplit("/", 1)[1])
+                        else:
+                            raise AddonError(404, "操作がありません")
+                        status = self.send_json(200, result)
+                        return
+                    except AddonError as error:
+                        raise HTTPError(error.status, str(error)) from None
                 # The existing REST/MCP/auth endpoints are deliberately NOT
                 # mapped to Host proxy principals in the A0 bootstrap slice.
                 raise HTTPError(404, "addon endpoint not available")
@@ -474,10 +499,10 @@ class Handler(BaseHTTPRequestHandler):
 
 
 class AddonShell:
-    """Safe A0 ControlDeck shell. QNAP remains the only data authority.
+    """ControlDeck client shell; ResearchDataHub is the only data authority.
 
-    No local SQLite, secrets, user sessions, model client or jobs are started.
-    Host identity and scoped NAS HTTPS API support arrive in A1/A2.
+    No local document SQLite or standalone user sessions are started.
+    Host introspection and scoped server HTTP clients enforce the boundary.
     """
     addon_mode = True
     exit_code = 0
@@ -487,6 +512,8 @@ class AddonShell:
         self.started = time.time()
         self.static = StaticCache(WEB_DIR)
         self.httpd = None
+        from .addon_client import AddonClient
+        self.client = AddonClient(self.data_dir)
 
     def request_shutdown(self, exit_code=0):
         self.exit_code = exit_code
