@@ -106,6 +106,9 @@ class ScaleApiTest(unittest.TestCase):
             self.assertFalse(set(d["id"] for d in page["items"]) &
                              set(d["id"] for d in second["items"]))
             self.assertEqual(client.call("GET", "/api/v1/collections/big-patents/documents?cursor=bad")[0], 400)
+            st, exact = client.call("GET", "/api/v1/collections/big-patents/documents?ext_id=3")
+            self.assertEqual(st, 200, exact)
+            self.assertEqual([d["ext_id"] for d in exact["items"]], ["3"])
         finally:
             srv.close()
 
