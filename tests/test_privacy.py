@@ -113,6 +113,12 @@ class PrivacyApiTest(unittest.TestCase):
                                     {"question": "発明の秘密", "use_news": True})[0], 400)
             self.assertEqual(c.call("POST", "/api/v1/connectors/gdelt/run",
                                     {"params": {"query": "秘密"}})[0], 403)
+            st, watch = c.call("POST", "/api/v1/watches",
+                               {"name": "未承認", "connector": "gdelt", "params": {"query": "秘密"}})
+            self.assertEqual(st, 200)
+            self.assertNotIn(watch["id"], srv.app.watches.due())
+            self.assertEqual(c.call("POST", "/api/v1/watches/%d/run" % watch["id"], {})[0], 400)
+
         finally:
             srv.close()
 
