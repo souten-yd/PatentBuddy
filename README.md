@@ -110,3 +110,10 @@ ResearchDataHubは資料の保存・収集・検索サーバーです。別のPa
 同じLinuxユーザーで稼働するPatentBuddyとResearchDataHubは、トークン入力なしで読み取り専用接続を確立します。[ローカル自動認証の条件](docs/local-addon-auth.md)を参照してください。
 
 PatentBuddyでは文献詳細からローカルAIによる要約・請求項確認を実行できます。処理状況からキャンセル・再実行し、結果はResearchDataHubへ原文の版付きで保存します。本文10万文字以内に対応し、結果は原文と照合するまで未確認として扱います。Hostのlocal-only AI契約対応が必要です。
+
+
+PatentBuddyの「PDFを取り込む」でControlDeck上のPDFを選択できます。文字抽出を優先し、画像があるページや文字が少ないページは日本語・英語OCRを併用します。原本・ページ根拠・PDF内の画像はResearchDataHubへ保存し、そのまま要約・請求項確認へ進めます。OCRの誤読や図番号は原本と照合してください。画像抽出は埋め込みラスター画像が対象で、ベクトル図形の切り出しは行いません。
+
+PCにPoppler（pdfinfo/pdftotext/pdftoppm/pdfimages）とTesseractの日本語・英語データが必要です。入力は50MiB・200ページ、抽出本文100万文字、画像200点・各2MiB/1600万画素・合計32MiBまで。PDFは同時1件、暗号化PDFは非対応です。AI分析は別に本文10万文字以内の制限があります。[PDF処理と復旧の仕様](docs/pdf-ocr-plan.md)を参照してください。
+
+別PC/NASへの接続では、管理Webのデバイストークンから「PDF取り込み・分析結果保存」を選んで発行し、HTTPSの接続設定に使用できます。この権限は文献の読み取りと限定された取り込み・分析保存だけを許可します。

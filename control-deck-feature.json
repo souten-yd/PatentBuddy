@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "feature_id": "patent-buddy",
-  "version": "0.5.9",
+  "version": "0.5.10",
   "platform": "linux",
   "architecture": "x86_64",
   "entrypoint": "pb.sh",

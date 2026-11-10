@@ -137,3 +137,63 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - v0.5.9候補: health余剰fieldを除去。手動token設定時もsetup済みとし、接続検証は認証済みstatus/UIで行う。新規AI/Jobs権限をHost正規enable APIで明示付与する。
 
 - Host実スキーマはhealthy時のreason_code=readyも拒否するため省略へ修正。setup_required/healthy双方を実Host AddonHealthReportで検証成功。最終122 tests成功30.752秒、Linux/Feature build成功。/tmp/pb-health-059-verify-final.log。追加ディスク書込みなし。
+
+## PDF/OCR次の実装単位
+
+- 隔離worktree `/data1tb/PatentBuddy-pdf`、feat/pdf-ocr-import。計画は `docs/pdf-ocr-plan.md`。まず上限/キャンセル付きのページ単位ローカル抽出とテスト、その後Host Files/Jobs/CPU lease・限定保存認証・原本snapshot・UIを結合する。
+- Host画面修正PR20はmain6963a54へ統合、v0.5.9 Release42829063808成功。署名Featureを実更新済み、実ブラウザ受入中。サーバーはv0.5.8（healthのみのAddon修正と区別）。
+
+## v0.5.9実画面受入とPDFコア（最新）
+
+- PR20 main6963a54924551d12debf7af56b2c0de470f9b8f3 / v0.5.9 / Release42829063808成功。署名Feature SHA1d3022e466778b97dca26b60637440040abc1f244aad3823e1d2cc4b5e9db849、実update成功。公式0.5.8→0.5.9自己更新でcookie/CSRF/文献・分析結果保持成功（/tmp/pb-autoupdate-059.json）。
+- 実Host HTTPSログイン/Bridge/導入済みAddon/実local-only LLMで1280px要約・320px請求項分析とキャンセル成功、横溢れ/JSエラーなし。合成資料のtemp ResearchDataHubだけを接続して隔離検証（実本番文献の受入ではない）。証拠 `/data1tb/PatentBuddy-addon/.data/installed-ai-browser.json`。enable要求の初回403は試験scriptのCSRF header漏れ、正規X-Requested-With付与後成功。
+- Host正規enable APIで既存3capにai.inference/jobs.writeを明示追加。テストconnection.jsonを撤去し、実サーバー17871/v0.5.8/local_peerへの自動接続復帰確認。temp user/session/job metadata削除、監査・Host job履歴保持、remaining_job_count=0。全3ユーザーサービスactive、pre0.5.8から秘密保持確認。旧合成UI試験プロセスも停止。
+- PR21 PDFコア `qnaplibrary/pdf_extract.py` を追加中。Linux別processでCPU/AS/file-size上限、子process group停止、入力50MiB/200page/100万字上限、固定tool argv・shellなし・ページ長辺2400pixel。新依存は追加せず任意既存Poppler/Tesseractを使用。まだAPI/UI/Host lease/保存には未接続。
+- 指定PDFの初回native抽出は15ページ1.83秒だが、表紙の出願人等の画像部分を取りこぼすことを確認。pdfimages一覧で画像入りページを検出し、表紙と12〜15ページだけOCRするよう改善。再試験15ページ6.86秒（直接CPUの候補module試験、Host Jobではない）、native10/OCR併用5。原本hash/ページ/nativeとOCR本文/エンジン版/単語信頼度を保持。表紙OCRは29低信頼単語があり品質完了とはしない。
+- 任意tool有無/入力サイズ/偽PDF/取消/リンク拒否/実child停止/実native/強制OCR/画像混在PDFを4 testsで確認。画像混在回帰込み3.433秒成功。`.data/pdf-extract-user.json`はローカル試験データでgit追跡しない。初回edit scriptの構文エラーはコード変更前に失敗、修正して再実行済み。
+- 次: コア最終tests・コードreview後push。Host Files grant・Jobs/CPU lease・狭いimport認証・原本blob/ページ根拠の正本保存/復元・UIを実装する。PDF原本/抽出資料をAddon永続文献DBへ保存しない。PR21はDraftでリリース未実施。PR-F/P2/PR-Gも未完。
+
+- PDFコア最終全verify126 tests成功（/tmp/pb-pdf-extract-verify-final.log）。低信頼単語の行/段落を最大1000件残し、超過時は省略flagを明示。実際のOCR取り込み画面・Host Job/Broker・原本保存は引き続き未実装。次回は `/data1tb/PatentBuddy-pdf` のPR21から続ける。
+
+## PR21 PDFの正本保存・Host接続（作業中）
+
+- `pdf_store.py` / API POST `/api/v1/pdf-imports` を追加。原本はSHA256キーのSQLite BLOBとして1個だけ保存、抽出版ごとにimmutable文献とページ根拠を作る。取り込み専用scopeはfixed `pdf-imports` コレクションへの新規作成のみ、任意文献更新/削除/設定/分析保存不可。原本readは認証必須、published tokenでは不可。
+- 原本/抽出/本文/FTS/監査は同じtransaction。既存add_documentsに内部connection引数を追加して正本transaction内で再利用（外部APIから指定不可、通知はcommit後）。全抽出版を削除したときだけ原本BLOBを削除する。snapshotに原本も含まれるので、別ディレクトリコピーによる復元漏れはない。
+- 独立RAM `pdf_import` tokenとUnix socketを追加。ro/analysis tokenは既存のまま。別UID/非loopback/再起動/無効化時に受け付けない。NASの手動接続は現時点rw tokenが必要で、狭い永続import tokenと接続設定UIはまだ未対応。
+- `addon_pdf_host.py`: 正規grant UUID/期限/サイズ/PDF名確認、Host原本stream取得、2GiBのHost RAM/CPU lease取得・activate/renew/release、GPUへの代替を拒否、取消時にsocket停止。Host実RuntimeResourceRequestで要求schema検証成功。HostSessionのrequired能力をclass属性にし、PDF処理にAI能力を不要とする。
+- 関連9 tests成功3.486秒、全133 tests成功35.100秒（/tmp/pb-pdf-storage-verify.log）。atomic失敗rollback、二重取込DB変更0、抽出版2つに原本1個、最終参照削除、原本/抽出/監査のsnapshot復元、scope境界、独立Unix token失効を確認。
+- 指定122330-byte PDFのtemp正本保存測定: 初回0.0095秒/process write622592 bytes/DB changes214、WAL総量1009432 bytes（増分とは異なる）。同一再投入0.0004秒/DB changes0/process write0。snapshot733184 bytes、復元含む0.0082秒、原本SHA一致/quick_check=ok、maxRSS23380 KiB。/tmp/pb-pdf-store-measure.json。これは1資料のPC上観測であり大量/NAS/50MiB上限の性能保証ではない。原本BLOBと版根拠の追加writeがバックアップ一貫性に必要。
+- 実Host Jobs/CPU lease/files grantで指定PDFを取得する試験を実行。初回は高速nativeページのprogressがHostの2Hz制約に当たりHTTP429。途中成功扱いせず、lease解放/一時addon・user・session除去。失敗証拠 /tmp/pb-pdf-host-live-attempt1.*。progressを1Hzにまとめ、最終page通知は取消可能な待ちで間隔維持、回帰4 tests成功。
+- 再試験 `/tmp/pb-pdf-host-live.py` は実Hostで原本取得→15ページOCR併用→temp ResearchDataHub保存→CPUlease解放→Host完了照合まで成功。続けて同文献を実Host local-only LLMで要約中。結果は `/tmp/pb-pdf-host-live.jsonl`、session66815。実原本を使うが本番DBへはまだ未登録。
+- 次: LLM試験/一時grant metadata cleanup/最終verify結果を確認してpush。PDFJob managerの中断・再起動・Host終端再送・一時原本掃除、UIのFiles pickerとページ根拠/原本/図閲覧、署名配布/実更新/実画面受入が未完。既存AnalysisJobsと並行できるよう上限とowner境界を保持。PR-F/P2/PR-Gも継続。
+
+- 再試験完了: 指定PDFの取込後に実Host local-only LLMの要約生成/正本保存/Host終端同期成功64.59秒/3962文字。これは内容品質の人間承認ではない。temp addon/user/session削除、監査/Host履歴保持、一時grant metadata 2件も除去。最終134 tests成功37.560秒（/tmp/pb-pdf-storage-verify-final.log）。lease解放応答のID/状態/Job照合も追加し回帰検証済み。
+
+## PR21 PDF UI / Job管理（最新、未公開）
+
+- `PDFJobs`を実装。独立最大32件のmetadata履歴、PDF同時1件、所有者境界、CPU leaseと認証の5秒監視、キャンセル、原本SHAを確認する再選択実行、Host終端再送。原本/抽出本文/filename/tokenはmetadataへ保存しない。一時原本と中間画像は0700 scratchの中で処理し、終了時削除。再起動時は排他lock取得後に当該scratch残骸だけ削除する。
+- 保存API応答を失ったときは抽出版hashの読取receiptで照合。照合先まで落ちていればinterrupted/確認待ちとし、後で保存済み資料を回収する。原本/結果を保存済みなのに失敗と決めつけたり重複文献を作らない。新API GET `/api/v1/pdf-imports/{digest}` はread、published拒否は既存境界を維持。
+- UIにHost Files picker・OCRページ指定・進捗/取消・状態照合/再選択・原本download・ページ根拠/低信頼語数を追加。取り込み中は新規選択buttonを無効化。分析へそのまま進める。Host capabilitiesにfiles.pick/resources.acquire追加（配布後に正規enableで明示grantが必要）。
+- `tests.test_addon_pdf_jobs`は原本/秘密がmetadataに残らない、取消未保存/owner拒否、一時領域掃除、応答喪失receipt復旧、保存確認待ち、Host終端再送、排他lockを検証。既存AddonShell test teardownへPDFJobs.close追加。urllib HTTPError responseもcloseし、最終139 tests成功43.919秒、ResourceWarningなし（/tmp/pb-pdf-jobs-ui-verify-final.log）。前段139 testsは成功したが未close警告があり修正した。
+- 実Host Chromeの1280pxで選択→指定PDF15ページ取り込み→原本download/SHA一致→ローカルAI要約表示成功。320pxで頁根拠表示/原本SHA/取消成功。横溢れ/JSエラーなし。fixtureは候補Addon+temp ResearchDataHubで、導入済み製品の受入ではない。`.data/pdf-ui-first.json` / `/tmp/pb-pdf-ui-browser.log`。
+- テストscriptのフォルダbutton名は末尾「›」を含むため、最初の2回はexact locatorがtimeout。部分一致に修正。最初の320pxは前回成功資料を先に開いていたため、次回は新規成功カード数の増加を待つよう改善。busy button修正後の再試験で1280/320双方の新規取込と原本SHA/取消も成功（/tmp/pb-pdf-ui-browser2.log、LLM再実行は省略）。
+- fixtureの初回起動は実class名を誤りImportError。生成直後の一時user1件はJob/session未作成を確認し削除、classをAddonShellへ修正して再起動。その後のfixture停止ではtemporary addon/user/session/grantとtemp原本/DBを除去、監査/Hostjob履歴を保持する。
+- 未完の重要契約: Hostのlease解放済み/期限切れ状態を再起動後に照合するGET `/resources/leases/{id}` が現在ない。PDF clientに409時のGET照合を実装したが、Host側の最小read route追加/権限テスト/PRと実反映が必要。確認できない場合はhost_sync_pendingを残す。Hostを勝手に完了扱いしない。
+- 次はこのHost復旧契約、原本からの図/ページ画像の保存・閲覧、狭い永続PDF取込token（NAS接続でrwを要求しない）、リリース用docs/版整合・Linux/QPKG/署名Featureビルド、実更新・導入済み画面受入。その後PR-F/P2/PR-Gを続ける。現在本番はPatentBuddy v0.5.9 / RDH v0.5.8のまま。
+
+- 2回目の実Host UI fixtureも停止・一時addon/user/session/grant除去を確認。本番Addon healthはhealthyのまま。最後にPDF取込のJSON配列を400で拒否する型検査を追加し、保存/Jobs/client関連12 testsを再検証。全体139 tests以降の変更はこの入力検証とテストだけ。
+
+## v0.5.10候補・画像と復旧の仕上げ
+
+- ControlDeck PR350はmain5e1dde7へ統合。scoped GET lease追加/所有者DB照合をto_thread化。35関連tests成功4.69秒。初回全体1件失敗は新worktreeにfrontend/distがなくSPA route不在だったため（Project Lab 404/405）、コード/テストを緩めずfrontend build21.32秒後に同一test成功。全1226 tests成功112.41秒/2skip/既存warning。実Hostのresources.pyが元mainと一致すること・active Jobsゼロを確認して当該1ファイルだけ反映、ユーザーpasskey変更を保持して正常再起動。
+- 実Hostでlease GETが期限を延長しないこと、二重releaseが409→GET released確認で復旧することを検証成功（/tmp/pb-host-lease-live2.jsonl）。初回は古い試験scriptがmanifestへ既存capabilityを二重追加して422、dedupe後成功。一時addon/user/session除去、監査/Host履歴保持。
+- 指定PDFの埋め込み画像13点/64182 bytesを抽出（表紙の画像を含む、図番号の自動確定ではない）。PDF画像のページ/index/PNG hash/寸法を保持。PNGはCRC/完結/画素上限確認、1点2MiB/200点/合計32MiB。workerのpdfimages出力も1file2MiBに制限してから実行する。原本と同様に共有BLOB+抽出版参照として原子的に保存し、最後の参照削除で削除する。
+- PNGの壊れ/偽装/頁・hash不一致拒否、atomic rollback、画像共有、無変更write0、snapshot復元/最後の参照削除、private読取境界を追加。全142 tests成功38.790秒（/tmp/pb-pdf-images-verify.log）。その後、狭い永続analysis/pdf_import/pdf_analysis scopeを追加、関連7 tests成功1.954秒。一般CRUD/admin拒否。
+- UIで13点の画像を1枚ずつ表示/保存する機能を追加。実画面でblob画像が既存img-srcポリシーに遮断されることを再現し、Addonモードのimg-srcだけblobを追加。サーバー管理WebのCSPは変更しない。関連13 tests成功3.040秒。実画像ブラウザ再試験中。
+- 版を0.5.10へ整合、README/認証/OCR仕様を更新。新規ディスク書込みは原本/抽出版/画像BLOB・参照索引・import監査と最大32件のjob状態に必要。UIの表示/GETで新しい画像を再生成しない。次は実画像UI結果確認、最終verify/build、PR21 review/merge、公式更新/署名Feature更新、導入済み画面受入。本番DBへの指定PDFの登録も配布後に行う。
+
+## PDF/OCR配布前の最終受入（2026-11-11）
+
+- 最終verifyは143 tests成功39.690秒（/tmp/pb-pdf-0510-verify.log）。Linux・QPKG・Featureビルド成功。全diff/checkを確認。
+- 実Hostブラウザ1280/320pxで、指定PDF15ページ・画像13点の新規取込、PNG表示/保存、原本SHA一致、320pxで取消が成功。横溢れ・JS例外ゼロ（.data/pdf-ui-browser.json、スクリーンショット）。回路図の実表示を目視確認。今回は画像受入のためLLM再実行を省略し、前回の実HostローカルLLM受入を維持。
+- 一時fixtureを正常停止、一時addon/user/session/grantの除去を確認。本番の接続・文献DBはまだ変更していない。v0.5.10の公開・実更新・本番PDF取込は次の工程。

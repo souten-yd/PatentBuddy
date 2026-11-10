@@ -25,6 +25,9 @@ def owner_key(identity):
 
 
 class HostSession:
+    required = REQUIRED
+    capability_message = "ControlDeckでAIとジョブの権限を有効にしてください"
+
     def __init__(self, client, headers):
         self.client = client
         self.lock = threading.RLock()
@@ -38,8 +41,8 @@ class HostSession:
         self.require_capabilities()
 
     def require_capabilities(self):
-        if not REQUIRED.issubset(self.identity['granted_capabilities']):
-            raise AddonError(403, 'ControlDeckでAIとジョブの権限を有効にしてください')
+        if not self.required.issubset(self.identity['granted_capabilities']):
+            raise AddonError(403, self.capability_message)
 
     def call(self, method, path, body=None, timeout=20):
         with self.lock:
@@ -65,10 +68,10 @@ class HostSession:
             raise AddonError(502, 'ローカルAIの応答を検証できません')
         return result['content']
 
-    def create_job(self):
+    def create_job(self, title="PatentBuddy 文献分析"):
         if self.job_id is not None:
             raise AddonError(409, 'ジョブは作成済みです')
-        result = self.call('POST', '/jobs', {'title': 'PatentBuddy 文献分析', 'detached': True})
+        result = self.call('POST', '/jobs', {'title': title, 'detached': True})
         job_id = result.get('job', {}).get('id')
         if result.get('created') is not True or not isinstance(job_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', job_id):
             raise AddonError(502, 'Hostジョブの作成を確認できません')
@@ -84,7 +87,7 @@ class HostSession:
         identity = self.client.authenticate(headers)
         if (identity['subject'] != 'job:' + self.job_id
                 or identity.get('actor_subject', self.owner) != self.owner
-                or not REQUIRED.issubset(identity['granted_capabilities'])):
+                or not self.required.issubset(identity['granted_capabilities'])):
             raise AddonError(403, 'Hostジョブの認証範囲が一致しません')
         with self.lock:
             self.headers = headers
@@ -96,7 +99,7 @@ class HostSession:
         if self.identity['expires_at'] - time.time() < 90:
             self._replace_credential(self.call('POST', '/jobs/' + self.job_id + '/credential/refresh', {}))
         current = self.client.authenticate(dict(self.headers))
-        if current['subject'] != 'job:' + self.job_id or not REQUIRED.issubset(current['granted_capabilities']):
+        if current['subject'] != 'job:' + self.job_id or not self.required.issubset(current['granted_capabilities']):
             raise AddonError(403, 'Hostジョブの権限が変更されました')
         state = self.call('GET', '/jobs/' + self.job_id + '/control')
         if state.get('host_job_id') != self.job_id:

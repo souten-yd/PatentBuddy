@@ -181,6 +181,7 @@ class Auth:
         self._device_seen = {}
         self._local_token = "qll_" + secrets.token_urlsafe(32)
         self._local_analysis_token = "qla_" + secrets.token_urlsafe(32)
+        self._local_import_token = "qli_" + secrets.token_urlsafe(32)
 
     # admin --------------------------------------------------------------
     def admin_configured(self):
@@ -216,7 +217,7 @@ class Auth:
     def create_device(self, name, scopes="rw"):
         token = "qlt_" + secrets.token_urlsafe(32)
         name = (name or "device").strip()[:80] or "device"
-        if scopes not in ("rw", "ro", "published"):
+        if scopes not in ("rw", "ro", "published", "analysis", "pdf_import", "pdf_analysis"):
             raise ValueError("unsupported device token scope")
         with self.store.lock:
             cur = self.store.db.execute("INSERT INTO devices(name,token_hash,scopes,created) VALUES(?,?,?,?)",
@@ -225,20 +226,20 @@ class Auth:
 
     def local_token(self, scope="read"):
         if self.admin_configured() and self.config.get("auth", "local_auto_connect", default=True):
-            return self._local_analysis_token if scope == "analysis" else self._local_token if scope == "read" else None
+            return {"analysis": self._local_analysis_token, "read": self._local_token, "pdf_import": self._local_import_token}.get(scope)
         return None
 
     def device_for_token(self, token, ip):
-        if token and token.startswith(("qll_", "qla_")):
+        if token and token.startswith(("qll_", "qla_", "qli_")):
             import ipaddress
             try:
                 loopback = ipaddress.ip_address(ip).is_loopback
             except ValueError:
                 loopback = False
-            analysis = token.startswith("qla_")
-            current = self.local_token("analysis" if analysis else "read")
+            scope = "pdf_import" if token.startswith("qli_") else "analysis" if token.startswith("qla_") else "read"
+            current = self.local_token(scope)
             if loopback and current and secrets.compare_digest(token, current):
-                return {"id": 0, "name": "Local same-user client", "scopes": "analysis" if analysis else "ro"}
+                return {"id": 0, "name": "Local same-user client", "scopes": "ro" if scope == "read" else scope}
             return None
         if not token or not token.startswith("qlt_"):
             return None

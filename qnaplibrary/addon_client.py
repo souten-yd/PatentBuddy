@@ -42,18 +42,19 @@ def validate_url(url, host=False):
     return url.rstrip('/')
 
 
-def request_json(base, method, path, body=None, headers=None, timeout=20):
+def request_json(base, method, path, body=None, headers=None, timeout=20, max_bytes=8 * 1024 * 1024):
     payload = json.dumps(body, ensure_ascii=False).encode() if body is not None else None
     req = urllib.request.Request(base + path, data=payload, method=method,
         headers=dict({'Content-Type': 'application/json'}, **(headers or {})))
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
     try:
         with opener.open(req, timeout=timeout) as response:
-            raw = response.read(8 * 1024 * 1024 + 1)
-        if len(raw) > 8 * 1024 * 1024:
+            raw = response.read(max_bytes + 1)
+        if len(raw) > max_bytes:
             raise AddonError(502, '応答が上限を超えています')
         return json.loads(raw)
     except urllib.error.HTTPError as error:
+        error.close()
         status = error.code if error.code in (400, 401, 403, 404, 409, 429, 503) else 502
         raise AddonError(status, '接続先が要求を受け付けませんでした (HTTP %d)' % error.code) from None
     except (OSError, ValueError) as error:
@@ -104,17 +105,43 @@ class AddonClient:
 
     def data(self, method, path, body=None):
         config = self.settings()
-        if config.get('auth_method') == 'local_peer' and method == 'POST' and path.endswith('/analyses'):
+        if config.get('auth_method') == 'local_peer' and method == 'POST' and (path.endswith('/analyses') or path == '/api/v1/pdf-imports'):
             from .local_auth import connect
             try:
-                config = connect(17871, 'analysis')
+                config = connect(17871, 'pdf_import' if path == '/api/v1/pdf-imports' else 'analysis')
             except (OSError, ValueError):
-                raise AddonError(503, 'ResearchDataHubの分析結果保存用認証を利用できません') from None
+                raise AddonError(503, 'ResearchDataHubの保存用認証を利用できません') from None
         token = config.get('server_token')
         if not isinstance(token, str) or not token or '\n' in token or '\r' in token:
             raise AddonError(503, 'ResearchDataHubの接続トークンを設定してください')
         return request_json(validate_url(config['server_url']), method, path, body,
-                            {'Authorization': 'Bearer ' + token})
+                            {'Authorization': 'Bearer ' + token},
+                            max_bytes=16 * 1024 * 1024 if path.endswith('/pdf-extraction') else 8 * 1024 * 1024)
+
+    def original_pdf(self, doc_id):
+        return self._document_bytes(doc_id, 'original.pdf', 50 * 1024 * 1024, b'%PDF-')
+
+    def image_png(self, doc_id, image_id):
+        return self._document_bytes(doc_id, 'images/%d' % image_id, 2 * 1024 * 1024, b'\x89PNG\r\n\x1a\n')
+
+    def _document_bytes(self, doc_id, suffix, limit, signature):
+        config = self.settings()
+        token = config.get('server_token')
+        if not isinstance(token, str) or not token or '\r' in token or '\n' in token:
+            raise AddonError(503, 'ResearchDataHubの認証設定を確認してください')
+        url = validate_url(config['server_url']) + '/api/v1/documents/%d/%s' % (doc_id, suffix)
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
+        try:
+            with opener.open(urllib.request.Request(url, headers={'Authorization': 'Bearer ' + token}), timeout=30) as response:
+                raw = response.read(limit + 1)
+            if len(raw) > limit or not raw.startswith(signature):
+                raise AddonError(502, '資料の応答が不正です')
+            return raw
+        except urllib.error.HTTPError as error:
+            error.close()
+            raise AddonError(error.code if error.code in (401, 403, 404) else 502, '資料を取得できません') from None
+        except OSError:
+            raise AddonError(502, '資料との通信に失敗しました') from None
 
     def status(self):
         config = self.settings()

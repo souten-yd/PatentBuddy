@@ -1052,3 +1052,71 @@ def analysis_save(req):
 @route("GET", "/api/v1/documents/{did}/analyses", "read")
 def analysis_list(req):
     return req.app.store.list_analyses(int(req.params["did"]))
+
+
+@route('POST', '/api/v1/pdf-imports', 'pdf_import')
+def pdf_import(req):
+    import base64
+    from . import pdf_store
+    body = req.json(limit=144 * 1024 * 1024)
+    if not isinstance(body, dict):
+        raise _err(400, 'PDF取り込み条件を指定してください')
+    encoded = body.get('pdf_base64')
+    if not isinstance(encoded, str) or len(encoded) > ((pdf_store.MAX_PDF + 2) // 3) * 4:
+        raise _err(400, 'PDFのサイズまたは形式が不正です')
+    try:
+        content = base64.b64decode(encoded, validate=True)
+    except ValueError:
+        raise _err(400, 'PDFのエンコードが不正です') from None
+    from .pdf_images import MAX_IMAGES, MAX_IMAGE_BYTES, MAX_TOTAL_BYTES
+    entries = body.get('images', [])
+    if not isinstance(entries, list) or len(entries) > MAX_IMAGES:
+        raise _err(400, '画像の数が上限を超えています')
+    images, total = {}, 0
+    for item in entries:
+        if not isinstance(item, dict) or type(item.get('id')) is not int or item['id'] in images:
+            raise _err(400, '画像IDが不正です')
+        encoded_image = item.get('data_base64')
+        if not isinstance(encoded_image, str) or len(encoded_image) > ((MAX_IMAGE_BYTES + 2) // 3) * 4:
+            raise _err(400, '画像がサイズ上限を超えました')
+        try:
+            image = base64.b64decode(encoded_image, validate=True)
+        except ValueError:
+            raise _err(400, '画像のエンコードが不正です') from None
+        total += len(image)
+        if total > MAX_TOTAL_BYTES:
+            raise _err(400, '画像の合計は32MiB以内にしてください')
+        images[item['id']] = image
+    return pdf_store.import_pdf(req.app.store, content, body.get('extraction'), body.get('title'), req.actor, images=images)
+
+
+@route('GET', '/api/v1/documents/{did}/pdf-extraction', 'read')
+def pdf_extraction(req):
+    from . import pdf_store
+    return pdf_store.extraction_for(req.app.store, int(req.params['did']))
+
+
+@route('GET', '/api/v1/documents/{did}/original.pdf', 'read')
+def pdf_original(req):
+    from . import pdf_store
+    return req.h.send_bytes(200, pdf_store.original_for(req.app.store, int(req.params['did'])),
+                            'application/pdf', {'Content-Disposition': 'attachment; filename="original.pdf"',
+                                                'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff'})
+
+
+@route('GET', '/api/v1/pdf-imports/{digest}', 'read')
+def pdf_import_receipt(req):
+    digest = req.params['digest']
+    if not re.fullmatch(r'[a-f0-9]{64}', digest):
+        raise _err(400, '抽出版のIDが不正です')
+    row = req.app.store.one('SELECT doc_id,source_sha256,extraction_sha256 FROM document_pdfs WHERE extraction_sha256=?', (digest,))
+    if not row:
+        raise _err(404, '保存済みの抽出版がありません')
+    return dict(row)
+
+
+@route('GET', '/api/v1/documents/{did}/images/{iid}', 'read')
+def pdf_image(req):
+    from . import pdf_store
+    return req.h.send_bytes(200, pdf_store.image_for(req.app.store, int(req.params['did']), int(req.params['iid'])),
+                            'image/png', {'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff'})

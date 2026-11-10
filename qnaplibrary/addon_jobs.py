@@ -12,9 +12,11 @@ from .config import atomic_write
 
 
 class AnalysisJobs:
+    state_filename = "analysis-jobs.json"
+
     def __init__(self, client, data_dir):
         self.client = client
-        self.path = Path(data_dir) / 'analysis-jobs.json'
+        self.path = Path(data_dir) / self.state_filename
         self.lock = threading.RLock()
         self.jobs = {}
         self.sessions = {}

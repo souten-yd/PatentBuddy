@@ -13,7 +13,7 @@ def peer_uid(sock):
 
 
 def socket_path(port, scope="read"):
-    if scope not in ("read", "analysis"):
+    if scope not in ("read", "analysis", "pdf_import"):
         raise OSError("unsupported local scope")
     if not hasattr(socket, 'SO_PEERCRED') or os.getuid() == 0:
         raise OSError('local authentication requires an unprivileged Linux user')
@@ -22,7 +22,7 @@ def socket_path(port, scope="read"):
     directory = base / 'researchdatahub'
     directory.mkdir(mode=0o700, exist_ok=True)
     check_private(directory, directory=True)
-    return directory / ('%d%s.sock' % (port, '-analysis' if scope == 'analysis' else ''))
+    return directory / ('%d%s.sock' % (port, '' if scope == 'read' else '-' + scope))
 
 
 def check_private(path, directory=False):

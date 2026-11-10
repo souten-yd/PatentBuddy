@@ -75,5 +75,6 @@ class AddonClientTests(unittest.TestCase):
                         self.assertEqual(browser.call('POST', '/addon/v1/search', {'q': []})[0], 400)
                     self.assertFalse((Path(tmp) / 'library.sqlite3').exists())
                 finally:
+                    app.pdf_jobs.close(); app.jobs.close()
                     server.shutdown(); server.server_close(); thread.join()
         finally: hub.close()
