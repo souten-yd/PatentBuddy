@@ -70,7 +70,7 @@ class Providers:
             if not url.startswith(("http://", "https://")):
                 raise LLMError("base_url must be http(s)")
             ids.add(p["id"])
-            clean.append({k: p.get(k) for k in ("id", "type", "label", "base_url", "model", "secret", "options")
+            clean.append({k: p.get(k) for k in ("id", "type", "label", "base_url", "model", "secret", "options", "local_only_verified")
                           if p.get(k) is not None})
         llm = self.config.get("llm")
         llm["providers"] = clean
