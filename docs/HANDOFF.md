@@ -67,3 +67,8 @@
 - 規格(JIS/ISO/IEC)の全文はライセンスに制約があり得る。APIから公開する前に権利確認が必要。
 
 これまでの詳細な旧版の検証・変更履歴は各GitHub Release、PR #6/#8/#9/#12と`CHANGELOG.md`を参照。**今後のCodexの実装完了条件を満たしたものだけこのファイルの完了欄へ移す。**
+
+## PR-A 作業開始（2026-11-10）
+- PR #16 をレビュー・マージ。ベース `24cb084`。main v0.5.1 のローカル verify は58 testsと静的検査が合格。
+- Linux別名入口/表示/配布互換を `feat/researchdatahub-linux-entry` で実装中。PR-B〜Gは未完了。
+- ControlDeck管理のllama.cppプロセス（loopback 8097、ローカルGGUF Qwen3.8-27B）を確認。実LLM検証はこれから。
