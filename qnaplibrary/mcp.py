@@ -29,6 +29,8 @@ TOOLS = [
     _tool("patent_claim_chart", "請求項の構成要件ごとにライブラリから根拠候補を検索",
           {"id": {"type": "integer"}, "claim_no": {"type": "integer", "default": 1},
            "collections": {"type": "array", "items": {"type": "string"}}}, ["id"]),
+    _tool("classify", "分類辞書（IPC/FI/Fターム等）からコードを検索", {"query": {"type": "string"}}, ["query"]),
+    _tool("watch_hits", "特許ウォッチで検出された新しい候補文献", {"patent_id": {"type": "integer"}}),
     _tool("debug_bundle", "不具合調査用のデバッグ情報（秘密は除去済み）", {}),
 ]
 
@@ -84,6 +86,11 @@ def call_tool(app, name, args, scopes):
         return app.patents.get(int(args["id"]))
     if name == "patent_claim_chart":
         return app.patents.claim_chart(int(args["id"]), args.get("collections") or None, int(args.get("claim_no") or 1))
+    if name == "classify":
+        res = app.searcher.search(args.get("query", ""), None, 15, "keyword", kinds=["classification"])
+        return [{"code": r["ext_id"], "title": r["title"]} for r in res["results"]]
+    if name == "watch_hits":
+        return app.watches.hits(patent_id=args.get("patent_id"), status="new")
     if name == "debug_bundle":
         return app.debug_bundle()
     raise ValueError("unknown tool: %s" % name)

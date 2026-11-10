@@ -33,6 +33,8 @@ DEFAULTS = {
                       "truncate_dim": 1024, "batch": 32, "auto": True, "query_prefix": "", "doc_prefix": ""},
         "rag_top_k": 8,
     },
+    "notify": {"webhooks": [], "deadline_days": [60, 30, 7],
+               "email": {"enabled": False, "host": "", "port": 587, "user": "", "from": "", "to": "", "starttls": True}},
     "connectors": {"epo_ops": {"enabled": False}, "jpo": {"enabled": False, "base_url": "https://ip-data.jpo.go.jp"},
                    "uspto_odp": {"enabled": False}, "gdelt": {"enabled": True}, "rss": {"enabled": True}},
 }

@@ -8,7 +8,7 @@
 - コネクタ: GDELT、RSS、EPO OPS、JPO API（実験的）、USPTO ODP（実験的）
 - デバッグバンドル、GitHub Releases 自動更新、Linux tar.gz / QPKG
 
-## v0.2（特許の網羅性）
+## v0.2（特許の網羅性） — 完了
 - 特許ウォッチ（定期収集・差分・類似度で X/Y 候補提示）
 - IPC/FI/Fターム辞書、審査基準コレクションの取り込み支援
 - 期限通知（Webhook / メール）

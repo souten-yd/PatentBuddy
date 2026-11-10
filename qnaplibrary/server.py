@@ -22,6 +22,8 @@ from . import APP_NAME, DEFAULT_PORT, VERSION, api, debuglog, webauthn
 from .auth import Auth
 from .config import Config
 from .embedworker import EmbedWorker
+from .notify import Notifier
+from .watch import Scheduler, Watches
 from .llm import Providers
 from .patents import Patents
 from .search import Searcher
@@ -52,6 +54,9 @@ class App:
         self.searcher = Searcher(self.store, self.config, self._embedder, self._vector_model)
         self.embedder = EmbedWorker(self.store, self.providers, self.config)
         self.store.on_change = self.embedder.kick
+        self.notifier = Notifier(self.config, self.store)
+        self.watches = Watches(self)
+        self.scheduler = Scheduler(self)
         self.patents = Patents(self.store, self.searcher, self.providers)
         self.challenges = webauthn.Challenges()
         self.exit_code = 0
@@ -79,6 +84,8 @@ class App:
             "install_mode": self.updater.mode, "update": self.updater.status(),
             "store": self.store.stats(), "vectors": self.searcher.vectors.info(),
             "embedding": self.embedder.info(), "vector_models": self.store.vector_models(),
+            "scheduler": self.scheduler.status,
+            "watches": [{k: w[k] for k in ("id", "name", "connector", "last_run", "last_status", "new_hits")} for w in self.watches.list()],
             "settings": self.config.all(),
             "secrets": {k: self.config.secret_status(k) for k in api.SECRET_NAMES},
             "llm_providers": [{"id": p["id"], "type": p["type"], "base_url": p["base_url"], "model": p.get("model")}
@@ -403,12 +410,14 @@ def main(argv=None):
     app.updater.start_background()
     app.embedder.start()
     app.embedder.kick()
+    app.scheduler.start()
     LOG.warning("%s %s listening on %s://%s:%d (data: %s)", APP_NAME, VERSION, "https" if tls else "http", bind, port, args.data)
     try:
         httpd.serve_forever(poll_interval=1.0)
     finally:
         httpd.server_close()
         app.embedder.stop()
+        app.scheduler.stop()
         app.store.close()
     return app.exit_code
 

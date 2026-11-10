@@ -4,7 +4,8 @@
 
 ## 現在のバージョン
 
-- **v0.1.1（リリース済み・最新）**: https://github.com/souten-yd/QnapLibrary/releases/tag/v0.1.1
+- v0.2.0: PR（特許ウォッチ・通知・分類辞書・審査基準連携）。所有者の指示「順次確認不要で計画を最後まで」により v0.3 → v0.4 まで連続で進める
+- **v0.1.1（リリース済み）**: https://github.com/souten-yd/QnapLibrary/releases/tag/v0.1.1
 - v0.1.0 は PR #1 でマージしたがリリースなし（開発環境からはタグ push / API でのタグ作成 / workflow_dispatch がプロキシで禁止。リリースは main マージ時の release.yml が作る）
 
 ## 状態（2026-11-10）
@@ -33,7 +34,7 @@
 
 ## 次の一手
 
-2. `docs/proposals.md` の 1（特許ウォッチ）→ 2（IPC/FI 辞書）→ 3（審査基準）→ 5（期限通知）
+2. v0.3（Qdrant・リランカー・集計・PC 取り込みクライアント）→ v0.4（規格メタデータ・e-Stat/EDINET/SEC・調査ジョブ・検索フィルタ）
 
 ## 既知の問題 / 未決事項
 

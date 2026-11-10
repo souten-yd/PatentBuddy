@@ -277,6 +277,13 @@ class Patents:
         if self.searcher and task not in ("interview", "filing_check"):
             q = " OR ".join(_keywords(query_text)[:10]) or project["title"]
             evidence = self.searcher.search(q, collections, limit=8)["results"]
+        law, codes = [], []
+        if self.searcher and task in LAW_TASKS:
+            law = self.searcher.search(" OR ".join(_keywords(PROMPTS[task]["label"] + " " + query_text)[:8]) or task,
+                                       None, 4, "keyword", kinds=["law"])["results"]
+        if self.searcher and task in ("search_plan", "novelty", "idea"):
+            codes = self.searcher.search(" OR ".join(_keywords(query_text)[:10]) or project["title"], None, 15,
+                                         "keyword", kinds=["classification"])["results"]
         ev_text = "\n\n".join("[%d] %s (%s %s) %s\n%s" % (i + 1, e["title"], e["collection"], e.get("ext_id") or "",
                                                            e["section"], e["text"][:900]) for i, e in enumerate(evidence))
         refs = "\n".join("- [%s] %s %s" % (r["category"], r["ref"], r["relevance"]) for r in project["refs"])
@@ -288,6 +295,9 @@ class Patents:
         messages = [{"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": PROMPTS[task]["prompt"] + "\n\n" + context +
                      ("\n\n# 参照文献（ライブラリ検索結果。引用は [番号] で示す）\n" + ev_text if ev_text else "") +
+                     ("\n\n# 審査基準・法令（ライブラリ。引用は [基準n]）\n" + "\n\n".join(
+                         "[基準%d] %s\n%s" % (i + 1, e["title"], e["text"][:900]) for i, e in enumerate(law)) if law else "") +
+                     ("\n\n# 分類候補（ライブラリの分類辞書）\n" + "\n".join("- " + e["title"] for e in codes) if codes else "") +
                      ("\n\n# 追加指示\n" + extra if extra else "")}]
         if self.providers is None:
             return {"task": task, "messages": messages, "answer": None, "evidence": evidence}
@@ -312,6 +322,8 @@ def _keywords(text):
         out.append(c)
     return out
 
+
+LAW_TASKS = ("novelty", "inventive_step", "claim_draft", "spec_outline", "filing_check", "oa_response", "infringement", "fto", "strategy")
 
 SYSTEM_PROMPT = ("あなたは日本の特許実務に精通したアシスタントです。特許法・特許審査基準に沿って、根拠（参照文献の番号や条文）を示しながら"
                  "具体的に回答してください。推測は推測と明記し、最終判断は弁理士の確認が必要であることを忘れないでください。"

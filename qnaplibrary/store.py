@@ -16,7 +16,7 @@ from . import textproc
 
 LOG = logging.getLogger("qnaplibrary.store")
 SCHEMA_VERSION = 1
-KINDS = ("generic", "patent", "standard", "news", "market", "law", "paper", "note")
+KINDS = ("generic", "patent", "standard", "news", "market", "law", "paper", "note", "classification", "report")
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
@@ -67,6 +67,17 @@ CREATE TABLE IF NOT EXISTS chat_messages(
 CREATE TABLE IF NOT EXISTS jobs(
   id INTEGER PRIMARY KEY, kind TEXT NOT NULL, params TEXT NOT NULL DEFAULT '{}', status TEXT NOT NULL,
   result TEXT NOT NULL DEFAULT '', created REAL NOT NULL, finished REAL);
+CREATE TABLE IF NOT EXISTS watches(
+  id INTEGER PRIMARY KEY, name TEXT NOT NULL, patent_id INTEGER REFERENCES patents(id) ON DELETE CASCADE,
+  connector TEXT NOT NULL, params TEXT NOT NULL DEFAULT '{}', collection TEXT NOT NULL DEFAULT '',
+  interval_hours INTEGER NOT NULL DEFAULT 168, enabled INTEGER NOT NULL DEFAULT 1,
+  last_run REAL, last_status TEXT NOT NULL DEFAULT '', created REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS watch_hits(
+  id INTEGER PRIMARY KEY, watch_id INTEGER NOT NULL REFERENCES watches(id) ON DELETE CASCADE,
+  patent_id INTEGER, doc_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+  score REAL NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'new', created REAL NOT NULL,
+  UNIQUE(watch_id, doc_id));
+CREATE TABLE IF NOT EXISTS notify_log(key TEXT PRIMARY KEY, sent REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY, ts REAL NOT NULL, actor TEXT NOT NULL, action TEXT NOT NULL, detail TEXT NOT NULL DEFAULT '');
 """
 
@@ -166,6 +177,10 @@ class Store:
     def list_collections(self):
         return [self.collection_row(r) for r in self.q("SELECT * FROM collections ORDER BY name")]
 
+    def collection_ids_of_kind(self, kinds):
+        kinds = [kinds] if isinstance(kinds, str) else list(kinds)
+        return [r[0] for r in self.q("SELECT id FROM collections WHERE kind IN (%s)" % ",".join("?" * len(kinds)), kinds)] if kinds else []
+
     def get_collection(self, ref):
         if isinstance(ref, int) or (isinstance(ref, str) and ref.isdigit()):
             row = self.one("SELECT * FROM collections WHERE id=?", (int(ref),))
@@ -257,7 +272,7 @@ class Store:
         if len(docs) > 5000:
             raise StoreError("max 5000 documents per request")
         added = updated = unchanged = 0
-        ids = []
+        ids, added_ids = [], []
         t = now()
         with self.tx() as db:
             for doc in docs:
@@ -298,6 +313,7 @@ class Store:
                                       str(doc.get("date") or ""), _j(meta), body_view, digest, t, t))
                     doc_id = cur.lastrowid
                     added += 1
+                    added_ids.append(doc_id)
                 ids.append(doc_id)
                 title_tok = textproc.index_text(title)
                 for ord_, (section, text) in enumerate(self._sections(doc, c["kind"])):
@@ -312,7 +328,7 @@ class Store:
             if self.on_change:
                 self.on_change()
             self.audit(actor, "documents.add", "%s +%d ~%d" % (c["name"], added, updated))
-        return {"added": added, "updated": updated, "unchanged": unchanged, "ids": ids}
+        return {"added": added, "updated": updated, "unchanged": unchanged, "ids": ids, "added_ids": added_ids}
 
     def _drop_chunks(self, db, doc_id):
         if self.fts:

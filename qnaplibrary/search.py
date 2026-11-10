@@ -114,12 +114,17 @@ class Searcher:
         self.vectors = VectorIndex(store, model_fn)
         self.embedder = embedder  # callable(list[str]) -> list[list[float]] or None
 
-    def search(self, query, collections=None, limit=20, mode="hybrid", group_by_doc=True, qvec=None):
+    def search(self, query, collections=None, limit=20, mode="hybrid", group_by_doc=True, qvec=None, kinds=None):
         t0 = time.time()
         trace = {"query": query, "mode": mode, "stages": []}
         coll_ids = None
         if collections:
             coll_ids = [self.store.get_collection(c)["id"] for c in collections]
+        if kinds:
+            of_kind = self.store.collection_ids_of_kind(kinds)
+            coll_ids = [c for c in coll_ids if c in of_kind] if coll_ids else of_kind
+            if not coll_ids:
+                return {"results": [], "trace": dict(trace, results=0, ms=0.0, note="no collection of kind %s" % kinds)}
         limit = max(1, min(int(limit or 20), 200))
         pool = max(limit * 5, 50)
         bm25 = self.store.fts_search(query, coll_ids, pool) if mode in ("hybrid", "keyword") else []

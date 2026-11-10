@@ -220,7 +220,7 @@ async function patentDetail(main, id) {
     onclick: guard(async () => { await api("PATCH", "/api/v1/patents/" + id, { stage: s.id }); render(); }) }, (i + 1) + ". " + s.label))));
   main.append(h("div", { class: "card small" }, h("strong", {}, "この段階の目的: "), p.stage_info.goal,
     p.stage_info.ai.length ? h("span", {}, "　AI: ", p.stage_info.ai.map(t => h("button", { class: "btn", onclick: () => { S.patentTab = "ai"; S.aiTask = t; render(); } }, S.meta.tasks[t]))) : null));
-  const tabs = [["summary", "発明内容"], ["claims", "請求項"], ["refs", "先行文献 " + p.refs.length], ["chart", "クレームチャート"], ["timeline", "期限・経過"], ["ai", "AI 支援"]];
+  const tabs = [["summary", "発明内容"], ["claims", "請求項"], ["refs", "先行文献 " + p.refs.length], ["chart", "クレームチャート"], ["timeline", "期限・経過"], ["watch", "ウォッチ"], ["ai", "AI 支援"]];
   main.append(h("div", { class: "tabs" }, tabs.map(([t, l]) => h("button", { class: tab === t ? "active" : "", onclick: () => { S.patentTab = t; render(); } }, l))));
   const body = h("div", {}); main.append(body);
   const save = (patch) => api("PATCH", "/api/v1/patents/" + id, patch).then(() => toast("保存しました"));
@@ -266,6 +266,8 @@ async function patentDetail(main, id) {
       h("div", { class: "card" }, h("h2", {}, "経過"), h("table", {}, p.events.map(e => h("tr", {}, h("td", {}, e.date), h("td", {}, S.meta.events[e.kind]), h("td", { class: "small" }, e.note),
         h("td", {}, h("button", { class: "btn danger", onclick: guard(async () => { await api("DELETE", "/api/v1/patents/" + id + "/events/" + e.id); render(); }) }, "削除"))))),
         h("div", { class: "row" }, kind, date, note, h("button", { class: "btn primary", onclick: guard(async () => { await api("POST", "/api/v1/patents/" + id + "/events", { kind: kind.value, date: date.value, note: note.value }); render(); }) }, "追加"))));
+  } else if (tab === "watch") {
+    await watchTab(body, id);
   } else if (tab === "ai") {
     const providers = await api("GET", "/api/llm/providers");
     const task = sel(Object.entries(S.meta.tasks), S.aiTask || "novelty");
@@ -281,6 +283,29 @@ async function patentDetail(main, id) {
       } finally { btn.disabled = false; } }) }, "実行");
     body.append(h("div", { class: "card" }, field("タスク", task), field("AI プロバイダ", prov), field("根拠を探すコレクション", picker), field("追加指示", extra), h("div", { class: "row end" }, btn)), out);
   }
+}
+
+async function watchTab(body, pid) {
+  const [ws, hits, cs] = await Promise.all([api("GET", "/api/v1/watches?patent_id=" + pid), api("GET", "/api/v1/watch-hits?patent_id=" + pid), api("GET", "/api/v1/connectors")]);
+  body.append(h("div", { class: "card" }, h("h2", {}, "ウォッチ（定期収集）"),
+    h("p", { class: "small muted" }, "外部データ源を定期的に取得し、新しい文献をこの案件の請求項と照合して候補に出します。新しい候補は通知（設定 > 通知）で知らせます。"),
+    ws.watches.length ? h("table", {}, h("tr", {}, h("th", {}, "名前"), h("th", {}, "収集元"), h("th", {}, "間隔"), h("th", {}, "前回"), h("th", {})),
+      ws.watches.map(w => h("tr", {}, h("td", {}, w.name, w.new_hits ? h("span", { class: "tag bad" }, "新" + w.new_hits) : null), h("td", { class: "small" }, w.connector, " ", h("code", {}, JSON.stringify(w.params))),
+        h("td", {}, Math.round(w.interval_hours / 24 * 10) / 10 + "日"), h("td", { class: "small muted" }, fmtDate(w.last_run), " ", w.last_status),
+        h("td", {}, h("button", { class: "btn", onclick: guard(async (e) => { e.target.disabled = true; try { const r = await api("POST", "/api/v1/watches/" + w.id + "/run", {}); toast(r.last_status); render(); } finally { e.target.disabled = false; } }) }, "今すぐ実行"),
+          h("button", { class: "btn danger", onclick: guard(async () => { await api("DELETE", "/api/v1/watches/" + w.id); render(); }) }, "削除"))))) : h("p", { class: "muted" }, "ウォッチはまだありません。")));
+  const conn = sel(cs.connectors.map(c => [c.id, c.label + (c.key && !c.configured ? "（未登録）" : "")]), "epo_ops");
+  const q = h("input", { class: "wide", placeholder: "EPO: CQL（例: ta=\"solid electrolyte\" and pd>=2024）／GDELT: 検索語／RSS: URL" });
+  const name = h("input", { placeholder: "名前" }), coll = h("input", { placeholder: "保存先（空なら自動）" }), days = h("input", { type: "number", value: 7, min: 1 });
+  body.append(h("div", { class: "card" }, h("h2", {}, "ウォッチを追加"), h("div", { class: "row" }, name, conn, days, h("span", { class: "small" }, "日ごと")), field("条件", q), field("保存先コレクション", coll),
+    h("button", { class: "btn primary", onclick: guard(async () => { const c = conn.value; const key = c === "rss" ? "url" : c === "jpo" ? "application_number" : "query";
+      await api("POST", "/api/v1/watches", { name: name.value || q.value.slice(0, 40), connector: c, params: { [key]: q.value }, collection: coll.value, patent_id: pid, interval_hours: Math.max(6, +days.value * 24) }); render(); }) }, "追加")));
+  body.append(h("div", { class: "card" }, h("h2", {}, "候補（新しい順・スコア順）"), hits.hits.length ? h("table", {}, hits.hits.map(x => h("tr", {},
+    h("td", {}, h("span", { class: "tag " + (x.status === "new" ? "bad" : x.status === "relevant" ? "ok" : "") }, { new: "新規", relevant: "関連", dismissed: "対象外" }[x.status])),
+    h("td", {}, h("a", { href: "#", onclick: e => { e.preventDefault(); openDoc(x.doc_id); } }, (x.ext_id || "") + " " + x.title), h("div", { class: "small muted" }, x.watch_name + " / " + (x.doc_date || "") + " / スコア " + x.score)),
+    h("td", {}, h("button", { class: "btn", onclick: guard(async () => { await api("POST", "/api/v1/watch-hits/" + x.id, { status: "relevant", category: "Y" }); toast("先行文献(Y)に追加"); render(); }) }, "関連→Y"),
+      h("button", { class: "btn", onclick: guard(async () => { await api("POST", "/api/v1/watch-hits/" + x.id, { status: "relevant", category: "X" }); toast("先行文献(X)に追加"); render(); }) }, "X"),
+      h("button", { class: "btn", onclick: guard(async () => { await api("POST", "/api/v1/watch-hits/" + x.id, { status: "dismissed" }); render(); }) }, "対象外"))))) : h("p", { class: "muted" }, "候補はまだありません。")));
 }
 
 // ---------- data ----------
@@ -299,7 +324,7 @@ async function dataView(main) {
     h("button", { class: "btn", onclick: guard(async () => { const r = await api("POST", "/api/v1/collections/" + c.id + "/embed", { limit: 256 }); toast(r.embedded + " 件をベクトル化" + (r.more ? "（続きあり）" : "")); render(); }) }, "ベクトル化"),
     h("button", { class: "btn", onclick: guard(async () => { if (!confirm(c.name + " のベクトルを削除します（埋め込みモデル変更時の作り直し用）")) return; const r = await api("DELETE", "/api/v1/collections/" + c.id + "/vectors"); toast(r.deleted + " 件削除。自動で再作成されます"); await api("POST", "/api/llm/embedding/run", {}).catch(() => {}); render(); }) }, "ベクトル再作成"),
     h("button", { class: "btn danger", onclick: guard(async () => { if (!confirm(c.name + " を削除しますか？（元に戻せません）")) return; await api("DELETE", "/api/v1/collections/" + c.id); S.collId = null; render(); }) }, "削除")));
-  const fmt = sel([["ndjson", "NDJSON"], ["json", "JSON 配列"], ["csv", "CSV (id,title,body,url,date…)"], ["text", "テキスト1件"]], "ndjson");
+  const fmt = sel([["ndjson", "NDJSON"], ["json", "JSON 配列"], ["csv", "CSV (id,title,body,url,date…)"], ["text", "テキスト1件"], ["codes", "分類コード表（コード<TAB>説明）"]], "ndjson");
   const data = h("textarea", { placeholder: '{"id":"JP2020-123456A","title":"…","abstract":"…","sections":{"claims":"【請求項１】…","description":"…"},"date":"2020-01-01"}' });
   const file = h("input", { type: "file", accept: ".ndjson,.json,.jsonl,.csv,.txt,.md" });
   file.addEventListener("change", async () => { const f = file.files[0]; if (!f) return; if (f.size > 90e6) return toast("90MB 以下のファイルにしてください"); data.value = await f.text();
@@ -381,7 +406,7 @@ async function collectView(main) {
 async function settingsView(main) {
   main.append(h("h1", {}, "設定"));
   const tab = S.setTab || "account";
-  const tabs = [["account", "アカウント"], ["devices", "デバイス接続"], ["ai", "AI"], ["keys", "外部キー"], ["update", "更新"], ["debug", "デバッグ"]];
+  const tabs = [["account", "アカウント"], ["devices", "デバイス接続"], ["ai", "AI"], ["keys", "外部キー"], ["notify", "通知"], ["update", "更新"], ["debug", "デバッグ"]];
   main.append(h("div", { class: "tabs" }, tabs.map(([t, l]) => h("button", { class: tab === t ? "active" : "", onclick: () => { S.setTab = t; render(); } }, l))));
   const body = h("div", {}); main.append(body);
   if (tab === "account") {
@@ -417,11 +442,27 @@ async function settingsView(main) {
     await aiSettings(body);
   } else if (tab === "keys") {
     const s = await api("GET", "/api/settings");
-    const labels = { openrouter_api_key: "OpenRouter API キー", epo_ops_key: "EPO OPS Consumer Key", epo_ops_secret: "EPO OPS Consumer Secret", jpo_username: "JPO 特許情報取得API ID", jpo_password: "JPO 特許情報取得API パスワード", uspto_api_key: "USPTO ODP API キー", openai_api_key: "OpenAI 互換 API キー（任意）" };
+    const labels = { openrouter_api_key: "OpenRouter API キー", epo_ops_key: "EPO OPS Consumer Key", epo_ops_secret: "EPO OPS Consumer Secret", jpo_username: "JPO 特許情報取得API ID", jpo_password: "JPO 特許情報取得API パスワード", uspto_api_key: "USPTO ODP API キー", openai_api_key: "OpenAI 互換 API キー（任意）", smtp_password: "SMTP パスワード（通知メール）" };
     body.append(h("div", { class: "card" }, h("p", { class: "small muted" }, "キーは secrets.json（権限 0600）に保存され、画面・API・デバッグ出力には表示されません。"),
       h("table", {}, Object.entries(labels).map(([k, l]) => { const inp = h("input", { type: "password", placeholder: s.secrets[k].configured ? "設定済み（" + s.secrets[k].fingerprint + "）" : "未設定" });
         return h("tr", {}, h("td", {}, l), h("td", {}, inp), h("td", {}, h("button", { class: "btn", onclick: guard(async () => { await api("PUT", "/api/secrets/" + k, { value: inp.value }); toast("保存しました"); render(); }) }, "保存"),
           h("button", { class: "btn danger", onclick: guard(async () => { await api("PUT", "/api/secrets/" + k, { value: "" }); render(); }) }, "削除"))); }))));
+  } else if (tab === "notify") {
+    const st = await api("GET", "/api/settings"); const n = st.settings.notify || {}; const em = n.email || {};
+    const hooks = h("textarea", { value: (n.webhooks || []).map(w => [w.kind || "json", w.url, w.label || ""].join(" ")).join("\n"), placeholder: "1行に1件: 種類(json/discord/slack) URL 表示名\n例: discord https://discord.com/api/webhooks/... 研究用\n例: json http://192.168.1.20:8765/api/v1/webhooks/xxx ControlDeck" });
+    const days = h("input", { value: (n.deadline_days || [60, 30, 7]).join(","), placeholder: "60,30,7" });
+    const e = { enabled: h("input", { type: "checkbox", checked: em.enabled }), host: h("input", { value: em.host || "" }), port: h("input", { type: "number", value: em.port || 587 }), user: h("input", { value: em.user || "" }), from: h("input", { value: em.from || "" }), to: h("input", { value: em.to || "" }), starttls: h("input", { type: "checkbox", checked: em.starttls !== false }) };
+    const out = h("div", { class: "small" });
+    body.append(h("div", { class: "card" }, h("h2", {}, "通知先"), h("p", { class: "small muted" }, "特許の期限（目安）の事前通知と、ウォッチの新しい候補を送ります。同じ内容は一度だけ送ります。"),
+      field("Webhook", hooks), field("期限の何日前に通知（カンマ区切り）", days),
+      h("h3", {}, "メール（SMTP・任意）"), h("label", {}, e.enabled, " 有効"), h("div", { class: "row" }, field("サーバー", e.host), field("ポート", e.port), h("label", {}, e.starttls, " STARTTLS")),
+      h("div", { class: "row" }, field("ユーザー", e.user), field("差出人", e.from), field("宛先", e.to)), h("p", { class: "small muted" }, "SMTP パスワードは 外部キー の「SMTP パスワード」に保存します。"),
+      h("div", { class: "row" }, h("button", { class: "btn primary", onclick: guard(async () => {
+        const webhooks = hooks.value.split("\n").map(l => l.trim()).filter(Boolean).map(l => { const [kind, url, ...rest] = l.split(/\s+/); return { kind, url, label: rest.join(" ") }; });
+        await api("PUT", "/api/settings", { notify: { webhooks, deadline_days: days.value.split(",").map(x => +x.trim()).filter(x => x > 0),
+          email: { enabled: e.enabled.checked, host: e.host.value, port: +e.port.value, user: e.user.value, from: e.from.value, to: e.to.value, starttls: e.starttls.checked } } }); toast("保存しました"); }) }, "保存"),
+        h("button", { class: "btn", onclick: guard(async () => { const r = await api("POST", "/api/notify/test", {}); out.textContent = JSON.stringify(r.results); }) }, "テスト送信"),
+        h("button", { class: "btn", onclick: guard(async () => { const r = await api("POST", "/api/notify/deadlines", {}); toast(r.sent + " 件送信"); }) }, "期限通知を今すぐ確認")), out));
   } else if (tab === "update") {
     const u = await api("GET", "/api/update/status"), s = (await api("GET", "/api/settings")).settings;
     const auto = h("input", { type: "checkbox", checked: s.update.auto_apply }), check = h("input", { type: "checkbox", checked: s.update.auto_check });

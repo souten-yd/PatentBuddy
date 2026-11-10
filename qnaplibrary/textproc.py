@@ -88,6 +88,18 @@ def parse_query(query):
     return expr
 
 
+def or_query(text, max_terms=48):
+    """Bag-of-tokens query (each index token OR'ed) for ranking documents by similarity to a text."""
+    seen, out = set(), []
+    for t in tokens(text):
+        if t not in seen and len(t) >= 2:
+            seen.add(t)
+            out.append('"%s"' % t)
+        if len(out) >= max_terms:
+            break
+    return " OR ".join(out)
+
+
 def query_terms(query):
     """Plain terms of a query, for highlighting and LIKE fallback."""
     query = normalize(query)
