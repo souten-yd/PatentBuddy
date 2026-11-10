@@ -1215,3 +1215,9 @@ def document_evidence(req):
     from .evidence_read import document_range
     return document_range(req.app.store, int(req.params['did']), int(req.arg('start', -1)),
                           int(req.arg('end', -1)), req.arg('revision', ''))
+
+
+@route('GET', '/api/v1/analyses/{aid}/receipt', 'read')
+def analysis_receipt(req):
+    row = req.app.store.one('SELECT id,doc_id,kind,source_revision FROM document_analyses WHERE id=?', (req.params['aid'],))
+    return {'found': row is not None, 'analysis': dict(row) if row else None}

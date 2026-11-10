@@ -2,6 +2,7 @@ import copy
 import json
 import threading
 import unittest
+from unittest.mock import patch
 from qnaplibrary import claim_chart as chart
 from qnaplibrary.store import StoreError
 from qnaplibrary.chart_storage import review
@@ -73,7 +74,15 @@ class ChartTests(unittest.TestCase):
                 inputs=json.loads(messages[1]['content'])['elements']
                 return json.dumps({'rows':[{'label':r['label'],'judgment':'△','reason':'根拠の候補',
                     'citations':[r['sources'][0]['ref']]} for r in inputs]})
-        value=json.loads(chart.generate(Data(),Session(),self.doc,1))
+        with patch('qnaplibrary.chart_retrieval.ChartRetrieval') as factory:
+            retriever = factory.return_value
+            def retrieve(query, keywords, excluded, label):
+                row = next(r for r in self.chart['rows'] if r['element']['label'] == label)
+                return row['evidence'], {'graph_truncated': False, 'vector_truncated': False}
+            retriever.retrieve.side_effect = retrieve
+            value=json.loads(chart.generate(Data(),Session(),self.doc,1,'/unused'))
+            retriever.finish.assert_called_once()
+        self.assertEqual(value['retrieval']['stages'], ['keyword','vector','graph','rerank'])
         chart.validate(value,BODY,self.store.get_document)
         self.assertTrue(all(r['evidence'] for r in value['rows']))
 
@@ -86,3 +95,18 @@ class ChartTests(unittest.TestCase):
         self.client.call('POST','/api/v1/collections/charts/documents',{'documents':[{'id':'reference','body':'変更'}]})
         with self.assertRaises(StoreError):self.save(identifier='stale-input')
         self.assertEqual(self.store.one('SELECT COUNT(*) FROM document_analyses')[0],1)
+
+    def test_receipt_is_private_bounded_metadata_and_read_only(self):
+        self.save()
+        path = '/api/v1/analyses/chart-test/receipt'
+        before = self.store.db.total_changes
+        status, value = self.client.call('GET', path)
+        self.assertEqual(status, 200)
+        self.assertTrue(value['found'])
+        self.assertEqual(set(value['analysis']), {'id', 'doc_id', 'kind', 'source_revision'})
+        self.assertEqual(self.store.db.total_changes, before)
+        self.assertFalse(self.client.call('GET', '/api/v1/analyses/missing/receipt')[1]['found'])
+        stranger = Client(self.server.base)
+        self.assertEqual(stranger.call('GET', path)[0], 401)
+        stranger.token = self.server.app.auth.create_device('public-receipt', 'published')['token']
+        self.assertEqual(stranger.call('GET', path)[0], 403)

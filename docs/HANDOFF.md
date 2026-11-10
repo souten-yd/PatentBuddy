@@ -282,3 +282,14 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - 実Host Job/CPU leaseでBGE-M3とQwen3-Rerankerを使用し、一時RDH2文→索引構築→新候補検索エンジン→関連文上位・引用2件・truncated=falseを確認（`/tmp/pb-chart-retrieval-live.log`、err空）。graphは実fixtureでは空、非空承認graph候補のrerankはAPI回帰テスト。fixture終了・一時addon/user/session/DB/cache除去済み、Host Job/audit保持。
 - 次は`claim_chart.generate`を新エンジンへ切替、AnalysisJobsのchartだけComputeHostSessionとCPU lease/永続request・lease/終了前解放/再起動照合へ接続する。現chart.generateのnot_implemented表示はまだ正しいので維持。最終保存時のモデル/traceとgraph承認変更の扱い、人手レビューUI、生成モデル版、性能/配布、P2/PR-Gも未完。本番0.5.10不変、PR23 Draft、goal active。
 - 最終全verify **177 tests成功55.941秒**（`/tmp/pb-chart-retrieval-verify-final.log`）。初回は「全文APIなし」テストの末尾一致判定がgraph/documents APIも誤って拾い1件失敗。正しい完全一致へ直し、モデル変更/取消停止の回帰も追加して最終全件成功。関連5 tests成功3.063秒。コードdiff確認済み、配布前の中間コミットとして保持。
+
+## 全検索経路をチャート生成へ接続（2026-11-11）
+
+- 前turnは候補検索エンジンea862f3 pushのprogress。今回`claim_chart.generate`をChartRetrievalへ切替し、旧not_implementedを除去。keyword→vector→approved factual graph→rerankと行別モデル/索引/打切りtraceを保存。LLM回答の全行/同一行引用・正本保存時の原文版/範囲照合は維持。
+- AnalysisJobs chartのみComputeHostSession。request/lease即時保存、同時chart1件、heartbeatはCPUactivate後に開始、取消後/終了前にmonitor停止→資源解放→Host terminal照合。再起動はhost_sync_pendingとして保持し、未同期履歴の自動除去を禁止。新receipt APIはID/doc/kind/source_revisionだけ、保存POST応答消失/再起動時に重複生成せず保存済み結果を確認する。
+- 書込み理由: チャートtraceは正本の根拠/モデル再現性、PCの資源IDとterminal確認状態は中断復旧に必要。本文/LLM回答/秘密をPCジョブJSONへ追加しない。通常分析もterminal一致確認時に小さなメタデータ更新1回を追加し、未同期状態を解消する。
+- 全verify **180 tests成功58.249秒**（`/tmp/pb-chart-integration-verify.log`）、JS構文成功。追加ChartJobs3 testsで全pipeline/保存応答消失/取消・再開・再起動済み結果照合、CPU解放がterminalより先・永続leaseID・検索モデルtrace保存を確認。既存summary/claims回帰も成功。
+- 実Host UI一時fixture `/tmp/pb-chart-full-ui-fixture.py` で、索引構築→実BGE-M3→Qwen3-Reranker→Qwen3.8-27Bローカル生成→3要件チャート保存が成功。1280/320pxで引用A-E1/B-E1・全検索経路表示、横溢れ/JS例外0（`/tmp/pb-chart-full-ui-browser.log`）。`.data/chart-full-320.png`はチャート本体を目視し、3要件/引用/未確認表示を確認。追加実ブラウザAPI照合でhost_sync_pending=false、lease/request=None、行別model trace保存を確認。
+- 実fixtureのgraphは空、非空graph候補の検証は前turnのAPI回帰範囲。fixture PID500256はSIGINTで終了し、一時addon/user/session/grants/DB/secret除去済み（`/tmp/pb-chart-full-ui-fixture.log`）。本番0.5.10や接続/資料は変更なし。
+- 次: 生成LLMのモデル版の確実な保存/Host attestation、graph承認変更・削除に対するチャート依存管理、人手レビューとgraph提案・管理UIを実装する。大量検索性能/物理I/O、配布更新受入、P2一般メタデータ、PR-G NAS最終移行までgoal active。PR23はDraftで未配布。
+- 全verify後の変更は再照合後メッセージ/phaseの整合と案内文、receipt境界テスト。関連12 tests再成功、receipt含むchart5 tests成功2.931秒。receiptの未認証401/published403/本文なし・GET更新0を確認。最終HTML案内追加は文言のみ。

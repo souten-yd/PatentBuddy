@@ -64,3 +64,11 @@ EmbeddingJobsを追加し、独立した「検索索引を構築・更新」ボ�
 新しいread APIはチャンクから原文に一致する最大650文字、または文献の明示範囲/版だけをSQLで取得する。全文をPCへ転送せず、原文に対応しないsections断片はcitable=falseとして除外。published tokenには非公開。ベクトル候補の版と原文、graphの引用範囲/版、Hostのembedding/rerank model_refを照合する。検索終了時にpendingと索引etagを再検証する。traceは両モデル指紋/版方式/索引etag・走査数・打切り・候補数を保持する。
 
 実Host BGE-M3/Qwen3-Rerankerと合成2文の全経路実行（graphは空）で関連文上位を確認。非空の承認済みgraph候補→rerank→正確な引用位置は合成APIテストで確認。現在のchart.generateはまだ旧keyword/graph経路であり、このエンジンのUI呼出・保存/取消/資源管理との接続は次の工程。大量性能・graph承認状態変更後のチャート再検証も未完。
+
+## チャート生成への全検索経路の接続（未配布）
+
+`claim_chart.generate`をChartRetrievalへ切替。要件ごとにkeyword/vector/approved factual graph/rerankを実行し、行別モデル指紋・索引etag・走査/打切り情報を正本チャートJSONへ保存する。終了時に索引を再照合し、従来どおりLLMの全行/引用と保存境界の原文版・文字範囲を検証する。画面には検索経路と、上限に達した場合の候補範囲の制限を表示する。構築前に索引を更新する手順を併記。
+
+AnalysisJobsのchartだけComputeHostSession/CPU leaseを使用。request/lease IDを即時保存し、取消後も解放前にterminalへ移さない。monitor停止→CPU解放→Host terminal照合の順で、再起動時は未同期として保持する。チャート同時実行は1件、未同期チャートは履歴から自動除去しない。私用receipt APIはID/doc/kind/source_revisionだけ返し、保存POST応答消失や再起動後に同一結果を再生成せず確認する。
+
+実ControlDeck画面で、合成2文の索引構築→BGE検索/Qwen3 reranker→ローカルQwen生成→3要件のチャート保存・Host終了同期と資源解放まで成功。1280/320pxで引用表示・検索経路・横溢れ/JS例外なし、320pxチャート本体の目視確認済み。graphは実fixtureでは空であり、非空graph候補は別API回帰テストの範囲。生成モデル版の固定/保存、人手レビューUI、graph承認変更の依存管理、大量性能と配布は引き続き未完。

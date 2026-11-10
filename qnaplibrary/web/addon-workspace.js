@@ -83,6 +83,8 @@ async function loadAnalyses(id) {
     if (item.kind === 'chart') {
       const chart = JSON.parse(item.content);
       text.textContent = `請求項${chart.claim_no} · ${item.review_status === 'approved' ? '確認済み' : '未確認'}\n` +
+        (chart.retrieval?.stages?.includes('vector') ? 'キーワード・ベクトル・承認済み関係から検索し、ローカルAIで再順位付け\n' : '') +
+        (chart.retrieval?.vector_truncated || chart.retrieval?.graph_truncated ? '検索上限に達したため、候補は一部の範囲です。\n' : '') +
         chart.rows.map(row => `${row.element.label}: ${row.element.text}\n${row.assessment.judgment} ${row.assessment.reason}\n引用: ${row.assessment.citations.join(', ') || 'なし'}\n候補の根拠:\n` +
           row.evidence.map(e => `${e.ref} · 文献${e.doc_id} [${e.start},${e.end})\n${e.quote}`).join('\n')).join('\n\n');
     } else { text.textContent = item.content; }
@@ -119,7 +121,7 @@ async function loadJobs() {
           finally { await loadJobs(); }
         };
         row.append(cancel);
-      } else if (['failed', 'canceled', 'interrupted'].includes(job.status)) {
+      } else if (['failed', 'canceled', 'interrupted'].includes(job.status) && !job.host_sync_pending) {
         const rerun = document.createElement('button'); rerun.textContent = '現在の原文で再実行';
         rerun.onclick = async () => {
           rerun.disabled = true;
@@ -129,8 +131,8 @@ async function loadJobs() {
         };
         row.append(rerun);
       }
-      if (job.host_sync_pending) {
-        const sync = document.createElement('button'); sync.textContent = 'Hostへ完了状態を再送';
+      if (job.host_sync_pending && !['queued', 'running'].includes(job.status)) {
+        const sync = document.createElement('button'); sync.textContent = '保存結果・Host状態を確認';
         sync.onclick = async () => {
           sync.disabled = true;
           try { await api('jobs/' + job.id + '/reconcile', {}); }

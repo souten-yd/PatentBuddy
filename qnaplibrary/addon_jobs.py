@@ -8,6 +8,7 @@ import uuid
 
 from .addon_client import AddonError
 from .addon_host import HostSession, owner_key
+from .addon_compute_host import ComputeHostSession
 from .config import atomic_write
 
 
@@ -30,6 +31,8 @@ class AnalysisJobs:
             for value in values:
                 if value['status'] in ('queued', 'running'):
                     value.update(status='interrupted', phase='interrupted', message='アドオンが再起動しました。再実行できます。')
+                    if value.get('kind') == 'chart':
+                        value['host_sync_pending'] = True
                 self.jobs[value['id']] = value
 
     def _save(self):
@@ -55,7 +58,7 @@ class AnalysisJobs:
             raise AddonError(400, '文献と分析方法を選択してください')
         if resume_id is not None and (not isinstance(resume_id, str) or not re.fullmatch(r"[a-f0-9]{32}", resume_id)):
             raise AddonError(400, "再実行IDが不正です")
-        session = HostSession(self.client, headers)
+        session = (ComputeHostSession if kind == 'chart' else HostSession)(self.client, headers)
         if not session.local_available():
             raise AddonError(503, 'Hostのローカル限定AIを利用できません')
         # Fetch and validate before creating a Host Job, and never silently truncate.
@@ -72,18 +75,20 @@ class AnalysisJobs:
             active = [x for x in self.jobs.values() if x['status'] in ('queued', 'running')]
             if len(active) >= 2 or any(x['owner'] == session.owner for x in active):
                 raise AddonError(429, '実行中の分析が完了してから再度実行してください')
+            if kind == 'chart' and any(j.get('kind') == 'chart' and (j.get('host_sync_pending') or k in self.sessions) for k, j in self.jobs.items()):
+                raise AddonError(409, '前回のチャート処理とHost状態の確認を完了してください')
             if resume_id:
                 old = self.jobs.get(resume_id)
                 if not old or old['owner'] != session.owner or old['status'] not in ('interrupted', 'failed', 'canceled'):
                     raise AddonError(403, '再実行できるジョブがありません')
                 if old['doc_id'] != doc_id or old['kind'] != kind or (kind == 'chart' and old.get('claim_no') != claim_no):
                     raise AddonError(400, '再実行する文献と分析方法が一致しません')
-                if old.get('host_job_id'):
+                if old.get('host_job_id') and kind != 'chart':
                     session.job_id = old['host_job_id']
                     session.finish('canceled')
                     session.job_id = None
             while len(self.jobs) >= 32:
-                victim = next((k for k, v in self.jobs.items() if v['status'] not in ('queued', 'running')), None)
+                victim = next((k for k, v in self.jobs.items() if v['status'] not in ('queued', 'running') and not v.get('host_sync_pending') and k not in self.sessions), None)
                 if victim is None:
                     raise AddonError(429, 'ジョブの上限に達しました')
                 del self.jobs[victim]
@@ -92,6 +97,9 @@ class AnalysisJobs:
             value = {'id': identifier, 'host_job_id': host_id, 'owner': session.owner,
                      'doc_id': doc_id, 'kind': kind, 'claim_no': claim_no if kind == 'chart' else None, 'source_revision': document['revision'],
                      'status': 'queued', 'phase': 'queued', 'created': time.time(), 'message': '実行を準備しています'}
+            if kind == 'chart':
+                value['host_sync_pending'] = True
+                session.resource_changed = lambda: self._update(identifier, request_id=session.request_id, lease_id=session.lease_id)
             self.jobs[identifier] = value
             self.sessions[identifier] = session
             try:
@@ -113,6 +121,9 @@ class AnalysisJobs:
             session = self.sessions.get(identifier)
             if session:
                 session.abort()
+            if value['kind'] == 'chart':
+                self._update(identifier, phase='canceling', message='中断し、Host資源を解放しています')
+                return self._public(value)
             self._update(identifier, status='canceled', phase='canceled', message='キャンセルしました')
             if session:
                 session.finish('canceled')
@@ -129,18 +140,49 @@ class AnalysisJobs:
             self._save()
             return {'removed': True}
 
+    def _chart_receipt(self, job):
+        value = self.client.data('GET', '/api/v1/analyses/' + job['host_job_id'] + '/receipt')
+        if value.get('found') is False:
+            return None
+        saved = value.get('analysis')
+        if (value.get('found') is not True or not isinstance(saved, dict)
+                or saved.get('id') != job['host_job_id'] or saved.get('doc_id') != job['doc_id']
+                or saved.get('kind') != 'chart' or saved.get('source_revision') != job['source_revision']):
+            raise AddonError(409, '保存済みチャートの識別情報が一致しません')
+        return saved
+
+    def _release_chart(self, identifier, session):
+        if self.jobs[identifier]['kind'] == 'chart' and (session.request_id or session.lease_id or self.jobs[identifier].get('request_id') or self.jobs[identifier].get('lease_id')):
+            session.release_cpu()
+            self._update(identifier, request_id=None, lease_id=None)
+
     def reconcile(self, headers, identifier):
-        session = HostSession(self.client, headers)
+        with self.lock:
+            kind = self.jobs.get(identifier, {}).get('kind')
+        session = (ComputeHostSession if kind == 'chart' else HostSession)(self.client, headers)
         with self.lock:
             job = self.jobs.get(identifier)
             if not job or job['owner'] != session.owner:
                 raise AddonError(404, 'ジョブがありません')
+            if identifier in self.sessions:
+                raise AddonError(409, '処理の終了を待ってください')
+            if job['kind'] == 'chart':
+                saved = self._chart_receipt(job)
+                if saved:
+                    self._update(identifier, status='succeeded', phase='done', result_id=saved['id'], message='保存済みチャートを確認しました（未確認）')
+                elif job['status'] == 'interrupted':
+                    self._update(identifier, status='canceled', phase='canceled', message='前回の処理は終了しています。再実行できます')
+                elif job['status'] == 'succeeded':
+                    raise AddonError(409, '保存結果を確認できません')
+                session.job_id = job['host_job_id']
+                session.request_id = job.get('request_id'); session.lease_id = job.get('lease_id')
+                self._release_chart(identifier, session)
             if job['status'] not in ('succeeded', 'failed', 'canceled'):
                 raise AddonError(409, '処理がまだ終了していません')
             session.job_id = job['host_job_id']
             result = {'doc_id': job['doc_id'], 'analysis_id': job['result_id']} if job['status'] == 'succeeded' else None
             receipt = session.finish(job['status'], result)
-            if receipt.get('terminal_matches') is not True:
+            if receipt.get('terminal_matches') is not True and not (job['kind'] == 'chart' and job['status'] != 'succeeded' and receipt.get('status') == 'interrupted'):
                 raise AddonError(409, 'Hostの処理状態と一致しません。Host側のジョブを確認してください')
             self._update(identifier, host_sync_pending=False)
             return self._public(job)
@@ -156,8 +198,19 @@ class AnalysisJobs:
                         lost.set(); session.abort(); return
                 except AddonError:
                     lost.set(); session.abort(); return
-        watcher = threading.Thread(target=monitor, daemon=True); watcher.start()
+        watcher = threading.Thread(target=monitor, daemon=True)
+        def finish(status, result=None):
+            done.set()
+            if watcher.is_alive(): watcher.join()
+            self._release_chart(identifier, session)
+            receipt = session.finish(status, result)
+            if receipt.get('terminal_matches') is True:
+                self._update(identifier, host_sync_pending=False)
+            return receipt
         try:
+            if self.jobs[identifier]['kind'] == 'chart':
+                session.acquire_cpu()
+            watcher.start()
             with self.lock:
                 job = self.jobs[identifier]
                 if job['status'] == 'canceled':
@@ -172,12 +225,12 @@ class AnalysisJobs:
                         {'role': 'user', 'content': instruction + '\n\n文献本文:\n' + document['body']}]
             if job['kind'] == 'chart':
                 from .claim_chart import generate
-                answer = generate(self.client, session, document, job['claim_no'])
+                answer = generate(self.client, session, document, job['claim_no'], self.path.parent)
             else:
                 answer = session.stream(messages)
             state = session.heartbeat()
             with self.lock:
-                if lost.is_set() or self.stopping.is_set() or self.jobs[identifier]['status'] == 'canceled' or state.get('cancel_requested'):
+                if lost.is_set() or session.aborted.is_set() or self.stopping.is_set() or self.jobs[identifier]['status'] == 'canceled' or state.get('cancel_requested'):
                     lost.set()
                     raise AddonError(409, '分析を中断しました')
                 self._update(identifier, phase='saving', message='ResearchDataHubへ分析結果を保存しています')
@@ -186,25 +239,39 @@ class AnalysisJobs:
                 result = self.client.data('POST', '/api/v1/documents/%d/analyses' % job['doc_id'], {
                     'id': session.job_id, 'kind': job['kind'], 'source_revision': job['source_revision'], 'content': answer})
                 self._update(identifier, status='succeeded', phase='done', result_id=result['id'], message='分析結果を保存しました（未確認）')
-            receipt = session.finish('succeeded', {'doc_id': job['doc_id'], 'analysis_id': result['id']})
+            receipt = finish('succeeded', {'doc_id': job['doc_id'], 'analysis_id': result['id']})
             if receipt.get('terminal_matches') is not True:
                 raise AddonError(409, 'Hostの完了状態と一致しません')
         except Exception as error:
+            if self.jobs[identifier]['kind'] == 'chart':
+                try:
+                    saved = self._chart_receipt(self.jobs[identifier])
+                    if saved:
+                        self._update(identifier, status='succeeded', result_id=saved['id'], phase='done', message='保存済みチャートを確認しました（未確認）')
+                except AddonError:
+                    self._update(identifier, status='interrupted', phase='interrupted', host_sync_pending=True)
             with self.lock:
                 status = self.jobs[identifier]['status']
-                if status != 'succeeded':
-                    canceled = status == 'canceled' or lost.is_set() or self.stopping.is_set()
+                if status not in ('succeeded', 'interrupted'):
+                    canceled = status == 'canceled' or session.aborted.is_set() or lost.is_set() or self.stopping.is_set()
                     status = 'canceled' if canceled else 'failed'
                     self._update(identifier, status=status, phase=status, error_code=('http_%s' % error.status if isinstance(error, AddonError) else type(error).__name__),
                                  message='分析が中断されました。再実行できます。' if canceled else '分析に失敗しました。接続・原文の版・モデルを確認して再実行してください。')
             try:
-                receipt = session.finish(status, {'doc_id': document['id'], 'analysis_id': self.jobs[identifier]['result_id']} if status == 'succeeded' else None)
+                if status == 'interrupted':
+                    raise AddonError(409, '保存結果の確認を待っています')
+                receipt = finish(status, {'doc_id': document['id'], 'analysis_id': self.jobs[identifier]['result_id']} if status == 'succeeded' else None)
                 if receipt.get('terminal_matches') is not True:
                     raise AddonError(409, 'Hostの完了状態と一致しません')
             except AddonError:
                 self._update(identifier, host_sync_pending=True)
         finally:
-            done.set(); watcher.join(timeout=3)
+            done.set()
+            if watcher.is_alive(): watcher.join()
+            try:
+                self._release_chart(identifier, session)
+            except Exception:
+                self._update(identifier, host_sync_pending=True)
             with self.lock:
                 self.sessions.pop(identifier, None)
 

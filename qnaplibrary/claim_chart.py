@@ -101,10 +101,12 @@ def validate(chart, body, get_document):
     return chart
 
 
-def generate(client, session, document, claim_no):
+def generate(client, session, document, claim_no, cache_directory):
+    from .chart_retrieval import ChartRetrieval
+    retrieval = ChartRetrieval(client, session, cache_directory)
     claim, items = elements(document['body'], claim_no)
     rows, documents = [], {document['id']: document}
-    graph_truncated = False
+    traces = []
     last_progress = time.monotonic()
     def get_document(did):
         if did not in documents:
@@ -116,35 +118,8 @@ def generate(client, session, document, claim_no):
         if session.aborted.is_set():
             raise StoreError('chart canceled')
         query = ' OR '.join(_keywords(item['text'])[:6]) or item['text'][:80]
-        hits = client.data('POST', '/api/v1/search', {'q':query, 'mode':'keyword', 'rerank':False,
-            'limit':8, 'include_text':True, 'group_by_doc':True})['results']
-        candidates = []
-        def candidate(did, text, via):
-            if did == document['id'] or len(candidates) >= MAX_SOURCES or not isinstance(text, str):
-                return
-            doc = get_document(did)
-            quote = text[:MAX_QUOTE]; start = doc['body'].find(quote)
-            if not quote or start < 0 or any(c['doc_id'] == did for c in candidates):
-                return
-            candidates.append({'ref':item['label']+'-E'+str(len(candidates)+1),'doc_id':did,
-                'revision':doc['revision'],'start':start,'end':start+len(quote),'quote':quote,'via':via})
-        # Expand only a bounded number of search seeds; provenance remains exact text.
-        for hit in hits:
-            if len(candidates) >= 2:
-                break
-            if hit['doc_id'] != document['id']:
-                candidate(hit['doc_id'], hit.get('text'), 'keyword')
-        seeds = []
-        for hit in hits[:3]:
-            nodes = client.data('GET', '/api/v1/graph/documents/%d' % hit['doc_id'])['nodes']
-            seeds.extend(n['id'] for n in nodes)
-        if seeds:
-            expanded = client.data('GET', '/api/v1/graph/expand?seeds='+','.join(str(s) for s in sorted(set(seeds)))+'&hops=2&max_nodes=20&max_edges=20')
-            graph_truncated = graph_truncated or expanded['truncated']
-            for edge in expanded['edges']:
-                candidate(edge['evidence_doc_id'], edge['quote'], 'graph:'+edge['id'])
-        for hit in hits:
-            candidate(hit['doc_id'], hit.get('text'), 'keyword')
+        candidates, trace = retrieval.retrieve(item['text'], query, document['id'], item['label'])
+        traces.append(dict(trace, label=item['label']))
         rows.append({'element':item, 'evidence':candidates})
         if time.monotonic() - last_progress >= 1:
             session.progress('retrieving', index+1, len(items))
@@ -159,7 +134,9 @@ def generate(client, session, document, claim_no):
         assessed = [dict(r, assessment={'label':r['element']['label'],'judgment':'?',
                     'reason':'対比文献の根拠候補がありません','citations':[]}) for r in rows]
     chart = {'schema_version':1,'claim_no':claim_no,'claim_text':claim,'rows':assessed,
-             'retrieval':{'stages':['keyword','graph'],'graph_truncated':graph_truncated,
-                          'vector':'not_implemented','rerank':'not_implemented'},'review_status':'unreviewed'}
+             'retrieval':{'stages':['keyword','vector','graph','rerank'], 'rows':traces,
+                          'graph_truncated':any(t['graph_truncated'] for t in traces),
+                          'vector_truncated':any(t['vector_truncated'] for t in traces)},'review_status':'unreviewed'}
+    retrieval.finish()
     validate(chart, document['body'], get_document)
     return json.dumps(chart,ensure_ascii=False)
