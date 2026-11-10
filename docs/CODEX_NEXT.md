@@ -89,3 +89,7 @@ SMB/NFS経由で稼働中SQLite/WALを直接開かない。PCとNASで同じデ�
 - `main` 最新公開済みは v0.5.1。PR #12のクラウドLLM機密防壁はmainに入っている。
 - PR #10、#11、#13、#14、#15 はDraftで未マージ。これらのコードは**mainにない**。
 - PR #16 は議論を確定した**文書だけのチェックポイント**。Linux用のResearchDataHub aliasなどは次の実装PRで作る。現時点で新ブランドのLinuxバイナリや稼働サービスを配布したと主張しない。
+
+
+### 2026-11-10 PR-A進捗
+PR #16の設計はmainへ統合済み。PR #17でLinux別名入口・doctor/serve/test・health/Web表示・配布同梱を実装し、61 tests、Linux配布/非rootインストール、QPKGのLinux上smoke、ControlDeckローカルLLMの合成案件assistを検証。リリース/更新は検証待ち、PR-B〜GとQNAP実機は未完了。詳細はHANDOFF。上記の「未実装」は設計チェックポイント時点の記録。

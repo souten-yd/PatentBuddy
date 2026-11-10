@@ -81,7 +81,7 @@ function render() {
   if (!S.me) return $app.append(loginView());
   const views = [["home", "ホーム"], ["search", "検索"], ["patents", "特許"], ["data", "データ"], ["analytics", "分析"], ["chat", "AIチャット"], ["collect", "収集"], ["settings", "設定"]];
   const main = h("main", {});
-  const nav = h("nav", { class: "side" }, h("div", { class: "brand" }, h("img", { src: "icon.svg", alt: "" }), "QnapLibrary"),
+  const nav = h("nav", { class: "side" }, h("div", { class: "brand" }, h("img", { src: "icon.svg", alt: "" }), "ResearchDataHub"),
     views.map(([id, label]) => h("button", { class: S.view === id ? "active" : "", onclick: () => { S.view = id; render(); } }, label)),
     h("div", { class: "ver" }, "v" + S.health.version));
   $app.append(h("div", { class: "layout" }, nav, main));
@@ -97,7 +97,7 @@ function loginView() {
   });
   pw.addEventListener("keydown", e => { if (e.key === "Enter") go(); });
   const box = h("div", { class: "login" }, h("div", { class: "card" },
-    h("h1", {}, setup ? "QnapLibrary 初期設定" : "QnapLibrary ログイン"),
+    h("h1", {}, setup ? "ResearchDataHub 初期設定" : "ResearchDataHub ログイン"),
     setup ? h("p", { class: "muted small" }, "管理者パスワードを設定します（LANからのみ）。後で設定からパスキー（Face ID 等）を登録できます。") : null,
     field(setup ? "新しい管理者パスワード" : "パスワード", pw),
     h("div", { class: "row" }, h("button", { class: "btn primary", onclick: go }, setup ? "設定して開始" : "ログイン"),
@@ -172,7 +172,7 @@ async function homeView(main) {
     h("dt", {}, "検索用ベクトル索引"), h("dd", {}, st.vectors.vectors + " 件 / RAM " + st.vectors.ram_mb + " MB"));
   main.append(h("details", { class: "card home-technical" },
     h("summary", {}, "技術情報を表示"), info));
-  main.append(h("p", { class: "small muted home-version" }, "QnapLibrary v" + S.health.version));
+  main.append(h("p", { class: "small muted home-version" }, "ResearchDataHub v" + S.health.version));
 
   const live = () => main.isConnected && S.view === "home";
   let lastActivity = null;

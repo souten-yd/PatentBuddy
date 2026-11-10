@@ -40,3 +40,7 @@
 ## 特許専用ロードマップ（v0.6以降）
 
 詳細は [patent-feature-plan.md](patent-feature-plan.md) を参照。機密保護をゲートに、発明創出・ブレスト・請求項→先行技術/新規性・進歩性→競合/回避設計・FTO→出願文書へ段階的に進める。AIの外部送信は公開一般論に限定し、未公開発明・案件資料はローカル専用。
+
+
+### 2026-11-10 PR-A進捗
+PR #16の設計はmainへ統合済み。PR #17でLinux別名入口・doctor/serve/test・health/Web表示・配布同梱を実装し、61 tests、Linux配布/非rootインストール、QPKGのLinux上smoke、ControlDeckローカルLLMの合成案件assistを検証。リリース/更新は検証待ち、PR-B〜GとQNAP実機は未完了。詳細はHANDOFF。上記の「未実装」は設計チェックポイント時点の記録。

@@ -438,7 +438,7 @@ class Server(ThreadingHTTPServer):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(prog="qnaplibrary", description="QnapLibrary server")
+    parser = argparse.ArgumentParser(prog="qnaplibrary", description="ResearchDataHub server (qnaplibrary compatible)")
     parser.add_argument("--data", default=os.environ.get("QNAPLIBRARY_DATA", "./.data"), help="persistent data directory")
     parser.add_argument("--bind", default=None)
     parser.add_argument("--port", type=int, default=None)

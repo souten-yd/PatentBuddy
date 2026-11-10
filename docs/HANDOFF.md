@@ -4,10 +4,10 @@
 
 ## 現在地（確認済み事実）
 
-- GitHub: `souten-yd/QnapPatentBuddy`、default branch `main`。
+- GitHub: `souten-yd/PatentBuddy`、default branch `main`。
 - **公開済みの最新バージョンはv0.5.1**: https://github.com/souten-yd/QnapPatentBuddy/releases/tag/v0.5.1（2026-11-10）。バイナリは旧互換名 `QnapLibrary_0.5.1_x86_64.qpkg`, `qnaplibrary-0.5.1-linux.tar.gz`。QNAP実機での更新・パスキー・保存先継続の動作は未確認。
 - PR #12（未公開発明をクラウドへ送らないガード）は**mainにマージ済み**。出入口のネットワーク境界は `docs/privacy-boundary.md` を参照。
-- **このチェックポイント PR #16 はdocs-only**。新ブランドのLinux launcherやサービス名、Host本体との接続、NASへの移行は**まだ実装していない**。ソフトウェアのリリース不要。
+- **PR #16はdocs-onlyとしてマージ済み**。PR-AのLinux入口はPR #17で実装・検証済み、リリース待ち。Host結合/NAS移行は未実装。
 - 既存v0.5.0 release workflowはPython 52件テスト成功＋Linux/QPKGビルド成功（当時）。今回のPR #16に関してローカル完全 `scripts/verify.sh`、Linux/QPKGビルド、ControlDeck実機、PC→QNAP移行テストを実施したとは主張しない。
 
 ## 2026-11-10に決定したアーキテクチャ（最優先）
@@ -68,7 +68,17 @@
 
 これまでの詳細な旧版の検証・変更履歴は各GitHub Release、PR #6/#8/#9/#12と`CHANGELOG.md`を参照。**今後のCodexの実装完了条件を満たしたものだけこのファイルの完了欄へ移す。**
 
-## PR-A 作業開始（2026-11-10）
+## PR-A / PR #17 — v0.5.2 開発中（2026-11-10）
 - PR #16 をレビュー・マージ。ベース `24cb084`。main v0.5.1 のローカル verify は58 testsと静的検査が合格。
-- Linux別名入口/表示/配布互換を `feat/researchdatahub-linux-entry` で実装中。PR-B〜Gは未完了。
-- ControlDeck管理のllama.cppプロセス（loopback 8097、ローカルGGUF Qwen3.8-27B）を確認。実LLM検証はこれから。
+- Linux別名入口/表示/配布互換を `feat/researchdatahub-linux-entry` / PR #17で実装。PR-B〜Gは未完了。
+- ControlDeck管理のllama.cppプロセス（loopback 8097、ローカルGGUF Qwen3.8-27B）を確認。実LLM検証は下記。
+
+- 新旧プロセスの共通DB・管理者ログイン・RP ID・保存先分離、doctor無書込みを検証。61 tests合格（版番号更新前）。v0.5.2版番号更新後にHANDOFFの版記載不足をテストが検出し、追記して再検証中。
+- ControlDeck Qwen3.8-27Bへテスト観点を照会し、18.314秒/983 tokensで応答。合成案件の実API検証も追加。出力本文や秘密は記録せず件数・モデル名・所要時間だけを保存。
+
+- **v0.5.2 候補の検証**: `bash scripts/verify.sh` 61 tests＋Python/JS/shell/依存検査合格。Linux/QPKGビルド成功、QPKG payload 43 entries検査成功。
+- tar.gzを一時領域へ展開しdoctor/3 smoke tests成功、非root install.sh→旧binの0.5.2表示→インストール済み新入口の3 smoke tests成功。
+- QPKGを一時展開してLinux上でstart/status/health/stop成功（app=ResearchDataHub/version=0.5.2）。**QTS実機試験ではない**。
+- `PYTHONPATH=. python3 scripts/test-local-llm.py --verified-local`: ControlDeck管理のllama.cpp/Qwen3.8-27Bに合成案件のassistを実API送信、42.58秒、回答1137文字、案件の変更なし。初回はテスト側の応答キーをcontentと誤指定し失敗、実APIのanswerへ修正して再実行合格。法的品質/実案件品質は未評価。
+- PR-Aは薄い入口/表示/配布のみで新規DBスキーマ・常駐I/Oなし。testは明示実行時だけ一時DBへ書込み、doctorはメモリのみ。
+- Release公開・旧版からの自己更新は次の検証。iPhone実パスキー、QNAP本番、PR-B〜G、性能ベンチ、Host署名/結合、GraphRAG、NAS移行は**未完了**。

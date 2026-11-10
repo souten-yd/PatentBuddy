@@ -56,6 +56,7 @@ mkdir -p "$PREFIX/versions" "$PREFIX/bin" "$DATA"
 rm -rf "$PREFIX/versions/$VERSION"
 mkdir -p "$PREFIX/versions/$VERSION"
 cp -R "$HERE/qnaplibrary" "$HERE/VERSION" "$HERE/README.md" "$HERE/CHANGELOG.md" "$PREFIX/versions/$VERSION/"
+cp -R "$HERE/researchdatahub" "$HERE/rdh.sh" "$PREFIX/versions/$VERSION/"
 ln -sfn "versions/$VERSION" "$PREFIX/current"
 cp "$HERE/install.sh" "$PREFIX/install.sh"; cp "$HERE/VERSION" "$PREFIX/VERSION"; cp -R "$HERE/qnaplibrary.service.in" "$PREFIX/"
 cat > "$PREFIX/bin/qnaplibrary" <<EOF
