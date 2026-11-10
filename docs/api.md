@@ -36,6 +36,12 @@ curl -X POST http://NAS:17871/api/v1/pair -H 'Content-Type: application/json' \
 
 カーソル方式の初回は `?cursor=start&limit=100`、続きは `?cursor=<next_cursor>&limit=100` を使用します。`has_more=false` で終了します。ID降順でページを固定するため、途中で新文献が追加されても同一文献の二重取得は発生しません。ただし取り込み中のスナップショットではないため、途中削除や旧文献更新の完全な履歴は保証しません。カーソルモードの `total` は `null`（毎ページの全件カウントを省略）です。従来の `offset` は更新日時順・`total`ありです。
 
+低遅延・大量のAPI検索では、最初に以下の**全文検索モード**を使います。これはOpenRouter等への埋め込み要求を発生させません（権限は従来のBearer/管理セッションのまま）。意味検索が必要な質問だけ `mode: "hybrid"` と任意のリランカーを使います。
+
+```json
+{"q":"固体電解質","collections":["patents-jp"],"mode":"keyword","rerank":false,"limit":50,"include_text":false}
+```
+
 文書の形式:
 
 ```json
