@@ -127,3 +127,9 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 
 - v0.5.8最終121 tests成功33.258秒、Linux/QPKG build/payload成功。保存snapshot復元/監査保持、独立analysis Unix tokenとro境界を確認。公開/実更新/実Host画面はこれから。
 - 追加ユーザー要求: PDF読み取りと必要時OCR。PC上にpdftotext/pdftoppm/tesseract、jpn/eng/osdが既存。画面からのPDF取込/OCRは未実装。指定PDFの表紙OCRは過去の個別処理でありアプリ統合と区別。PR19 AI/Jobsを完了後、Host Files/Brokerとページ単位抽出・原本hash/ページ/方法の根拠保存を実装する。
+
+## v0.5.8実導入とHost画面の修正（作業中）
+
+- PR19はmain725e3ecへ統合、Release42827637382成功。公式Linuxと署名Featureを実更新し双方v0.5.8。旧0.5.7の管理APIから公式自己更新も成功（/tmp/pb-autoupdate-058.json）。121 tests成功。
+- 実Hostブラウザ受入で停止中表示を再現。Hostの厳格AddonHealthReportがapp/version/service_roleという余剰fieldを拒否している。合成Host試験では検出できなかった契約不一致。さらに更新後の新規ai.inference/jobs.write権限は既存grantに自動追加されない。画面で使える状態に直してからPDF/OCRに進む。
+- 本修正PRはhealth契約整合と実Host画面受入に限定。PDF/OCRは次の作業で、現在アプリには未統合。
