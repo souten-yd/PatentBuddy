@@ -28,6 +28,7 @@ from .research import Research
 from .watch import Scheduler, Watches
 from .llm import Providers
 from .patents import Patents
+from .public_catalog import PublicCatalog
 from .search import Searcher
 from .store import Store
 from .updater import Updater
@@ -51,6 +52,7 @@ class App:
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.config = Config(self.data_dir)
         self.store = Store(self.data_dir / "library.sqlite3")
+        self.public_catalog = PublicCatalog(self.store)
         self.backups = Backups(self.store)
         self.auth = Auth(self.config, self.store)
         self.providers = Providers(self.config)
@@ -384,12 +386,23 @@ class Handler(BaseHTTPRequestHandler):
             req = Request(self, method, path, parse_qs(parts.query), params)
             self._authenticate(req)
             access = route["auth"]
+            # Published-only tokens may access ONLY the approved snapshot API.
+            # Never treat them as ordinary read tokens that can inspect private
+            # patent claims, drafts, settings, export, or the whole corpus.
+            if req.device and req.device["scopes"] == "published":
+                if access != "published":
+                    raise HTTPError(403, "このトークンは公開済み資料の検索専用です")
+                if not req.is_https() and req.ip not in ("127.0.0.1", "::1", "::ffff:127.0.0.1"):
+                    raise HTTPError(403, "公開データ専用トークンはHTTPS接続が必要です")
+            if access == "published" and req.actor != "admin" and (
+                    not req.device or req.device["scopes"] != "published"):
+                raise HTTPError(403, "公開資料専用の認証が必要です")
             if access != "public":
                 if req.actor is None:
                     raise HTTPError(401, "認証が必要です")
                 if access == "admin" and req.actor != "admin":
                     raise HTTPError(403, "管理者のみ実行できます")
-                if req.device and method != "GET" and req.device["scopes"] != "rw" and access != "read":
+                if req.device and method != "GET" and req.device["scopes"] != "rw" and access not in ("read", "published"):
                     raise HTTPError(403, "読み取り専用デバイスです")
             if req.session and access != "public" and method not in ("GET", "HEAD"):
                 origin = self.headers.get("Origin")
