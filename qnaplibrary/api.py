@@ -1238,3 +1238,12 @@ def document_evidence(req):
 def analysis_receipt(req):
     row = req.app.store.one('SELECT id,doc_id,kind,source_revision FROM document_analyses WHERE id=?', (req.params['aid'],))
     return {'found': row is not None, 'analysis': dict(row) if row else None}
+
+
+@route('POST', '/api/v1/analyses/{aid}/relations/{index}/register', 'admin')
+def register_relation_proposal(req):
+    from .relation_proposals import register
+    body = req.json()
+    if not isinstance(body, dict) or set(body) != {'confirm_evidence'} or body['confirm_evidence'] is not True:
+        raise _err(400, '根拠の照合が必要です')
+    return register(req.app.store, req.params['aid'], int(req.params['index']), req.actor)

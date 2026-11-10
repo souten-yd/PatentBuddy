@@ -356,3 +356,13 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - 実Host Chrome1280/320pxでも分析メニューから関係提案→実LLM→正本保存→引用表示に成功、overflow/JS例外0（/tmp/pb-relations-ui-browser.log、.data/relations-*.png）。正本DBで4件/inferred/unreviewed/graph_edges0、PC metadataでjob succeeded/host_sync_pending=false/request_idとlease_id=nullを確認。一時fixture PID549330停止、temporary_addon_user_session_grants_removed=true。secretもcleanup。本番0.5.10/利用者資料は不変。
 - 次: 管理者が提案の根拠を照合して個別採用/却下し、推定区分を維持してgraphへ登録する導線、PatentBuddy→管理Web認証導線、履歴ページング、trace保存境界、性能I/O・配布更新、P2/PR-G。PR23 Draft、全体goal active。
 - 全verify **195 tests成功67.414秒**（/tmp/pb-relations-verify.log）、workspace JS構文/diff whitespace/変更diff確認成功。
+
+## 推定候補の個別登録と人手レビュー（2026-11-11）
+
+- 生成Jobs変更を318d64dとしてpush後、保存済みrelations候補から1件を選びgraphへ登録するadmin専用POST /api/v1/analyses/{aid}/relations/{index}/registerを追加。confirm_evidenceはstrict true必須、read/research_analysis token不可。原分析のID/文献版/厳密引用/モデル版を再検証し、edgeはinferred/unreviewedで作成。既存graph.reviewで承認/却下し、推定区分は維持。
+- analysis ID+候補indexから決定的edge IDを作成し、同じ候補を再登録しても重複しない。concept nodeは概念名hash、source documentは既存ラベルを保持。モデル版:実行版(129文字)、原分析作成日時、host_relation_proposal、原文範囲/quoteを保持。source更新競合はgraph.saveのtransaction内の版/引用再検証でも拒否する。新規書込みは利用者の明示登録edge/node/auditのみ、新テーブルなし。
+- 管理Web文献詳細にAI候補/引用/信頼度、原文照合checkbox、個別登録button。保存後は既存関係一覧から確認/却下。原文変更時は登録不可。候補のまま却下する独立statusは未実装（登録後のgraph却下は実装済み）。
+- core/API4 tests成功2.360秒（/tmp/pb-relation-register-tests.log）。匿名401/research_analysis403/同意なし・false・数値1は400、冪等書込み0、推定維持、改版拒否を確認。
+- 新一時fixtureでControlDeck実LLM→候補保存→PatentBuddy1280/320px引用表示を再確認（/tmp/pb-relation-register-generation.log）。続けてResearchDataHub実Chrome1280で候補登録→承認、320で同じ候補再登録→却下。overflow/JS例外0、edge重複0（/tmp/pb-relation-register-browser.log）。正本DBでedge1/inferred/rejected/method=host_relation_proposal/model欄129文字を照合。
+- fixture PID571342をSIGINT停止、一時addon/user/session/grants除去。本番0.5.10・利用者資料は不変。PR23 Draft/未配布。次は候補レビュー状態の整理・PatentBuddy→管理Web導線、履歴ページング、検索trace保存境界、性能I/O/配布更新、P2/PR-G。goal active。
+- 全verify **196 tests成功67.512秒**（/tmp/pb-relation-register-verify.log）、JS構文・diff whitespace・変更diff確認成功。

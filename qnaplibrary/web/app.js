@@ -312,6 +312,29 @@ async function documentReviews(main, d) {
     if (item.stale) { select.disabled = true; check.disabled = true; }
   }
   const analyses = await api("GET", "/api/v1/documents/" + d.id + "/analyses");
+  for (const item of analyses.items.filter(x => x.kind === "relations")) {
+    const value = JSON.parse(item.content);
+    const box = h("details", { class: "relation-proposals" }, h("summary", {}, "AIの関係提案（推定・未確認）"));
+    if (item.stale) box.append(h("p", {}, "原文が変更されています。PatentBuddyで再生成してください。"));
+    if (!value.proposals.length) box.append(h("p", {}, "根拠に基づく候補はありません。"));
+    value.proposals.forEach((proposal, index) => {
+      const checked = h("input", {type:"checkbox", disabled:item.stale});
+      const button = h("button", {class:"btn", disabled:true}, "推定関係として登録");
+      checked.addEventListener("change", () => {button.disabled = item.stale || !checked.checked;});
+      button.addEventListener("click", guard(async () => {
+        button.disabled = true;
+        try {
+          await api("POST", "/api/v1/analyses/" + encodeURIComponent(item.id) + "/relations/" + index + "/register", {confirm_evidence:true});
+          toast("推定関係を登録しました。関係一覧で確認状態を変更できます。");
+          await openDoc(d.id);
+        } finally {button.disabled = item.stale || !checked.checked;}
+      }));
+      box.append(h("div", {class:"relation-proposal"}, h("h3", {}, proposal.relation + ": " + proposal.concept),
+        h("p", {}, "信頼度: " + proposal.confidence + " / 範囲 " + proposal.start + "–" + proposal.end),
+        h("div", {class:"pre"}, proposal.quote), field("引用と原文を照合しました", checked), button));
+    });
+    panel.append(box);
+  }
   for (const item of analyses.items.filter(x => x.kind === "chart")) {
     const chart = JSON.parse(item.content);
     const box = h("details", { class: "review-chart" }, h("summary", {}, "クレームチャート: 請求項" + chart.claim_no),

@@ -55,3 +55,25 @@ class RelationProposalTests(unittest.TestCase):
             with self.assertRaises(StoreError):proposals.generate(self.session,self.doc)
         self.session.stream.return_value='{"proposals":[]}'
         self.save(json.loads(proposals.generate(self.session,self.doc)))
+
+
+    def test_admin_registration_is_idempotent_inferred_and_revision_checked(self):
+        value=json.loads(proposals.generate(self.session,self.doc));self.save(value)
+        path='/api/v1/analyses/relation-test/relations/0/register'
+        device=Client(self.server.base)
+        device.token=self.server.app.auth.create_device('analysis','research_analysis')['token']
+        self.assertEqual(device.call('POST',path,{'confirm_evidence':True})[0],403)
+        self.assertEqual(Client(self.server.base).call('POST',path,{'confirm_evidence':True})[0],401)
+        for body in ({},{'confirm_evidence':False},{'confirm_evidence':1}):
+            self.assertEqual(self.client.call('POST',path,body)[0],400)
+        status,edge=self.client.call('POST',path,{'confirm_evidence':True})
+        self.assertEqual(status,200,edge)
+        self.assertEqual((edge['basis'],edge['review_status']),('inferred','unreviewed'))
+        before=self.store.db.total_changes
+        self.assertEqual(self.client.call('POST',path,{'confirm_evidence':True})[1]['id'],edge['id'])
+        self.assertEqual(self.store.db.total_changes,before)
+        self.assertEqual(self.client.call('POST','/api/v1/graph/edges/'+edge['id']+'/review',{'status':'approved'})[0],200)
+        self.assertEqual(self.store.one('SELECT basis FROM graph_edges')[0],'inferred')
+        self.client.call('POST','/api/v1/collections/relations/documents',{'documents':[{'id':'source','body':'変更'}]})
+        self.assertNotEqual(self.client.call('POST',path,{'confirm_evidence':True})[0],200)
+        self.assertEqual(self.store.one('SELECT COUNT(*) FROM graph_edges')[0],1)

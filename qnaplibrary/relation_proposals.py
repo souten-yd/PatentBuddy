@@ -71,3 +71,32 @@ def generate(session, document):
              'proposals':_proposals(parsed['proposals'], body)}
     validate(value, document)
     return json.dumps(value, ensure_ascii=False)
+
+
+def register(store, identifier, index, actor):
+    """Copy one immutable proposal into the unreviewed graph, admin route only."""
+    import hashlib
+    import datetime
+    from . import evidence_graph
+    if type(index) is not int or not 0 <= index < 12:
+        raise StoreError('invalid proposal index')
+    row = store.one("SELECT * FROM document_analyses WHERE id=? AND kind='relations'", (identifier,))
+    if row is None:
+        raise StoreError('relation analysis not found')
+    document = store.get_document(row['doc_id'])
+    value = validate(json.loads(row['content']), document)
+    if index >= len(value['proposals']):
+        raise StoreError('relation proposal not found')
+    p = value['proposals'][index]
+    node = store.one('SELECT label FROM graph_nodes WHERE doc_id=?', (document['id'],))
+    label = node['label'] if node else (document['title'] or str(document['id']))[:300]
+    edge_id = 'proposal-' + hashlib.sha256((identifier + ':' + str(index)).encode()).hexdigest()
+    return evidence_graph.save(store, {
+        'id':edge_id, 'source':{'kind':'document','key':str(document['id']),'label':label},
+        'target':{'kind':'concept','key':hashlib.sha256(p['concept'].encode()).hexdigest(),'label':p['concept']},
+        'relation':p['relation'],'basis':'inferred','confidence':p['confidence'],
+        'model':value['generation']['model_ref'] + ':' + value['generation']['runtime_ref'],
+        'evidence':{'doc_id':document['id'],'revision':value['source_revision'],'start':p['start'],'end':p['end'],
+                    'quote':p['quote'],'method':'host_relation_proposal',
+                    'retrieved_at':datetime.datetime.fromtimestamp(row['created'], datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}
+    }, actor)
