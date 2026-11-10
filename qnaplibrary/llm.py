@@ -96,6 +96,18 @@ class Providers:
             if scope == "public_reference":
                 if not privacy.fixed_public_request(path, body):
                     raise LLMError("機密保護: 固定公開プロンプト以外は外部送信できません")
+                # Rebuild the entire request. Provider/user options may contain
+                # unrelated sensitive strings (web tools, stop sequences, etc.).
+                # Never forward them as part of a public-only operation.
+                model = body.get("model", "")
+                if not isinstance(model, str) or (model and (len(model) > 160 or
+                        not all(c.isalnum() or c in "/_.:@-" for c in model))):
+                    raise LLMError("機密保護: 不正な公開モデル名です")
+                public_body = {"messages": body["messages"], "stream": False,
+                               "max_tokens": 16 if len(body["messages"]) == 1 else 2048}
+                if model:
+                    public_body["model"] = model
+                body = public_body
             elif not privacy.confidential_allowed(p, self.config):
                 raise LLMError("機密保護: この操作はローカルLLM限定です。外部AIへの送信を遮断しました")
         url = p["base_url"].rstrip("/") + path
