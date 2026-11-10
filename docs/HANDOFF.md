@@ -137,3 +137,8 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - v0.5.9候補: health余剰fieldを除去。手動token設定時もsetup済みとし、接続検証は認証済みstatus/UIで行う。新規AI/Jobs権限をHost正規enable APIで明示付与する。
 
 - Host実スキーマはhealthy時のreason_code=readyも拒否するため省略へ修正。setup_required/healthy双方を実Host AddonHealthReportで検証成功。最終122 tests成功30.752秒、Linux/Feature build成功。/tmp/pb-health-059-verify-final.log。追加ディスク書込みなし。
+
+## PDF/OCR次の実装単位
+
+- 隔離worktree `/data1tb/PatentBuddy-pdf`、feat/pdf-ocr-import。計画は `docs/pdf-ocr-plan.md`。まず上限/キャンセル付きのページ単位ローカル抽出とテスト、その後Host Files/Jobs/CPU lease・限定保存認証・原本snapshot・UIを結合する。
+- Host画面修正PR20はmain6963a54へ統合、v0.5.9 Release42829063808成功。署名Featureを実更新済み、実ブラウザ受入中。サーバーはv0.5.8（healthのみのAddon修正と区別）。
