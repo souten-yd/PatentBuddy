@@ -529,7 +529,7 @@ async function collectView(main) {
 async function researchCard(main) {
   const [jobs, providers] = await Promise.all([api("GET", "/api/v1/research"), api("GET", "/api/llm/providers")]);
   const q = h("textarea", { placeholder: "調査したいこと（例: 全固体電池の硫化物系電解質について、主要出願人と最近の技術課題・規格動向を整理して）" });
-  const prov = sel(providers.providers.map(x => [x.id, x.label || x.id]), providers.default_provider), news = h("input", { type: "checkbox" }), picker = collectionPicker([]);
+  const prov = sel(providers.providers.map(x => [x.id, x.label || x.id]), providers.default_provider), news = h("input", { type: "checkbox", disabled: true }), picker = collectionPicker([]);
   const out = h("div", {});
   const show = guard(async (id) => { const j = await api("GET", "/api/v1/research/" + id); const r = j.result;
     clear(out).append(h("div", { class: "card" }, h("div", { class: "row" }, h("strong", {}, j.params.question), h("span", { class: "tag " + (j.status === "done" ? "ok" : j.status === "failed" ? "bad" : "warn") }, r.step || j.status)),
@@ -538,7 +538,7 @@ async function researchCard(main) {
       r.sources ? h("div", { class: "small muted" }, "根拠: ", r.sources.map(x => h("a", { href: "#", onclick: e => { e.preventDefault(); openDoc(x.doc_id); } }, "[" + x.n + "] " + (x.ext_id || x.title) + " "))) : null));
     if (j.status === "running") setTimeout(() => S.view === "collect" && show(id), 4000); });
   main.append(h("h1", {}, "調査ジョブ"), h("div", { class: "card" }, h("p", { class: "small muted" }, "質問をサブ質問に分け、ライブラリ（と任意で世界ニュース）を検索して根拠付きレポートを作り、reports コレクションに保存します。1 件ずつ実行します。"),
-    q, h("div", { class: "row" }, prov, h("label", {}, news, " 世界ニュース（GDELT）も調べる"), h("span", { class: "spacer" }),
+    q, h("div", { class: "row" }, prov, h("label", {}, news, " 世界ニュース外部検索（機密保護のため無効）"), h("span", { class: "spacer" }),
       h("button", { class: "btn primary", onclick: guard(async () => { const j = await api("POST", "/api/v1/research", { question: q.value, provider: prov.value, use_news: news.checked, collections: picker.values() }); show(j.id); }) }, "調査開始")), picker,
     jobs.jobs.length ? h("table", {}, jobs.jobs.slice(0, 10).map(j => h("tr", { class: "click", onclick: () => show(j.id) }, h("td", {}, j.question), h("td", {}, h("span", { class: "tag" }, j.status)), h("td", { class: "small muted" }, fmtDate(j.created))))) : null), out);
 }
@@ -673,7 +673,7 @@ async function aiSettings(body) {
     eDim = h("input", { type: "number", value: emb.dimensions || "" }), eTrunc = h("input", { type: "number", value: emb.truncate_dim || "" }), eAuto = h("input", { type: "checkbox", checked: emb.auto !== false }),
     eList = h("datalist", { id: "emb-models" }), eStat = h("div", { class: "small muted" }), eQ = h("input", { value: emb.query_prefix || "", placeholder: "例: query: " }), eD = h("input", { value: emb.doc_prefix || "", placeholder: "例: passage: " }), topk = h("input", { type: "number", value: cfg.rag_top_k || 8 });
   body.append(h("div", { class: "card" }, field("既定のプロバイダ", def), field("RAG で渡す根拠数", topk)), ...cards.map(c => c.el),
-    h("div", { class: "card" }, h("h2", {}, "埋め込み（ベクトル検索・任意）"), h("p", { class: "small muted" }, "既定は OpenRouter の qwen/qwen3-embedding-8b（多言語・低価格）。OpenRouter の API キーを登録すると、取り込んだ文書を自動でベクトル化します（NAS では計算しません）。別PCの Ollama なども選べます。未設定でも全文検索で動作します。"),
+    h("div", { class: "card" }, h("h2", {}, "埋め込み（ベクトル検索・任意）"), h("p", { class: "small muted" }, "機密保護：埋め込みも文書本文を送信します。OpenRouterへの文書送信は禁止です。管理者がローカル専用と確認したLLMのみ利用できます。未設定なら全文検索で動作します。"),
       eStat, field("プロバイダ", eProv), field("モデル", eModel), eList,
       h("div", { class: "row" }, field("次元を切り詰め（RAM節約, 推奨1024）", eTrunc), field("APIに渡す dimensions（任意）", eDim)),
       field("クエリ接頭辞", eQ), field("文書接頭辞", eD), h("label", {}, eAuto, " 取り込み時に自動でベクトル化"),
@@ -710,6 +710,7 @@ function jsonEditor(provs, def) {
 function providerCard(p) {
   const o = p.options || {}, pr = o.provider || {}, rs = o.reasoning || {};
   const f = { label: h("input", { value: p.label || "" }), base_url: h("input", { class: "wide", value: p.base_url || "" }), model: h("input", { class: "wide", value: p.model || "", list: "models-" + p.id }), secret: h("input", { value: p.secret || "", placeholder: "secrets 名（例: openrouter_api_key）" }) };
+  const localChecked = h("input", { type: "checkbox", checked: p.local_only_verified === true });
   const num = (v) => h("input", { type: "number", step: "any", value: v ?? "" });
   const opt = { temperature: num(o.temperature), top_p: num(o.top_p), max_tokens: num(o.max_tokens) };
   const orf = p.type === "openrouter" ? {
@@ -728,6 +729,8 @@ function providerCard(p) {
   const split = (s) => s.split(",").map(x => x.trim()).filter(Boolean);
   const el = h("div", { class: "card" }, h("div", { class: "row" }, h("h2", {}, p.label || p.id), h("span", { class: "tag" }, p.type), p.secret_status ? h("span", { class: "tag " + (p.secret_status.configured ? "ok" : "warn") }, p.secret_status.configured ? "キー設定済" : "キー未設定") : null),
     field("表示名", f.label), field("Base URL（OpenAI互換 /v1）", f.base_url), field("モデル", f.model), list, field("APIキーの secrets 名（外部キーで値を設定）", f.secret),
+    p.type === "openrouter" ? h("p", { class: "small muted" }, "公開情報の一般ガイド専用。未公開発明・文書・検索履歴は送信できません。") :
+      h("label", {}, localChecked, " このエンドポイントがクラウド中継しないローカル推論専用であることを管理者が確認済み"),
     h("div", { class: "row" }, field("temperature", opt.temperature), field("top_p", opt.top_p), field("max_tokens", opt.max_tokens)),
     orf ? h("details", {}, h("summary", {}, "OpenRouter 詳細設定（ルーティング・推論・価格上限）"), field("フォールバックモデル（順に試行）", orf.fallback),
       h("div", { class: "row" }, field("プロバイダ並び替え", orf.sort), field("フォールバック", orf.allow_fallbacks), field("データ収集", orf.data_collection)),
@@ -739,7 +742,7 @@ function providerCard(p) {
       h("button", { class: "btn", onclick: guard(async () => { testOut.textContent = "テスト中…"; try { const r = await api("POST", "/api/llm/test", { provider: p.id }); testOut.textContent = "OK: " + r.model + " " + r.ms + "ms 「" + r.content.slice(0, 20) + "」"; } catch (e) { testOut.textContent = e.message; } }) }, "接続テスト（保存後）"), testOut));
   const value = () => {
     const n = (i) => i.value === "" ? null : +i.value;
-    const out = { id: p.id, type: p.type, label: f.label.value, base_url: f.base_url.value, model: f.model.value, secret: f.secret.value, options: { ...(p.options || {}), temperature: n(opt.temperature), top_p: n(opt.top_p), max_tokens: n(opt.max_tokens) } };
+    const out = { id: p.id, type: p.type, label: f.label.value, base_url: f.base_url.value, model: f.model.value, secret: f.secret.value, local_only_verified: p.type !== "openrouter" && localChecked.checked, options: { ...(p.options || {}), temperature: n(opt.temperature), top_p: n(opt.top_p), max_tokens: n(opt.max_tokens) } };
     if (orf) {
       const prov = { sort: orf.sort.value || null, order: split(orf.order.value), only: split(orf.only.value), ignore: split(orf.ignore.value), quantizations: split(orf.quantizations.value),
         data_collection: orf.data_collection.value || null, zdr: orf.zdr.checked || null, require_parameters: orf.require_parameters.checked || null,
