@@ -32,6 +32,10 @@ CREATE TABLE IF NOT EXISTS documents(
   UNIQUE(collection_id, ext_id));
 CREATE INDEX IF NOT EXISTS documents_coll ON documents(collection_id, updated);
 CREATE INDEX IF NOT EXISTS documents_coll_id ON documents(collection_id, id DESC);
+CREATE TABLE IF NOT EXISTS document_analyses(
+  id TEXT PRIMARY KEY, doc_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+  source_revision TEXT NOT NULL, kind TEXT NOT NULL, content TEXT NOT NULL, created REAL NOT NULL);
+CREATE INDEX IF NOT EXISTS document_analyses_doc ON document_analyses(doc_id, created DESC);
 CREATE TABLE IF NOT EXISTS chunks(
   id INTEGER PRIMARY KEY, doc_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
   collection_id INTEGER NOT NULL, ord INTEGER NOT NULL, section TEXT NOT NULL DEFAULT '', text TEXT NOT NULL);
@@ -388,9 +392,49 @@ class Store:
              "created": row["created"], "updated": row["updated"]}
         if body:
             d["body"] = row["body"]
+            d["revision"] = self.document_revision(row)
         else:
             d["body_chars"] = row["body_chars"] if "body_chars" in row.keys() else len(row["body"] or "")
         return d
+
+    @staticmethod
+    def document_revision(row):
+        return hashlib.sha256(json.dumps([row["hash"], row["source"]], ensure_ascii=False).encode()).hexdigest()
+
+    def save_analysis(self, doc_id, value, actor="system"):
+        import re
+        if not isinstance(value, dict):
+            raise StoreError("analysis must be an object")
+        identifier, kind, content = value.get("id"), value.get("kind"), value.get("content")
+        revision = value.get("source_revision")
+        if (not isinstance(identifier, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", identifier)
+                or kind not in ("summary", "claims") or not isinstance(content, str)
+                or not content.strip() or len(content) > 100000
+                or not isinstance(revision, str) or not re.fullmatch(r"[a-f0-9]{64}", revision)):
+            raise StoreError("invalid analysis fields")
+        with self.tx() as db:
+            doc = db.execute("SELECT hash,source FROM documents WHERE id=?", (doc_id,)).fetchone()
+            if doc is None:
+                raise StoreError("document not found")
+            if self.document_revision(doc) != revision:
+                raise StoreError("source revision changed; rerun analysis")
+            old = db.execute("SELECT * FROM document_analyses WHERE id=?", (identifier,)).fetchone()
+            if old:
+                if (old["doc_id"], old["source_revision"], old["kind"], old["content"]) != (doc_id, revision, kind, content):
+                    raise StoreError("analysis id already has a different result")
+            else:
+                db.execute("INSERT INTO document_analyses VALUES(?,?,?,?,?,?)",
+                           (identifier, doc_id, revision, kind, content, now()))
+                self.audit(actor, "analysis.add", "%s %s %s" % (doc_id, kind, identifier))
+        return {"id": identifier, "doc_id": doc_id, "review_status": "unreviewed"}
+
+    def list_analyses(self, doc_id):
+        doc = self.one("SELECT hash,source FROM documents WHERE id=?", (doc_id,))
+        if doc is None:
+            raise StoreError("document not found")
+        revision = self.document_revision(doc)
+        return {"items": [dict(dict(row), stale=row["source_revision"] != revision, review_status="unreviewed")
+                          for row in self.q("SELECT * FROM document_analyses WHERE doc_id=? ORDER BY created DESC LIMIT 20", (doc_id,))]}
 
     def get_document(self, doc_id, with_chunks=False):
         row = self.one("SELECT * FROM documents WHERE id=?", (int(doc_id),))

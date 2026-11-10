@@ -76,3 +76,22 @@ class LocalAuthTests(unittest.TestCase):
             with self.assertRaises(OSError): check_private(link)
             Path(tmp).chmod(0o755)
             with self.assertRaises(OSError): check_private(Path(tmp), directory=True)
+
+
+    def test_analysis_socket_has_independent_scoped_credential(self):
+        hub = LiveServer()
+        try:
+            Client(hub.base).login_setup()
+            with tempfile.TemporaryDirectory() as tmp:
+                with mock.patch('qnaplibrary.local_auth.socket_path', side_effect=lambda port, scope='read': Path(tmp) / (scope + '.sock')):
+                    reader = LocalAuthServer(hub.app.auth, hub.httpd.server_port)
+                    writer = LocalAuthServer(hub.app.auth, hub.httpd.server_port, 'analysis')
+                    try:
+                        read = connect(hub.httpd.server_port)['server_token']
+                        analysis = connect(hub.httpd.server_port, 'analysis')['server_token']
+                        self.assertNotEqual(read, analysis)
+                        self.assertEqual(hub.app.auth.device_for_token(read, '127.0.0.1')['scopes'], 'ro')
+                        self.assertEqual(hub.app.auth.device_for_token(analysis, '127.0.0.1')['scopes'], 'analysis')
+                        self.assertIsNone(hub.app.auth.device_for_token(analysis, '192.168.1.2'))
+                    finally: writer.close(); reader.close()
+        finally: hub.close()

@@ -90,3 +90,9 @@ while True:
 管理セッションで `POST /api/v1/publications/preview`（doc_id, excerpt）を呼び、返されたpublicationのtitle/publication_number/textを全件確認する。同じdoc_id/excerptとpreview_token、confirm_public:trueで `POST /api/v1/publications` を呼ぶ。10分期限・文献変更・再起動後はプレビューを取り直す。取消は `DELETE /api/v1/publications/{doc_id}`。
 
 管理者発行のscopes=published tokenは `POST /api/v1/public-catalog/search`（q, limit:最大50）と `GET /api/v1/public-catalog/{public_id}` のみ。元文献、案件、MCP、debug/export、設定APIへのアクセス不可。通常rw/ro tokenとは権限が異なる。loopback以外はHTTPS必須。公開APIは外部LLMを呼ばない。詳しくはpublic-catalog.md。
+
+## 文献分析結果
+
+詳細GETの `revision` は本文/メタデータ/明示セクション/出典の版を表す。`POST /api/v1/documents/{id}/analyses` に `{id, kind: summary|claims, source_revision, content}` を送る。管理者またはrw、同一ユーザーの限定analysis認証のみが保存可能。ro/publishedは保存できない。同じID/内容の再送は無変更、同じIDで異なる内容や原文版が変わった要求は拒否する。本文結果は10万文字以内。
+
+`GET /api/v1/documents/{id}/analyses` は最大20件の保存済み結果を新しい順に返し、原文が変わった結果に `stale=true` を付ける。全て `review_status=unreviewed` であり、自動で確認済み/法的結論へ昇格しない。原文の削除時は結果も外部キーで削除する。
