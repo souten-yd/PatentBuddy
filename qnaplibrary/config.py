@@ -39,7 +39,8 @@ DEFAULTS = {
     "notify": {"webhooks": [], "deadline_days": [60, 30, 7],
                "email": {"enabled": False, "host": "", "port": 587, "user": "", "from": "", "to": "", "starttls": True}},
     "connectors": {"epo_ops": {"enabled": False}, "jpo": {"enabled": False, "base_url": "https://ip-data.jpo.go.jp"},
-                   "uspto_odp": {"enabled": False}, "gdelt": {"enabled": True}, "rss": {"enabled": True}},
+                   "uspto_odp": {"enabled": False}, "gdelt": {"enabled": True}, "rss": {"enabled": True},
+                   "sec_user_agent": ""},
 }
 
 

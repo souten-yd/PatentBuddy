@@ -238,6 +238,94 @@ def uspto_search(query, api_key, limit=25):
     return docs
 
 
+# e-Stat (政府統計) ---------------------------------------------------------
+def estat(query, app_id, limit=50):
+    if not app_id:
+        raise ConnectorError("e-Stat のアプリケーションIDが未設定です（e-stat.go.jp で無料登録）")
+    url = "https://api.e-stat.go.jp/rest/3.0/app/json/getStatsList?" + urllib.parse.urlencode(
+        {"appId": app_id, "searchWord": query, "limit": max(1, min(int(limit), 100)), "lang": "J"})
+    data = json.loads(http_get(url, pace=1.0).decode("utf-8"))
+    root = data.get("GET_STATS_LIST", {})
+    err = root.get("RESULT", {})
+    if str(err.get("STATUS", "0")) not in ("0", "1"):
+        raise ConnectorError("e-Stat: %s" % err.get("ERROR_MSG"))
+    tables = (root.get("DATALIST_INF") or {}).get("TABLE_INF") or []
+    if isinstance(tables, dict):
+        tables = [tables]
+
+    def txt(v):
+        return v.get("$", "") if isinstance(v, dict) else str(v or "")
+    docs = []
+    for t in tables:
+        tid = t.get("@id", "")
+        title = txt(t.get("TITLE")) or txt(t.get("STATISTICS_NAME"))
+        stat = txt(t.get("STAT_NAME"))
+        docs.append({"id": "estat:" + tid, "title": "%s %s" % (stat, title), "source": "e-Stat",
+                     "url": "https://www.e-stat.go.jp/dbview?sid=%s" % tid, "date": _date8(str(t.get("OPEN_DATE", ""))),
+                     "body": " / ".join(filter(None, [stat, title, txt(t.get("GOV_ORG")), txt(t.get("MAIN_CATEGORY")),
+                                                     txt(t.get("SUB_CATEGORY")), "調査年月 " + str(t.get("SURVEY_DATE", ""))])),
+                     "meta": {"stats_data_id": tid, "gov_org": txt(t.get("GOV_ORG")), "cycle": t.get("CYCLE"),
+                              "survey_date": t.get("SURVEY_DATE"), "category": txt(t.get("MAIN_CATEGORY"))}})
+    return docs
+
+
+def _date8(s):
+    s = s.replace("-", "")
+    return "%s-%s-%s" % (s[:4], s[4:6], s[6:8]) if len(s) >= 8 and s[:8].isdigit() else ""
+
+
+# EDINET (有価証券報告書等の提出書類一覧) -------------------------------------
+def edinet(date, api_key, query=""):
+    if not api_key:
+        raise ConnectorError("EDINET API キーが未設定です（EDINET の API 利用登録で無料取得）")
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date or ""):
+        raise ConnectorError("date は YYYY-MM-DD")
+    url = "https://api.edinet-fsa.go.jp/api/v2/documents.json?" + urllib.parse.urlencode(
+        {"date": date, "type": 2, "Subscription-Key": api_key})
+    data = json.loads(http_get(url, pace=1.0).decode("utf-8"))
+    if data.get("metadata", {}).get("status") not in (None, "200", 200):
+        raise ConnectorError("EDINET: %s" % data.get("metadata", {}).get("message"))
+    docs = []
+    for r in data.get("results") or []:
+        name, desc = r.get("filerName") or "", r.get("docDescription") or ""
+        if query and query not in name and query not in desc:
+            continue
+        docs.append({"id": "edinet:" + r.get("docID", ""), "title": "%s %s" % (name, desc), "source": "EDINET",
+                     "url": "https://disclosure2.edinet-fsa.go.jp/WZEK0040.aspx?%s" % r.get("docID", ""),
+                     "date": (r.get("submitDateTime") or "")[:10], "body": "%s %s" % (name, desc),
+                     "meta": {"doc_id": r.get("docID"), "edinet_code": r.get("edinetCode"), "sec_code": r.get("secCode"),
+                              "doc_type": r.get("docTypeCode"), "filer": name}})
+    return docs
+
+
+# SEC EDGAR (米国企業の提出書類) -------------------------------------------
+def sec_filings(cik, user_agent, forms="10-K,10-Q,8-K", limit=40):
+    if not user_agent or "@" not in user_agent:
+        raise ConnectorError("SEC は連絡先付き User-Agent が必須です（設定 connectors.sec_user_agent に「名前 メール」）")
+    cik = re.sub(r"\D", "", str(cik or ""))
+    if not cik:
+        raise ConnectorError("CIK（数字）が必要です")
+    data = json.loads(http_get("https://data.sec.gov/submissions/CIK%010d.json" % int(cik),
+                               headers={"User-Agent": user_agent}, pace=0.2).decode("utf-8"))
+    name = data.get("name", "")
+    recent = (data.get("filings") or {}).get("recent") or {}
+    wanted = {f.strip().upper() for f in (forms or "").split(",") if f.strip()}
+    docs = []
+    for i, form in enumerate(recent.get("form", [])):
+        if wanted and form.upper() not in wanted:
+            continue
+        acc = recent["accessionNumber"][i]
+        prim = recent.get("primaryDocument", [""])[i]
+        docs.append({"id": "sec:" + acc, "title": "%s %s %s" % (name, form, recent.get("primaryDocDescription", [""])[i] or ""),
+                     "source": "SEC EDGAR", "date": recent.get("filingDate", [""])[i],
+                     "url": "https://www.sec.gov/Archives/edgar/data/%d/%s/%s" % (int(cik), acc.replace("-", ""), prim),
+                     "body": "%s %s %s" % (name, form, recent.get("primaryDocDescription", [""])[i] or ""),
+                     "meta": {"cik": cik, "form": form, "company": name, "tickers": data.get("tickers")}})
+        if len(docs) >= int(limit):
+            break
+    return docs
+
+
 CATALOG = [
     {"id": "gdelt", "label": "GDELT 世界ニュース", "kind": "news", "key": None,
      "params": [{"name": "query", "label": "検索語（英語推奨, 例: semiconductor export）"},
@@ -256,11 +344,21 @@ CATALOG = [
     {"id": "uspto", "label": "USPTO Open Data Portal", "kind": "patent", "key": ["uspto_api_key"],
      "params": [{"name": "query", "label": "検索語"}, {"name": "limit", "label": "最大件数", "default": 25}],
      "note": "data.uspto.gov で API キー取得。実験的。"},
+    {"id": "estat", "label": "e-Stat（政府統計の表一覧）", "kind": "market", "key": ["estat_app_id"],
+     "params": [{"name": "query", "label": "検索語（例: 半導体 生産）"}, {"name": "limit", "label": "最大件数", "default": 50}],
+     "note": "e-stat.go.jp で無料のアプリケーションID登録が必要。表の名称・調査年月・URL を保存。"},
+    {"id": "edinet", "label": "EDINET（有価証券報告書などの提出一覧）", "kind": "market", "key": ["edinet_api_key"],
+     "params": [{"name": "date", "label": "提出日 YYYY-MM-DD"}, {"name": "query", "label": "会社名・書類名で絞り込み（任意）"}],
+     "note": "EDINET の API 利用登録（無料）でキーを取得。"},
+    {"id": "sec", "label": "SEC EDGAR（米国企業の提出書類）", "kind": "market", "key": None,
+     "params": [{"name": "cik", "label": "CIK（例: 320193）"}, {"name": "forms", "label": "書類種別", "default": "10-K,10-Q,8-K"}],
+     "note": "キー不要。設定 connectors.sec_user_agent に「名前 メールアドレス」が必要（SEC の規則）。"},
 ]
 
 
-def run(connector_id, params, secrets):
+def run(connector_id, params, secrets, settings=None):
     p = params or {}
+    settings = settings or {}
     if connector_id == "gdelt":
         if not p.get("query"):
             raise ConnectorError("query が必要です")
@@ -274,4 +372,10 @@ def run(connector_id, params, secrets):
                             p.get("base_url") or "https://ip-data.jpo.go.jp")
     if connector_id == "uspto":
         return uspto_search(p.get("query", ""), secrets("uspto_api_key"), p.get("limit") or 25)
+    if connector_id == "estat":
+        return estat(p.get("query", ""), secrets("estat_app_id"), p.get("limit") or 50)
+    if connector_id == "edinet":
+        return edinet(p.get("date", ""), secrets("edinet_api_key"), p.get("query") or "")
+    if connector_id == "sec":
+        return sec_filings(p.get("cik"), settings.get("sec_user_agent", ""), p.get("forms") or "10-K,10-Q,8-K")
     raise ConnectorError("unknown connector")

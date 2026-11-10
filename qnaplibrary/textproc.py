@@ -15,10 +15,15 @@ _TOKEN_RE = re.compile(r"[%s]+|[0-9a-z]+(?:[._\-/][0-9a-z]+)*" % _CJK)
 _CJK_RE = re.compile(r"^[%s]+$" % _CJK)
 
 
+_STD_RE = re.compile(r"\b(jis|jas|iso|iec|astm|din|bs|en|ieee|jasos|jesd|ul|ansi|api|asme|sae)\s*[-/]?\s*([a-z])?\s*-?\s*(\d{1,6})")
+
+
 def normalize(text):
+    """NFKC + lower case; standard numbers are collapsed ("JIS B 1194" / "JISB1194" -> "jisb1194")."""
     if not text:
         return ""
-    return unicodedata.normalize("NFKC", str(text)).lower()
+    t = unicodedata.normalize("NFKC", str(text)).lower()
+    return _STD_RE.sub(lambda m: m.group(1) + (m.group(2) or "") + m.group(3), t)
 
 
 def _bigrams(run):

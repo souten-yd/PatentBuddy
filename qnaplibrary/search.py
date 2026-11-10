@@ -133,6 +133,15 @@ class Searcher:
         pool = max(limit * 5, 50)
         bm25 = self.store.fts_search(query, coll_ids, pool) if mode in ("hybrid", "keyword") else []
         trace["stages"].append({"stage": "bm25", "hits": len(bm25), "ms": round((time.time() - t0) * 1000, 1)})
+        if mode in ("hybrid", "keyword") and len(bm25) < min(limit, 5) and self.store.fts:
+            # natural-language questions rarely match as exact phrases: rank by shared tokens instead
+            loose = textproc.or_query(query)
+            if loose:
+                t1 = time.time()
+                have = {c for c, _ in bm25}
+                extra = [(c, s_) for c, s_ in self.store.fts_search(loose, coll_ids, pool) if c not in have]
+                bm25 = bm25 + extra
+                trace["stages"].append({"stage": "bm25_loose", "hits": len(extra), "ms": round((time.time() - t1) * 1000, 1)})
         dense = []
         if mode in ("hybrid", "vector"):
             if qvec is None and self.embedder is not None:

@@ -23,6 +23,7 @@ from .auth import Auth
 from .config import Config
 from .embedworker import EmbedWorker
 from .notify import Notifier
+from .research import Research
 from .watch import Scheduler, Watches
 from .llm import Providers
 from .patents import Patents
@@ -61,6 +62,7 @@ class App:
         self.notifier = Notifier(self.config, self.store)
         self.watches = Watches(self)
         self.scheduler = Scheduler(self)
+        self.research = Research(self)
         self.patents = Patents(self.store, self.searcher, self.providers)
         self.challenges = webauthn.Challenges()
         self.exit_code = 0

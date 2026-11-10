@@ -31,6 +31,10 @@ TOOLS = [
            "collections": {"type": "array", "items": {"type": "string"}}}, ["id"]),
     _tool("classify", "分類辞書（IPC/FI/Fターム等）からコードを検索", {"query": {"type": "string"}}, ["query"]),
     _tool("watch_hits", "特許ウォッチで検出された新しい候補文献", {"patent_id": {"type": "integer"}}),
+    _tool("research_start", "調査ジョブを開始（サブ質問に分解→ライブラリ検索→根拠付きレポート）。id を返す",
+          {"question": {"type": "string"}, "collections": {"type": "array", "items": {"type": "string"}},
+           "use_news": {"type": "boolean", "default": False}}, ["question"]),
+    _tool("research_get", "調査ジョブの状態とレポート", {"id": {"type": "integer"}}, ["id"]),
     _tool("debug_bundle", "不具合調査用のデバッグ情報（秘密は除去済み）", {}),
 ]
 
@@ -91,6 +95,12 @@ def call_tool(app, name, args, scopes):
         return [{"code": r["ext_id"], "title": r["title"]} for r in res["results"]]
     if name == "watch_hits":
         return app.watches.hits(patent_id=args.get("patent_id"), status="new")
+    if name == "research_start":
+        if scopes != "rw":
+            raise PermissionError("read-only device")
+        return app.research.start(args.get("question"), args.get("collections") or None, None, args.get("use_news"))
+    if name == "research_get":
+        return app.research.get(int(args["id"]))
     if name == "debug_bundle":
         return app.debug_bundle()
     raise ValueError("unknown tool: %s" % name)
