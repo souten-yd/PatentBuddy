@@ -2,10 +2,12 @@
 import os
 import concurrent.futures
 import selectors
+import sqlite3
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 from qnaplibrary.store import Store, StoreError
 from tests.helpers import Client, LiveServer
@@ -86,6 +88,33 @@ class ScaleStoreTest(unittest.TestCase):
         plan = self.store.q("EXPLAIN QUERY PLAN SELECT id FROM documents "
                             "WHERE collection_id=? AND id<? ORDER BY id DESC LIMIT 10", (self.cid, 9999))
         self.assertTrue(any("documents_coll_id" in row[3] for row in plan), [tuple(r) for r in plan])
+
+    def test_batch_lookup_respects_parameter_limit_and_collection_key(self):
+        if hasattr(self.store.db, "setlimit"):
+            self.store.db.setlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER, 500)
+        docs = [{"id": "shared-%d" % i, "body": "電池"} for i in range(850)]
+        self.assertEqual(self.store.add_documents(self.cid, docs)["added"], 850)
+        before = self.store.db.total_changes
+        self.assertEqual(self.store.add_documents(self.cid, docs)["unchanged"], 850)
+        self.assertEqual(self.store.db.total_changes, before)
+        other = self.store.create_collection("other")["id"]
+        self.assertEqual(self.store.add_documents(other, docs[:1])["added"], 1)
+        self.assertEqual(self.store.list_documents(other, ext_id="shared-0")["items"][0]["collection_id"], other)
+
+    def test_fts_unavailable_still_supports_ingestion_and_search(self):
+        with mock.patch.object(Store, "_init_fts", return_value=False):
+            fallback = Store(os.path.join(self.tmp.name, "no-fts.sqlite3"))
+        try:
+            cid = fallback.create_collection("fallback")["id"]
+            docs = [{"id": "IEC-SYN", "body": "電池の構造", "meta": {"revision": "2026"}}]
+            self.assertEqual(fallback.add_documents(cid, docs)["added"], 1)
+            before = fallback.db.total_changes
+            self.assertEqual(fallback.add_documents(cid, docs)["unchanged"], 1)
+            self.assertTrue(fallback.fts_search("電池", [cid]))
+            self.assertEqual(fallback.list_documents(cid, cursor="start")["items"][0]["ext_id"], "IEC-SYN")
+            self.assertEqual(fallback.db.total_changes, before)
+        finally:
+            fallback.close()
 
     def test_source_and_explicit_sections_are_not_silently_skipped(self):
         doc = {"id": "provenance", "body": "原本本文", "source": "first",

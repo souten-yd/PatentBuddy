@@ -59,3 +59,11 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - 現時点のControlDeck LLM: 前回の8097 listener/llama-serverは今回存在しない。既存の成功記録は履歴として保持するが今回実行したと扱わない。Host管理経由の現在のruntime選択をPR-E結合時に確認する。直接モデルを勝手に起動していない。
 
 - P0計測方法・初期値は `docs/benchmark-datahub.md`。全verify **89 tests成功**（20.728秒、`/tmp/pb-scale-verify.log`）、後続のsections順序を含める一行修正後はscale8 tests再成功。最終全verifyはマージ前に実施。
+
+## 追加受入 / QNAP更新問い合わせ
+
+- ユーザーの「QNAPのv5.2で想定外のダウンロードURL」に対し、アプリv0.5.2の実tagコードと現行公式ReleaseのQPKG URLで同じ例外を再現。旧REPO `souten-yd/QnapPatentBuddy` が原因。修正済みselectorはv0.5.4資産を受理。初回のみApp Centerから手動上書き更新する手順を案内。公式QPKGを `/home/souten/ダウンロード/QnapLibrary_0.5.4_x86_64.qpkg` へ保存しGitHub digestとSHA-256一致を確認。NAS自体は変更しておらず、手動更新成功は未確認。
+- `bench_datahub_restart.py`: 変更前/候補の1千/1万/10万件で実プロセス停止・再起動・別temp領域復元を検証。全6ケースで古いCookie/CSRFの読書き、件数、検索一致、snapshot SHA、quick_check成功。10万件候補のhealth再起動0.102秒、復元2.622秒、変更前0.102/1.410秒（50ms polling、各1回、同等性能保証ではない）。原データ `.data/bench/restart-*.json`、ログ `/tmp/rdh-restart.log`。
+- scale testsは10件成功。SQLite変数上限500で850件batch再投入、コレクション間同一IDの独立性、FTS無効時の検索/再投入/カーソルを追加。
+- ControlDeck既存Gateway APIキーをメモリ内で取得して一時テストの0600 secretsへ渡し、`http://127.0.0.1:8765/api/v1/llm/v1` 経由で実LLMテスト成功。APIキーは出力していない。`resolve_instance('auto')`でローカルGGUF Qwen3.8-27Bを確認、Hostのadmission/起動経由、68.44秒/1169文字、案件不変。`/tmp/pb-host-llm-test.json`。直接モデルプロセスを起動していない。これはAdd-on principal結合の完了ではない。
+- PR-E事前調査は `docs/host-integration-review.md`。最新mainと稼働checkoutが異なるため実装時に双方の実契約を再確認。未コミットのControlDeck作業を変更していない。

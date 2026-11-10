@@ -36,3 +36,15 @@ Ryzen 7 9700X / 31GiB級RAM / NVMe / SQLite3.45.1、変更前`b7816cf`、初期�
 この規模の速度差だけで高速化を断定しない。書込み回避は観測できた。候補の1万件登録process write bytesは128,733,184、変更前127,406,080で増加しており、追加索引の費用も評価対象とする。
 
 原データは `.data/bench/{baseline,candidate}-{1000,10000}.json`。後から出典/明示セクション訂正の正確性修正を追加したため最終候補の再測定が必要。10万件・15分idleの比較は進行中。QNAP HDD・サービス再起動・実文献規模への一般化は未検証。
+
+## OSプロセス再起動と復元の受入
+
+`scripts/bench_datahub_restart.py`は別のtemp合成データを使い、`python3 -m researchdatahub`を実プロセスとして起動する。1千/1万/10万件それぞれで変更前/候補を比較できる。
+
+```bash
+python3 scripts/bench_datahub_restart.py --repo /path/to/checkout \
+  --documents 100000 --workdir .data/bench \
+  --output .data/bench/restart-candidate-100000.json
+```
+
+管理APIでsnapshot→プロセス停止→同じDB再起動→停止→別領域へsnapshot/config/secrets復元→新プロセス起動を直列に実施。古いCookie/CSRFでの読書き、件数・検索結果、snapshotのSHA-256、quick_checkを検証する。healthまでの時間は50ms間隔のポーリングで測るため、それ以下の差を性能差と解釈しない。書込み元は常に1プロセスだけ。一般Linuxでの受入であり、QTS上のサービス受入ではない。

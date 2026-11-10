@@ -100,3 +100,7 @@ python3 -m researchdatahub --data /path/to/pc-data --bind 127.0.0.1 --port 17871
 配布smokeです。全開発検査は `bash scripts/verify.sh` を使用します。
 Linux tar.gzに同梱し、インストール後は `<prefix>/current/rdh.sh` から使用できます。
 既存の `<prefix>/bin/qnaplibrary-run` とsystemdサービスは引き続き利用できます。
+
+### v0.5.1 / v0.5.2からの更新
+
+「想定外のダウンロードURLです」は旧版が改名前のリポジトリURLを検証するため発生します。v0.5.3以降で修正済みですが、旧版からは初回だけ[ReleaseのQPKG](https://github.com/souten-yd/PatentBuddy/releases/latest)をQNAP App Centerの手動インストールで上書き更新してください。既存アプリをアンインストールしないでください。内部ID `QnapLibrary` と既存の `QnapLibrary-data` は維持します。QTS実機の更新完了は別途確認が必要です。
