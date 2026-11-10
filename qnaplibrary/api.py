@@ -49,7 +49,7 @@ def _err(status, message):
 @route("GET", "/api/health", "public")
 def health(req):
     a = req.app
-    return {"app": "QnapLibrary", "version": VERSION, "ok": True, "setup_required": not a.auth.admin_configured(),
+    return {"app": "QnapPatentBuddy", "version": VERSION, "ok": True, "setup_required": not a.auth.admin_configured(),
             "pairing": a.auth.pairing_enabled(), "https": req.is_https(), "https_url": a.config.get("server", "https_url", default=""), "uptime_s": round(time.time() - a.started)}
 
 
@@ -137,8 +137,8 @@ def passkey_register_options(req):
         handle = webauthn.b64url_encode(_s.token_bytes(16))
         app.config.set_secret("passkey_user_handle", handle)
     return {"publicKey": {
-        "challenge": challenge, "rp": {"id": rp_id, "name": "QnapLibrary"},
-        "user": {"id": handle, "name": "admin", "displayName": "QnapLibrary 管理者"},
+        "challenge": challenge, "rp": {"id": rp_id, "name": "QnapPatentBuddy"},
+        "user": {"id": handle, "name": "admin", "displayName": "QnapPatentBuddy 管理者"},
         "pubKeyCredParams": [{"type": "public-key", "alg": webauthn.ALG_ES256}, {"type": "public-key", "alg": webauthn.ALG_RS256}],
         "timeout": 120000, "attestation": "none",
         "authenticatorSelection": {"residentKey": "preferred", "userVerification": "required"},
@@ -669,14 +669,14 @@ def watches_list(req):
     return {"watches": req.app.watches.list(req.arg("patent_id"))}
 
 
-@route("POST", "/api/v1/watches", "user")
+@route("POST", "/api/v1/watches", "admin")
 def watches_create(req):
     b = req.json()
     return req.app.watches.create(b.get("name"), b.get("connector"), b.get("params"), b.get("collection", ""),
                                   b.get("patent_id"), b.get("interval_hours", 168))
 
 
-@route("PATCH", "/api/v1/watches/{wid}", "user")
+@route("PATCH", "/api/v1/watches/{wid}", "admin")
 def watches_patch(req):
     return req.app.watches.update(req.params["wid"], req.json())
 
@@ -686,7 +686,7 @@ def watches_delete(req):
     return {"deleted": req.app.watches.delete(req.params["wid"])}
 
 
-@route("POST", "/api/v1/watches/{wid}/run", "user")
+@route("POST", "/api/v1/watches/{wid}/run", "admin")
 def watches_run(req):
     return req.app.watches.run(req.params["wid"])
 
@@ -778,12 +778,27 @@ def llm_models(req):
         raise _err(502, str(error))
 
 
+# Approved public-only AI: the user can select a fixed category, but cannot
+# place invention text, project data or search hits into the prompt.
+@route("POST", "/api/v1/public-patent-guidance", "admin")
+def public_patent_guidance(req):
+    from .privacy import public_reference_messages
+    b = req.json()
+    messages = public_reference_messages(str(b.get("topic") or ""))
+    try:
+        result = req.app.providers.chat(messages, provider=b.get("provider"), scope="public_reference")
+    except LLMError as error:
+        raise _err(502, str(error))
+    return {"topic": b["topic"], "answer": result["content"], "model": result.get("model"),
+            "privacy": "固定の一般公開情報のみ。案件・ユーザー入力・検索結果・履歴は送信しません"}
+
+
 @route("POST", "/api/llm/test", "admin")
 def llm_test(req):
     b = req.json()
     try:
         r = req.app.providers.chat([{"role": "user", "content": "「OK」とだけ答えてください。"}], b.get("provider"),
-                                   {"max_tokens": 16}, timeout=60)
+                                   {"max_tokens": 16}, timeout=60, scope="public_reference")
     except LLMError as error:
         raise _err(502, str(error))
     return r
@@ -898,9 +913,11 @@ def connectors_list(req):
     return {"connectors": out}
 
 
-@route("POST", "/api/v1/connectors/{name}/run", "user")
+@route("POST", "/api/v1/connectors/{name}/run", "admin")
 def connectors_run(req):
     b = req.json()
+    if b.get("public_query_confirmed") is not True:
+        raise _err(403, "機密保護: 外部APIへの検索語送信を明示承認してください")
     name = req.params["name"]
     spec = next((c for c in connectors.CATALOG if c["id"] == name), None)
     if not spec:

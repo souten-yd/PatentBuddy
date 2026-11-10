@@ -84,6 +84,10 @@ class App:
         if vb.get("type") != "qdrant" or not vb.get("url"):
             self._qdrant = None
             return None
+        # A remote Qdrant index would receive raw invention-derived embeddings.
+        from .privacy import local_endpoint
+        if not local_endpoint(vb["url"]):
+            raise ValueError("機密保護: Qdrantの送信先はNAS内または明示許可されたHTTPS LANに限定されます")
         from .qdrant import Qdrant
         key = (vb["url"], vb.get("collection") or "qnaplibrary")
         if self._qdrant is None or (self._qdrant.url, self._qdrant.collection) != (key[0].rstrip("/"), key[1]):

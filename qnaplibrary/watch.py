@@ -104,6 +104,10 @@ class Watches:
     # run -------------------------------------------------------------------
     def run(self, wid):
         w = self.get(wid)
+        # A saved search expression may contain an unpublished idea. Old
+        # watches are intentionally disabled until explicit public-only consent.
+        if w.get("params", {}).get("public_only_confirmed") is not True:
+            raise ValueError("機密保護: ウォッチの外部検索は公開検索語として明示承認するまで実行できません")
         spec = next(c for c in connectors.CATALOG if c["id"] == w["connector"])
         t0 = time.time()
         status = ""
@@ -151,8 +155,10 @@ class Watches:
 
     def due(self):
         t = time.time()
-        return [r["id"] for r in self.store.q("SELECT id, last_run, interval_hours FROM watches WHERE enabled=1")
-                if not r["last_run"] or t - r["last_run"] >= r["interval_hours"] * 3600]
+        return [r["id"] for r in self.store.q(
+            "SELECT id, params, last_run, interval_hours FROM watches WHERE enabled=1")
+            if json.loads(r["params"] or "{}").get("public_only_confirmed") is True
+            and (not r["last_run"] or t - r["last_run"] >= r["interval_hours"] * 3600)]
 
 
 class Scheduler:

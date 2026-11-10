@@ -1,4 +1,4 @@
-/* QnapLibrary management web — dependency-free, CSP-safe (no inline handlers, no innerHTML with data). */
+/* QnapPatentBuddy management web — dependency-free, CSP-safe (no inline handlers, no innerHTML with data). */
 "use strict";
 (() => {
 const S = { me: null, csrf: null, view: "home", health: null, collections: [], meta: null };
@@ -287,6 +287,30 @@ async function patentsView(main) {
   await loadCollections();
   if (S.patentId) return patentDetail(main, S.patentId);
   main.append(h("h1", {}, "特許案件"));
+  const publicHelp = h("details", { class: "card" },
+    h("summary", {}, "公開特許制度の一般ガイド（外部AI利用可）"));
+  const guidanceType = sel([
+    ["novelty", "新規性"], ["inventive_step", "進歩性"], ["claim_scope", "請求項と権利範囲"],
+    ["freedom_to_operate", "FTO・侵害リスク調査"], ["filing_strategy", "出願戦略"]
+  ], "novelty");
+  const guidanceOut = h("div", {});
+  const publicProviders = await api("GET", "/api/llm/providers");
+  const guidanceProvider = sel(publicProviders.providers.map(p => [p.id, p.label || p.id]),
+    publicProviders.default_provider);
+  const guidanceButton = h("button", { class: "btn", onclick: guard(async () => {
+    if (!confirm("案件情報を一切含まない固定プロンプトの一般論のみをAIへ送信します。よろしいですか？")) return;
+    guidanceButton.disabled = true;
+    clear(guidanceOut).append(h("p", { class: "small muted" }, "公開ガイドを作成中…"));
+    try {
+      const r = await api("POST", "/api/v1/public-patent-guidance",
+        { topic: guidanceType.value, provider: guidanceProvider.value });
+      clear(guidanceOut).append(h("p", { class: "small muted" }, r.privacy), md(r.answer));
+    } finally { guidanceButton.disabled = false; }
+  }) }, "一般ガイドを確認");
+  publicHelp.append(h("p", { class: "small muted" },
+    "送信されるのはサーバーで固定した一般論の質問だけです。あなたの発明、テーマ、資料、会話は一切送信しません。"),
+    h("div", { class: "row" }, guidanceType, guidanceProvider, guidanceButton), guidanceOut);
+  main.append(publicHelp);
   const title = h("input", { class: "wide", placeholder: "発明の名称（仮）" });
   main.append(h("div", { class: "card" }, h("div", { class: "row" }, title, h("button", { class: "btn primary", onclick: guard(async () => {
     const p = await api("POST", "/api/v1/patents", { title: title.value }); S.patentId = p.id; render(); }) }, "新規案件"))));
@@ -360,7 +384,7 @@ async function patentDetail(main, id) {
   } else if (tab === "ai") {
     const providers = await api("GET", "/api/llm/providers");
     const task = sel(Object.entries(S.meta.tasks), S.aiTask || "novelty");
-    const prov = sel(providers.providers.map(x => [x.id, x.label || x.id]), providers.default_provider);
+    const prov = sel(providers.providers.filter(x => x.type !== "openrouter" && x.local_only_verified === true).map(x => [x.id, x.label || x.id]), providers.default_provider);
     const picker = collectionPicker(S.collections.map(c => c.name));
     const extra = h("textarea", { placeholder: "追加指示（拒絶理由通知の本文、対象製品の説明など）" });
     const out = h("div", {});
@@ -370,7 +394,7 @@ async function patentDetail(main, id) {
         clear(out).append(h("div", { class: "card" }, h("div", { class: "row small muted" }, r.model || "", h("span", { class: "spacer" }), h("button", { class: "btn", onclick: () => navigator.clipboard.writeText(r.answer) }, "コピー")), md(r.answer),
           r.evidence.length ? h("div", { class: "small muted" }, "参照: ", r.evidence.map((e, i) => h("a", { href: "#", onclick: ev => { ev.preventDefault(); openDoc(e.doc_id); } }, "[" + (i + 1) + "] " + (e.ext_id || e.title) + " "))) : null));
       } finally { btn.disabled = false; } }) }, "実行");
-    body.append(h("div", { class: "card" }, field("タスク", task), field("AI プロバイダ", prov), field("根拠を探すコレクション", picker), field("追加指示", extra), h("div", { class: "row end" }, btn)), out);
+    body.append(h("div", { class: "card" }, field("タスク", task), field("AI プロバイダ（ローカル専用）", prov), field("根拠を探すコレクション", picker), field("追加指示", extra), h("div", { class: "row end" }, btn)), out);
   }
 }
 
@@ -384,11 +408,14 @@ async function watchTab(body, pid) {
         h("td", {}, h("button", { class: "btn", onclick: guard(async (e) => { e.target.disabled = true; try { const r = await api("POST", "/api/v1/watches/" + w.id + "/run", {}); toast(r.last_status); render(); } finally { e.target.disabled = false; } }) }, "今すぐ実行"),
           h("button", { class: "btn danger", onclick: guard(async () => { await api("DELETE", "/api/v1/watches/" + w.id); render(); }) }, "削除"))))) : h("p", { class: "muted" }, "ウォッチはまだありません。")));
   const conn = sel(cs.connectors.map(c => [c.id, c.label + (c.key && !c.configured ? "（未登録）" : "")]), "epo_ops");
-  const q = h("input", { class: "wide", placeholder: "EPO: CQL（例: ta=\"solid electrolyte\" and pd>=2024）／GDELT: 検索語／RSS: URL" });
+  const q = h("input", { class: "wide", placeholder: "公開特許に関する検索語（未公開の発明は含めないでください）" });
+  const publicWatch = h("input", { type: "checkbox" });
   const name = h("input", { placeholder: "名前" }), coll = h("input", { placeholder: "保存先（空なら自動）" }), days = h("input", { type: "number", value: 7, min: 1 });
   body.append(h("div", { class: "card" }, h("h2", {}, "ウォッチを追加"), h("div", { class: "row" }, name, conn, days, h("span", { class: "small" }, "日ごと")), field("条件", q), field("保存先コレクション", coll),
-    h("button", { class: "btn primary", onclick: guard(async () => { const c = conn.value; const key = c === "rss" ? "url" : c === "jpo" ? "application_number" : "query";
-      await api("POST", "/api/v1/watches", { name: name.value || q.value.slice(0, 40), connector: c, params: { [key]: q.value }, collection: coll.value, patent_id: pid, interval_hours: Math.max(6, +days.value * 24) }); render(); }) }, "追加")));
+    h("label", { class: "small" }, publicWatch, " 検索語が公開情報のみで、外部APIへ送信してよいことを確認"), h("button", { class: "btn primary", onclick: guard(async () => {
+      if (!publicWatch.checked) return toast("機密保護：外部検索の承認が必要です");
+      const c = conn.value; const key = c === "rss" ? "url" : c === "jpo" ? "application_number" : "query";
+      await api("POST", "/api/v1/watches", { name: name.value || q.value.slice(0, 40), connector: c, params: { [key]: q.value, public_only_confirmed: publicWatch.checked }, collection: coll.value, patent_id: pid, interval_hours: Math.max(6, +days.value * 24) }); render(); }) }, "追加")));
   body.append(h("div", { class: "card" }, h("h2", {}, "候補（新しい順・スコア順）"), hits.hits.length ? h("table", {}, hits.hits.map(x => h("tr", {},
     h("td", {}, h("span", { class: "tag " + (x.status === "new" ? "bad" : x.status === "relevant" ? "ok" : "") }, { new: "新規", relevant: "関連", dismissed: "対象外" }[x.status])),
     h("td", {}, h("a", { href: "#", onclick: e => { e.preventDefault(); openDoc(x.doc_id); } }, (x.ext_id || "") + " " + x.title), h("div", { class: "small muted" }, x.watch_name + " / " + (x.doc_date || "") + " / スコア " + x.score)),
@@ -481,7 +508,7 @@ async function chatView(main) {
     if (m.meta && (m.meta.model || m.meta.error)) el.append(h("div", { class: "src" }, (m.meta.model || "") + (m.meta.error ? " エラー: " + m.meta.error : "")));
     msgs.append(el); msgs.scrollTop = msgs.scrollHeight; return el; };
   th.messages.forEach(addMsg);
-  const prov = sel(providers.providers.map(x => [x.id, x.label || x.id]), S.chatProvider || providers.default_provider);
+  const prov = sel(providers.providers.filter(x => x.type !== "openrouter" && x.local_only_verified === true).map(x => [x.id, x.label || x.id]), S.chatProvider || providers.default_provider);
   const rag = h("input", { type: "checkbox", checked: S.chatRag !== false });
   const picker = collectionPicker(S.chatColls || []);
   const ta = h("textarea", { placeholder: "質問（Ctrl/⌘+Enter で送信）" });
@@ -520,7 +547,9 @@ async function collectView(main) {
       c.params.map(p => field(p.label, inputs[p.name] = h("input", { class: "wide", value: p.default ?? "" }))), field("保存先", coll),
       c.key && !c.configured ? h("p", { class: "small" }, h("span", { class: "tag warn" }, "未登録のため使いません"), " 設定 > 外部キー で登録すると利用できます。") : null,
       h("div", { class: "row end" }, out, h("button", { class: "btn primary", disabled: !!(c.key && !c.configured), onclick: guard(async (e) => { e.target.disabled = true;
-        try { const params = {}; for (const k in inputs) params[k] = inputs[k].value; const r = await api("POST", "/api/v1/connectors/" + c.id + "/run", { params, collection: coll.value });
+        try {
+          if (!confirm("入力した検索語・URLは外部の公的APIへ送信されます。未公開発明を含まず、公開情報のみですか？")) return;
+          const params = {}; for (const k in inputs) params[k] = inputs[k].value; const r = await api("POST", "/api/v1/connectors/" + c.id + "/run", { params, collection: coll.value, public_query_confirmed: true });
           out.textContent = r.collection + ": 取得 " + r.fetched + " / 追加 " + r.added + " / 更新 " + r.updated + "（" + r.ms + "ms）"; } finally { e.target.disabled = false; } }) }, "実行"))));
   });
   main.append(h("datalist", { id: "colls" }, S.collections.map(c => h("option", { value: c.name }))));
@@ -529,7 +558,7 @@ async function collectView(main) {
 async function researchCard(main) {
   const [jobs, providers] = await Promise.all([api("GET", "/api/v1/research"), api("GET", "/api/llm/providers")]);
   const q = h("textarea", { placeholder: "調査したいこと（例: 全固体電池の硫化物系電解質について、主要出願人と最近の技術課題・規格動向を整理して）" });
-  const prov = sel(providers.providers.map(x => [x.id, x.label || x.id]), providers.default_provider), news = h("input", { type: "checkbox" }), picker = collectionPicker([]);
+  const prov = sel(providers.providers.filter(x => x.type !== "openrouter" && x.local_only_verified === true).map(x => [x.id, x.label || x.id]), providers.default_provider), news = h("input", { type: "checkbox", disabled: true }), picker = collectionPicker([]);
   const out = h("div", {});
   const show = guard(async (id) => { const j = await api("GET", "/api/v1/research/" + id); const r = j.result;
     clear(out).append(h("div", { class: "card" }, h("div", { class: "row" }, h("strong", {}, j.params.question), h("span", { class: "tag " + (j.status === "done" ? "ok" : j.status === "failed" ? "bad" : "warn") }, r.step || j.status)),
@@ -537,8 +566,8 @@ async function researchCard(main) {
       r.error ? h("p", { class: "tag bad" }, r.error) : null, r.report ? md(r.report) : null,
       r.sources ? h("div", { class: "small muted" }, "根拠: ", r.sources.map(x => h("a", { href: "#", onclick: e => { e.preventDefault(); openDoc(x.doc_id); } }, "[" + x.n + "] " + (x.ext_id || x.title) + " "))) : null));
     if (j.status === "running") setTimeout(() => S.view === "collect" && show(id), 4000); });
-  main.append(h("h1", {}, "調査ジョブ"), h("div", { class: "card" }, h("p", { class: "small muted" }, "質問をサブ質問に分け、ライブラリ（と任意で世界ニュース）を検索して根拠付きレポートを作り、reports コレクションに保存します。1 件ずつ実行します。"),
-    q, h("div", { class: "row" }, prov, h("label", {}, news, " 世界ニュース（GDELT）も調べる"), h("span", { class: "spacer" }),
+  main.append(h("h1", {}, "調査ジョブ"), h("div", { class: "card" }, h("p", { class: "small muted" }, "未公開情報を含む可能性があるため、ローカルと確認したAIのみ利用します。外部ニュース検索は機密保護のため無効です。"),
+    q, h("div", { class: "row" }, prov, h("label", {}, news, " 世界ニュース外部検索（機密保護のため無効）"), h("span", { class: "spacer" }),
       h("button", { class: "btn primary", onclick: guard(async () => { const j = await api("POST", "/api/v1/research", { question: q.value, provider: prov.value, use_news: news.checked, collections: picker.values() }); show(j.id); }) }, "調査開始")), picker,
     jobs.jobs.length ? h("table", {}, jobs.jobs.slice(0, 10).map(j => h("tr", { class: "click", onclick: () => show(j.id) }, h("td", {}, j.question), h("td", {}, h("span", { class: "tag" }, j.status)), h("td", { class: "small muted" }, fmtDate(j.created))))) : null), out);
 }
@@ -673,7 +702,7 @@ async function aiSettings(body) {
     eDim = h("input", { type: "number", value: emb.dimensions || "" }), eTrunc = h("input", { type: "number", value: emb.truncate_dim || "" }), eAuto = h("input", { type: "checkbox", checked: emb.auto !== false }),
     eList = h("datalist", { id: "emb-models" }), eStat = h("div", { class: "small muted" }), eQ = h("input", { value: emb.query_prefix || "", placeholder: "例: query: " }), eD = h("input", { value: emb.doc_prefix || "", placeholder: "例: passage: " }), topk = h("input", { type: "number", value: cfg.rag_top_k || 8 });
   body.append(h("div", { class: "card" }, field("既定のプロバイダ", def), field("RAG で渡す根拠数", topk)), ...cards.map(c => c.el),
-    h("div", { class: "card" }, h("h2", {}, "埋め込み（ベクトル検索・任意）"), h("p", { class: "small muted" }, "既定は OpenRouter の qwen/qwen3-embedding-8b（多言語・低価格）。OpenRouter の API キーを登録すると、取り込んだ文書を自動でベクトル化します（NAS では計算しません）。別PCの Ollama なども選べます。未設定でも全文検索で動作します。"),
+    h("div", { class: "card" }, h("h2", {}, "埋め込み（ベクトル検索・任意）"), h("p", { class: "small muted" }, "機密保護：埋め込みも文書本文を送信します。OpenRouterへの文書送信は禁止です。管理者がローカル専用と確認したLLMのみ利用できます。未設定なら全文検索で動作します。"),
       eStat, field("プロバイダ", eProv), field("モデル", eModel), eList,
       h("div", { class: "row" }, field("次元を切り詰め（RAM節約, 推奨1024）", eTrunc), field("APIに渡す dimensions（任意）", eDim)),
       field("クエリ接頭辞", eQ), field("文書接頭辞", eD), h("label", {}, eAuto, " 取り込み時に自動でベクトル化"),
@@ -710,6 +739,7 @@ function jsonEditor(provs, def) {
 function providerCard(p) {
   const o = p.options || {}, pr = o.provider || {}, rs = o.reasoning || {};
   const f = { label: h("input", { value: p.label || "" }), base_url: h("input", { class: "wide", value: p.base_url || "" }), model: h("input", { class: "wide", value: p.model || "", list: "models-" + p.id }), secret: h("input", { value: p.secret || "", placeholder: "secrets 名（例: openrouter_api_key）" }) };
+  const localChecked = h("input", { type: "checkbox", checked: p.local_only_verified === true });
   const num = (v) => h("input", { type: "number", step: "any", value: v ?? "" });
   const opt = { temperature: num(o.temperature), top_p: num(o.top_p), max_tokens: num(o.max_tokens) };
   const orf = p.type === "openrouter" ? {
@@ -728,6 +758,8 @@ function providerCard(p) {
   const split = (s) => s.split(",").map(x => x.trim()).filter(Boolean);
   const el = h("div", { class: "card" }, h("div", { class: "row" }, h("h2", {}, p.label || p.id), h("span", { class: "tag" }, p.type), p.secret_status ? h("span", { class: "tag " + (p.secret_status.configured ? "ok" : "warn") }, p.secret_status.configured ? "キー設定済" : "キー未設定") : null),
     field("表示名", f.label), field("Base URL（OpenAI互換 /v1）", f.base_url), field("モデル", f.model), list, field("APIキーの secrets 名（外部キーで値を設定）", f.secret),
+    p.type === "openrouter" ? h("p", { class: "small muted" }, "公開情報の一般ガイド専用。未公開発明・文書・検索履歴は送信できません。") :
+      h("label", {}, localChecked, " このエンドポイントがクラウド中継しないローカル推論専用であることを管理者が確認済み"),
     h("div", { class: "row" }, field("temperature", opt.temperature), field("top_p", opt.top_p), field("max_tokens", opt.max_tokens)),
     orf ? h("details", {}, h("summary", {}, "OpenRouter 詳細設定（ルーティング・推論・価格上限）"), field("フォールバックモデル（順に試行）", orf.fallback),
       h("div", { class: "row" }, field("プロバイダ並び替え", orf.sort), field("フォールバック", orf.allow_fallbacks), field("データ収集", orf.data_collection)),
@@ -739,7 +771,7 @@ function providerCard(p) {
       h("button", { class: "btn", onclick: guard(async () => { testOut.textContent = "テスト中…"; try { const r = await api("POST", "/api/llm/test", { provider: p.id }); testOut.textContent = "OK: " + r.model + " " + r.ms + "ms 「" + r.content.slice(0, 20) + "」"; } catch (e) { testOut.textContent = e.message; } }) }, "接続テスト（保存後）"), testOut));
   const value = () => {
     const n = (i) => i.value === "" ? null : +i.value;
-    const out = { id: p.id, type: p.type, label: f.label.value, base_url: f.base_url.value, model: f.model.value, secret: f.secret.value, options: { ...(p.options || {}), temperature: n(opt.temperature), top_p: n(opt.top_p), max_tokens: n(opt.max_tokens) } };
+    const out = { id: p.id, type: p.type, label: f.label.value, base_url: f.base_url.value, model: f.model.value, secret: f.secret.value, local_only_verified: p.type !== "openrouter" && localChecked.checked, options: { ...(p.options || {}), temperature: n(opt.temperature), top_p: n(opt.top_p), max_tokens: n(opt.max_tokens) } };
     if (orf) {
       const prov = { sort: orf.sort.value || null, order: split(orf.order.value), only: split(orf.only.value), ignore: split(orf.ignore.value), quantizations: split(orf.quantizations.value),
         data_collection: orf.data_collection.value || null, zdr: orf.zdr.checked || null, require_parameters: orf.require_parameters.checked || null,
