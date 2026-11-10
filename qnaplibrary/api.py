@@ -778,6 +778,21 @@ def llm_models(req):
         raise _err(502, str(error))
 
 
+# Approved public-only AI: the user can select a fixed category, but cannot
+# place invention text, project data or search hits into the prompt.
+@route("POST", "/api/v1/public-patent-guidance", "admin")
+def public_patent_guidance(req):
+    from .privacy import public_reference_messages
+    b = req.json()
+    messages = public_reference_messages(str(b.get("topic") or ""))
+    try:
+        result = req.app.providers.chat(messages, provider=b.get("provider"), scope="public_reference")
+    except LLMError as error:
+        raise _err(502, str(error))
+    return {"topic": b["topic"], "answer": result["content"], "model": result.get("model"),
+            "privacy": "固定の一般公開情報のみ。案件・ユーザー入力・検索結果・履歴は送信しません"}
+
+
 @route("POST", "/api/llm/test", "admin")
 def llm_test(req):
     b = req.json()
