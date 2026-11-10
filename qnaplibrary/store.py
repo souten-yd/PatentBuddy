@@ -376,14 +376,20 @@ class Store:
             d["chunks"] = [dict(r) for r in self.q("SELECT id, ord, section, text FROM chunks WHERE doc_id=? ORDER BY ord", (d["id"],))]
         return d
 
-    def list_documents(self, cid, offset=0, limit=50, q="", cursor=None):
+    def list_documents(self, cid, offset=0, limit=50, q="", cursor=None, ext_id=None):
         """Legacy offset listing or opt-in stable descending-ID keyset listing."""
         limit = max(1, min(int(limit), 500))
-        c = self.get_collection(cid, counts=cursor is None)
+        c = self.get_collection(cid, counts=cursor is None and ext_id is None)
         projection = ("id, collection_id, ext_id, title, url, source, doc_date, meta, "
                       "created, updated, length(body) AS body_chars")
         args = [c["id"]]
         where = "collection_id=?"
+        # Exact publication-number lookups use the existing unique composite index.
+        if ext_id is not None:
+            if not isinstance(ext_id, str) or not 1 <= len(ext_id) <= 512:
+                raise StoreError("ext_id must be 1-512 characters")
+            where += " AND ext_id=?"
+            args.append(ext_id)
         if q:
             where += " AND (title LIKE ? OR ext_id LIKE ?)"
             args.extend(["%" + q + "%", "%" + q + "%"])
@@ -405,7 +411,8 @@ class Store:
                     "has_more": more, "next_cursor": page[-1]["id"] if more else None}
         rows = self.q("SELECT " + projection + " FROM documents WHERE " + where +
                       " ORDER BY updated DESC LIMIT ? OFFSET ?", args + [limit, max(0, int(offset))])
-        return {"total": c["documents"], "items": [self.doc_row(r, body=False) for r in rows]}
+        return {"total": c["documents"] if ext_id is None else None,
+                "items": [self.doc_row(r, body=False) for r in rows]}
 
     def iter_documents(self, cid, batch=200):
         c = self.get_collection(cid, counts=False)
