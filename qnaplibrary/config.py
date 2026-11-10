@@ -12,7 +12,7 @@ from pathlib import Path
 DEFAULTS = {
     "server": {"bind": "0.0.0.0", "port": 17871, "tls_cert": "", "tls_key": "",
                "allow_remote_devices": False, "trusted_networks": ["tailscale"], "https_url": ""},
-    "auth": {"session_hours": 12, "rp_id": ""},
+    "auth": {"session_hours": 720, "rp_id": ""},
     "update": {"channel": "stable", "auto_check": True, "auto_apply": False},
     "search": {"default_limit": 20, "hybrid": True, "rrf_k": 60},
     "llm": {
