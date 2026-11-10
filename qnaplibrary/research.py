@@ -54,6 +54,9 @@ class Research:
             self.app.store.db.execute("UPDATE jobs SET %s WHERE id=?" % ", ".join(sets), args + [jid])
 
     def start(self, question, collections=None, provider=None, use_news=False):
+        # Search words derived from a confidential invention must not leave the NAS.
+        if use_news:
+            raise ValueError("機密保護: 発明からのニュース外部検索は無効です。公開情報のみを独立して検索してください")
         question = (question or "").strip()
         if not question:
             raise ValueError("question が必要です")
@@ -123,7 +126,7 @@ class Research:
             self._save(jid, status="done", finished=time.time(),
                        result={"step": "完了", "report": report["content"], "sources": sources, "doc_id": saved["ids"][0],
                                "model": report.get("model")})
-            self.app.notifier.send("調査ジョブ完了: " + p["question"][:60], report["content"][:1500], key="research:%d" % jid)
+            self.app.notifier.send("調査ジョブ完了", "レポートが完成しました。NAS内で確認してください。", key="research:%d" % jid)
         except Exception as error:
             LOG.warning("research job %s failed: %s", jid, error)
             self._save(jid, status="failed", finished=time.time(), result={"step": "失敗", "error": str(error)[:400]})
