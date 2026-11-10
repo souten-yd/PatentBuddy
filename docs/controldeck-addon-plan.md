@@ -64,3 +64,11 @@ ControlDeck本体の汎用 `workflows/rag_graph.py` にはLLM三つ組抽出の�
 - **A5**: 正確な特許グラフ + 根拠付き意味拡張 + bounded GraphRAG。ベンチマークで効果が確認された関係のみ既定ON。
 
 PR #10（クレーム）、#11（認証）、#13（大量投入）は別PR。PR #12（未公開発明保護）はmainへマージ済みであり制約として維持する。NAS限定公開データの独立した受入ゲートをA1より前に追加し、PR #15から実装する。**今回のPRはメインへの変更・自動リリースを伴わない**。実機検証はControlDeckを導入したUbuntu PCで行う。
+
+## 操作可能なプレビューの導入（2026-11-10）
+
+ユーザーの実導入要求に合わせ、PR-Eの初回配布はHost認証付き文献検索・取得と接続状態表示を先に提供する。AI/Host Jobs/GraphRAGの完了とは扱わない。ControlDeckのオプション機能から、既存release-bundleの導入/更新/有効化/無効化を使う。ResearchDataHubサーバーは独立したLinuxサービスであり、アドオン側の解除/更新では正本DBを変更しない。
+
+接続設定はFeature data内の `connection.json`（0600）に `server_url` と `server_token`。同一PCのHTTP loopbackまたは別端末のHTTPSだけを受理し、環境proxyとredirectを無効化する。接続tokenはResearchDataHubから発行された読み取り専用を推奨し、GET/API/logへ返さない。
+
+配布は `python3 scripts/build_cd_feature.py --out dist` と、既存publisher鍵を指定した `scripts/sign_cd_feature.py` を使う。新しい鍵は生成しない。`.tar.gz`、`.tar.gz.manifest.json`、`.tar.gz.manifest.json.sig`を同じversionのReleaseへ添付する。Host trusted catalogの公開鍵・feature_id・asset名・versionの一致と署名を検証してから導入する。Linux/QPKGの既存資産名・内部IDは維持する。

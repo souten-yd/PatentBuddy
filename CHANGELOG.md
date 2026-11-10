@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## 0.5.5
+## v0.5.5
 - PatentBuddyのControlDeck向けプレビュー画面を追加。Host認証後にResearchDataHubの文献を検索・閲覧し、アドオンと保存先サーバーの接続状態・バージョンを区別して表示します。
 - アドオンは独自の文献DBを作らず、ResearchDataHubの認証APIを利用します。AI/ジョブ操作の統合はまだ含みません。
 

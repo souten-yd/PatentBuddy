@@ -4,8 +4,8 @@
 
 ## 現在地
 
-- Repo: `souten-yd/PatentBuddy`。最新公開 **v0.5.3**、main `b14ed77`。
-- 作業ブランチ **feat/nas-public-patent-catalog**、Draft **PR #15 / PR-C**。v0.5.4候補。mainにはまだ公開資料APIはない。
+- Repo: `souten-yd/PatentBuddy`。最新公開 **v0.5.4**、main `b7816cf`。
+- 現在は **feat/control-deck-addon-foundation** / PR #14、v0.5.5候補。PR-C #15は公開済み。PR-D #13は別worktreeで計測中。
 - ユーザー目標は計画全体の完了。**PR-D〜G、QNAP実機は未完了**。勝手にPR-Cだけを全体完了としない。
 - 内部package `qnaplibrary`、QPKG ID `QnapLibrary`、port17871、Cookie/パスキーRP ID、Release資産名を維持する。ResearchDataHubは唯一の正本、PatentBuddyはPC上のControlDeck Add-on。SQLiteをSMB/NFSで共有・同時二重書込みしない。
 - 未公開情報は検証済みローカルLLMのみ。既存privacy gateを弱めない。NAS↔PCの認証/TLS通信とクラウドLLM送信は区別する。
@@ -60,3 +60,6 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - ControlDeck側 `/data1tb/ControlDeck-patentbuddy-feature` の `feat/patentbuddy-option` でtrusted catalog entryを準備。既存SonicForge publisherの公開鍵を再利用し、新規鍵生成なし。署名・公開・実installは未実施。稼働Hostのユーザー作業を変更していない。
 - v0.5.5候補でbundle identity統一。addon/API/境界/配布12 tests成功。全verify/Host release-bundle tests実行中、実ブラウザ/署名/導入/更新はこれから。
 - PR-D計測は別worktree `/data1tb/PatentBuddy` のsession57856が継続。candidate PID119637で10万件+900秒idle中。PR-D全93 tests成功、まだ未release。こちらのブランチを切り替えて測定中コードを変えない。
+
+- 最終全verify93 tests成功（22.189秒）、Linux/QPKGビルド・payload検査成功。Hostのrelease-bundle20 tests成功。既存publisher鍵でv0.5.5 Featureを署名・自己検証し、Hostの実_load_packageとtrusted public keyで署名/能力/identity検証成功。新しい鍵は生成していない。Host登録PRは https://github.com/souten-yd/ControlDeck/pull/348 （Draft）。
+- ResearchDataHub初期管理者設定はユーザーにより完了したことをhealthで確認。パスワードを読んだり変更していない。アドオン接続の読み取りtokenは未設定、ユーザーにファイル保存/画面入力の希望を非同期確認中。
