@@ -798,7 +798,7 @@ def llm_test(req):
     b = req.json()
     try:
         r = req.app.providers.chat([{"role": "user", "content": "「OK」とだけ答えてください。"}], b.get("provider"),
-                                   {"max_tokens": 16}, timeout=60)
+                                   {"max_tokens": 16}, timeout=60, scope="public_reference")
     except LLMError as error:
         raise _err(502, str(error))
     return r
