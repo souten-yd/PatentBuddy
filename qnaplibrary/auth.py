@@ -214,8 +214,8 @@ class Auth:
     def create_device(self, name, scopes="rw"):
         token = "qlt_" + secrets.token_urlsafe(32)
         name = (name or "device").strip()[:80] or "device"
-        if scopes not in ("rw", "ro"):
-            scopes = "rw"
+        if scopes not in ("rw", "ro", "published"):
+            raise ValueError("unsupported device token scope")
         with self.store.lock:
             cur = self.store.db.execute("INSERT INTO devices(name,token_hash,scopes,created) VALUES(?,?,?,?)",
                                         (name, token_hash(token), scopes, time.time()))

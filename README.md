@@ -13,6 +13,7 @@ QNAP NAS と Linux で動く**研究資料の保存・収集・検索APIサー�
 - **収集**: GDELT（公開世界ニュース）、RSS、EPO OPS、JPO 特許情報取得API、USPTO Open Data Portal。外部へ検索式を送る場合は公開情報のみと明示確認。
 - **接続**: LAN で事前パスコードによるペアリング → 以後トークンで無制限に利用。MCP（`/mcp`）対応
 - **ログイン**: パスワード、パスキー（Face ID / Windows Hello などの顔認証。HTTPS 接続時）
+- **公開資料API**: 管理者がタイトル・公開番号・抜粋を確認して承認した資料だけを専用トークンで検索・取得。原文更新で承認を停止します。自動クラウド送信はありません。詳しくは [公開資料API](docs/public-catalog.md)。
 - **AI 向けデバッグ出力**: 状態・直近エラー・検索トレースを JSON で取得（秘密は除去）
 - **自動更新**: [QnapPatentBuddy Releases](https://github.com/souten-yd/QnapPatentBuddy/releases) から SHA-256 を検証して更新
 - **バックアップ**: 管理 Web からSQLiteの一貫したスナップショットを手動作成（設定・秘密情報は別途保全が必要）
