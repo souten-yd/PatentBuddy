@@ -1,5 +1,8 @@
 # アーキテクチャ
 
+> **現在の確定方針**: [ResearchDataHub / PatentBuddy](researchdatahub-plan.md) を参照。以下の `QnapLibrary` 図は **v0.5.1の旧standalone実装**を説明するもので、将来の2サービス構成を示していない。開発時はLinux PC上のResearchDataHubが唯一の正本で、完成後はQNAPへ移行する。PatentBuddyはControlDeckのアドオンで、LLM/GraphRAGを受け持つ。SMB/NFS上で稼働DBを直接開かない。
+
+
 ```
  別PC / AI / ControlDeck ──(Bearer token)──┐          ┌── QnapAssistant :11435/v1 (同NAS)
  ブラウザ(管理Web, パスキー) ──(cookie+CSRF)─┤          ├── OpenRouter (詳細ルーティング)

@@ -11,7 +11,8 @@ WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 DIR="$WORK/qnaplibrary-$VERSION"
 mkdir -p "$DIR"
-cp -R "$ROOT/qnaplibrary" "$DIR/qnaplibrary"
+cp -R "$ROOT/qnaplibrary" "$ROOT/researchdatahub" "$DIR/"
+cp "$ROOT/rdh.sh" "$DIR/rdh.sh"
 find "$DIR" -name '__pycache__' -prune -exec rm -rf {} +
 cp "$ROOT/packaging/linux/install.sh" "$ROOT/packaging/linux/qnaplibrary.service.in" "$ROOT/README.md" "$ROOT/CHANGELOG.md" "$DIR/"
 cp "$ROOT/scripts/client/qnaplibrary_client.py" "$DIR/"

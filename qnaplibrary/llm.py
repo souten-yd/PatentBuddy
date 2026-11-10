@@ -10,8 +10,10 @@ import time
 import urllib.error
 import urllib.request
 
+from . import privacy
+
 LOG = logging.getLogger("qnaplibrary.llm")
-APP_URL = "https://github.com/souten-yd/QnapLibrary"
+APP_URL = "https://github.com/souten-yd/QnapPatentBuddy"
 OPENROUTER_PROVIDER_KEYS = ("order", "only", "ignore", "sort", "allow_fallbacks", "require_parameters",
                             "data_collection", "zdr", "quantizations", "max_price")
 SAMPLING_KEYS = ("temperature", "top_p", "top_k", "max_tokens", "frequency_penalty", "presence_penalty",
@@ -23,6 +25,16 @@ _QUERY_CACHE = {}
 
 class LLMError(RuntimeError):
     pass
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        # Redirects must not move a confidential payload outside the checked host.
+        return None
+
+
+# Do not honor system HTTP(S)_PROXY for invention-bearing model requests.
+_DIRECT_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect)
 
 
 class Providers:
@@ -58,7 +70,7 @@ class Providers:
             if not url.startswith(("http://", "https://")):
                 raise LLMError("base_url must be http(s)")
             ids.add(p["id"])
-            clean.append({k: p.get(k) for k in ("id", "type", "label", "base_url", "model", "secret", "options")
+            clean.append({k: p.get(k) for k in ("id", "type", "label", "base_url", "model", "secret", "options", "local_only_verified")
                           if p.get(k) is not None})
         llm = self.config.get("llm")
         llm["providers"] = clean
@@ -74,20 +86,40 @@ class Providers:
             h["Authorization"] = "Bearer " + key
         if p.get("type") == "openrouter":
             h["HTTP-Referer"] = APP_URL
-            h["X-Title"] = "QnapLibrary"
+            h["X-Title"] = "QnapPatentBuddy"
         return h
 
-    def _request(self, p, path, body=None, timeout=120, stream=False):
+    def _request(self, p, path, body=None, timeout=120, stream=False, scope="confidential"):
+        # Validate BEFORE creating the request or contacting the provider.
+        # No caller-supplied task prompt is allowed to claim public scope.
+        if body is not None:
+            if scope == "public_reference":
+                if not privacy.fixed_public_request(path, body):
+                    raise LLMError("機密保護: 固定公開プロンプト以外は外部送信できません")
+                # Rebuild the entire request. Provider/user options may contain
+                # unrelated sensitive strings (web tools, stop sequences, etc.).
+                # Never forward them as part of a public-only operation.
+                model = body.get("model", "")
+                if not isinstance(model, str) or (model and (len(model) > 160 or
+                        not all(c.isalnum() or c in "/_.:@-" for c in model))):
+                    raise LLMError("機密保護: 不正な公開モデル名です")
+                public_body = {"messages": body["messages"], "stream": False,
+                               "max_tokens": 16 if len(body["messages"]) == 1 else 2048}
+                if model:
+                    public_body["model"] = model
+                body = public_body
+            elif not privacy.confidential_allowed(p, self.config):
+                raise LLMError("機密保護: この操作はローカルLLM限定です。外部AIへの送信を遮断しました")
         url = p["base_url"].rstrip("/") + path
         data = json.dumps(body).encode() if body is not None else None
-        req = urllib.request.Request(url, data=data, headers=self._headers(p), method="POST" if data else "GET")
+        req = urllib.request.Request(url, data=data, headers=self._headers(p), method="POST" if data is not None else "GET")
         try:
-            resp = urllib.request.urlopen(req, timeout=timeout)
+            resp = _DIRECT_OPENER.open(req, timeout=timeout)
         except urllib.error.HTTPError as error:
-            detail = error.read(2000).decode("utf-8", "replace")
-            raise LLMError("%s %s: HTTP %d %s" % (p["id"], path, error.code, detail[:400]))
+            # Do not include response content: remote services may echo secrets.
+            raise LLMError("%s %s: HTTP %d" % (p["id"], path, error.code))
         except (urllib.error.URLError, OSError) as error:
-            raise LLMError("%s に接続できません: %s" % (p["id"], getattr(error, "reason", error)))
+            raise LLMError("%s: 接続に失敗しました（エンドポイントを確認してください）" % p["id"])
         if stream:
             return resp
         with resp:
@@ -126,10 +158,10 @@ class Providers:
                 body["usage"] = {"include": True}
         return body
 
-    def chat(self, messages, provider=None, overrides=None, timeout=180):
+    def chat(self, messages, provider=None, overrides=None, timeout=180, scope="confidential"):
         p = self.get(provider)
         t0 = time.time()
-        data = self._request(p, "/chat/completions", self.build_body(p, messages, overrides), timeout=timeout)
+        data = self._request(p, "/chat/completions", self.build_body(p, messages, overrides), timeout=timeout, scope=scope)
         try:
             choice = data["choices"][0]["message"]
         except (KeyError, IndexError, TypeError):
@@ -138,11 +170,11 @@ class Providers:
                 "model": data.get("model"), "usage": data.get("usage"), "provider": p["id"],
                 "ms": round((time.time() - t0) * 1000)}
 
-    def chat_stream(self, messages, provider=None, overrides=None, timeout=300):
+    def chat_stream(self, messages, provider=None, overrides=None, timeout=300, scope="confidential"):
         """Yield dict events: {"delta": str} / {"reasoning": str} / {"done": True, "usage":..., "model":...}."""
         p = self.get(provider)
         resp = self._request(p, "/chat/completions", self.build_body(p, messages, overrides, stream=True),
-                             timeout=timeout, stream=True)
+                             timeout=timeout, stream=True, scope=scope)
         usage, model = None, None
         with resp:
             for raw in resp:
@@ -195,7 +227,7 @@ class Providers:
             p = self.get(cfg["provider"])
         except LLMError:
             return False
-        return not p.get("secret") or bool(self.config.secret(p["secret"])) or p.get("type") != "openrouter"
+        return privacy.confidential_allowed(p, self.config) and (not p.get("secret") or bool(self.config.secret(p["secret"])))
 
     def embedding_tag(self):
         """Identifier stored with vectors: model + truncation, so different spaces never mix."""
@@ -238,7 +270,12 @@ class Providers:
 
     def rerank_enabled(self):
         cfg = self.rerank_config()
-        return bool(cfg.get("enabled") and cfg.get("provider") and cfg.get("model"))
+        if not (cfg.get("enabled") and cfg.get("provider") and cfg.get("model")):
+            return False
+        try:
+            return privacy.confidential_allowed(self.get(cfg["provider"]), self.config)
+        except LLMError:
+            return False
 
     def rerank(self, query, documents, top_n=None):
         """Return [(index, score)] best first. Cohere/Jina-compatible /rerank endpoint."""

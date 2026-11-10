@@ -44,6 +44,11 @@ CREATE INDEX IF NOT EXISTS vectors_coll ON vectors(collection_id);
 CREATE TABLE IF NOT EXISTS devices(
   id INTEGER PRIMARY KEY, name TEXT NOT NULL, token_hash TEXT UNIQUE NOT NULL, scopes TEXT NOT NULL DEFAULT 'rw',
   created REAL NOT NULL, last_seen REAL, last_ip TEXT NOT NULL DEFAULT '');
+-- The client holds only a random session cookie. Persist its SHA-256 digest,
+-- never the bearer cookie itself; survive package upgrades and restarts.
+CREATE TABLE IF NOT EXISTS admin_sessions(
+  sid_hash TEXT PRIMARY KEY, csrf TEXT NOT NULL, exp REAL NOT NULL,
+  via TEXT NOT NULL, created REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS passkeys(
   credential_id BLOB PRIMARY KEY, public_key BLOB NOT NULL, alg INTEGER NOT NULL, sign_count INTEGER NOT NULL,
   name TEXT NOT NULL DEFAULT '', created REAL NOT NULL, last_used REAL);
