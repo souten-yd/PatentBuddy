@@ -1,4 +1,4 @@
-/* QnapLibrary management web — dependency-free, CSP-safe (no inline handlers, no innerHTML with data). */
+/* QnapPatentBuddy management web — dependency-free, CSP-safe (no inline handlers, no innerHTML with data). */
 "use strict";
 (() => {
 const S = { me: null, csrf: null, view: "home", health: null, collections: [], meta: null };
@@ -31,7 +31,9 @@ async function api(method, path, body, opts = {}) {
   try { data = await res.json(); } catch (e) { data = null; }
   if (!res.ok) {
     if (res.status === 401 && !opts.quiet) { S.me = null; render(); }
-    throw new Error((data && data.error) || ("HTTP " + res.status));
+    const error = new Error((data && data.error) || ("HTTP " + res.status));
+    error.status = res.status;
+    throw error;
   }
   return data;
 }
@@ -81,7 +83,7 @@ function render() {
   if (!S.me) return $app.append(loginView());
   const views = [["home", "ホーム"], ["search", "検索"], ["patents", "特許"], ["data", "データ"], ["analytics", "分析"], ["chat", "AIチャット"], ["collect", "収集"], ["settings", "設定"]];
   const main = h("main", {});
-  const nav = h("nav", { class: "side" }, h("div", { class: "brand" }, h("img", { src: "icon.svg", alt: "" }), "QnapLibrary"),
+  const nav = h("nav", { class: "side" }, h("div", { class: "brand" }, h("img", { src: "icon.svg", alt: "" }), "QnapPatentBuddy"),
     views.map(([id, label]) => h("button", { class: S.view === id ? "active" : "", onclick: () => { S.view = id; render(); } }, label)),
     h("div", { class: "ver" }, "v" + S.health.version));
   $app.append(h("div", { class: "layout" }, nav, main));
@@ -97,7 +99,7 @@ function loginView() {
   });
   pw.addEventListener("keydown", e => { if (e.key === "Enter") go(); });
   const box = h("div", { class: "login" }, h("div", { class: "card" },
-    h("h1", {}, setup ? "QnapLibrary 初期設定" : "QnapLibrary ログイン"),
+    h("h1", {}, setup ? "QnapPatentBuddy 初期設定" : "QnapPatentBuddy ログイン"),
     setup ? h("p", { class: "muted small" }, "管理者パスワードを設定します（LANからのみ）。後で設定からパスキー（Face ID 等）を登録できます。") : null,
     field(setup ? "新しい管理者パスワード" : "パスワード", pw),
     h("div", { class: "row" }, h("button", { class: "btn primary", onclick: go }, setup ? "設定して開始" : "ログイン"),
@@ -172,7 +174,7 @@ async function homeView(main) {
     h("dt", {}, "検索用ベクトル索引"), h("dd", {}, st.vectors.vectors + " 件 / RAM " + st.vectors.ram_mb + " MB"));
   main.append(h("details", { class: "card home-technical" },
     h("summary", {}, "技術情報を表示"), info));
-  main.append(h("p", { class: "small muted home-version" }, "QnapLibrary v" + S.health.version));
+  main.append(h("p", { class: "small muted home-version" }, "QnapPatentBuddy v" + S.health.version));
 
   const live = () => main.isConnected && S.view === "home";
   let lastActivity = null;
@@ -636,11 +638,29 @@ async function settingsView(main) {
     body.append(h("div", { class: "card" }, h("dl", { class: "dl" }, h("dt", {}, "現在"), h("dd", {}, "v" + u.current + "（" + u.mode + "）"), h("dt", {}, "状態"), h("dd", {}, u.phase + " " + (u.message || "")),
       h("dt", {}, "最新"), h("dd", {}, u.latest ? "v" + u.latest.version + "（" + (u.latest.published_at || "") + "）" : "-"), h("dt", {}, "確認日時"), h("dd", {}, fmtDate(u.checked_at)), u.error ? [h("dt", {}, "エラー"), h("dd", {}, u.error)] : null),
       u.latest && u.latest.notes ? h("details", {}, h("summary", {}, "リリースノート"), md(u.latest.notes)) : null,
-      h("div", { class: "row" }, h("button", { class: "btn", onclick: guard(async () => { await api("POST", "/api/update/check", {}); render(); }) }, "更新を確認"),
+      h("div", { class: "row" }, h("button", { class: "btn", onclick: guard(async (event) => {
+          const btn = event.currentTarget;
+          btn.disabled = true;
+          btn.textContent = "更新を確認中…";
+          try {
+            try { await api("POST", "/api/update/check", {}); }
+            catch (error) {
+              // This endpoint is safe to retry: it only reads GitHub release metadata.
+              // A brief QTS/reverse-proxy 501/502/503 may occur around a restart.
+              if (![501, 502, 503].includes(error.status)) throw error;
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              await api("POST", "/api/update/check", {});
+            }
+            await render();
+          } finally {
+            btn.disabled = false;
+            btn.textContent = "更新を確認";
+          }
+        }) }, "更新を確認"),
         h("button", { class: "btn primary", disabled: !u.latest || u.mode === "dev", onclick: guard(async () => { if (!confirm("v" + u.latest.version + " に更新します。再起動します。")) return; await api("POST", "/api/update/apply", {}); toast("更新を開始しました"); waitRestart(u.current); }) }, "今すぐ更新")),
       h("label", {}, check, " 毎日自動で確認"), " ", h("label", {}, auto, " 新しい版を自動で適用"),
       h("button", { class: "btn", onclick: guard(async () => { await api("PUT", "/api/settings", { update: { auto_check: check.checked, auto_apply: auto.checked } }); toast("保存しました"); }) }, "保存"),
-      h("p", { class: "small muted" }, "GitHub Releases（souten-yd/QnapLibrary）の資産を SHA-256 で検証してから適用します。")));
+      h("p", { class: "small muted" }, "GitHub Releases（souten-yd/QnapPatentBuddy）の資産を SHA-256 で検証してから適用します。")));
   } else if (tab === "debug") {
     const pre = h("div", { class: "pre" }, "…");
     body.append(h("div", { class: "card" }, h("p", { class: "small muted" }, "AI に不具合調査を依頼するときは、このバンドルを渡してください（秘密情報は除去済み）。デバイストークンがあれば GET /api/debug/bundle や MCP の debug_bundle でも取得できます。"),
@@ -658,7 +678,7 @@ function httpsCard() {
       h("li", {}, "NAS に SSH で入り次を実行（証明書の取得・更新は Tailscale が自動で行います）"),
       h("li", {}, "https://<NAS名>.<tailnet名>.ts.net:8443/ を開き、パスワードでログインしてからパスキーを登録")),
     h("div", { class: "row" }, h("code", {}, cmd), h("button", { class: "btn", onclick: () => { navigator.clipboard.writeText(cmd); toast("コピーしました"); } }, "コピー")),
-    h("p", { class: "small muted" }, "QnapDownloader が 443（https://<NAS名>.ts.net/）を使っているため、QnapLibrary は 8443 を使います。同じ証明書・同じ名前で共存でき、ログイン Cookie の名前も別なので干渉しません。HTTP（LAN の :" + (location.port || "17871") + "）も引き続き使えます。"));
+    h("p", { class: "small muted" }, "QnapDownloader が 443（https://<NAS名>.ts.net/）を使っているため、QnapPatentBuddy は 8443 を使います。同じ証明書・同じ名前で共存でき、ログイン Cookie の名前も別なので干渉しません。HTTP（LAN の :" + (location.port || "17871") + "）も引き続き使えます。"));
 }
 function waitRestart(prev) {
   let n = 0; const t = setInterval(async () => { n++; try { const hh = await fetch("/api/health").then(r => r.json()); if (hh.version !== prev) { clearInterval(t); toast("v" + hh.version + " に更新されました"); setTimeout(() => location.reload(), 800); } } catch (e) {} if (n > 120) clearInterval(t); }, 3000);
