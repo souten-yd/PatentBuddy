@@ -14,7 +14,7 @@
 - **PatentBuddy**: ControlDeck PC上の**特許専用Add-on**。高度検索、ローカルLLM、クレームチャート、調査Jobs、GraphRAGはここで行う。将来、別の規格向けアドオンもResearchDataHub APIを使える。
 - 既存リポジトリ名 `QnapPatentBuddy`、Pythonパッケージ `qnaplibrary`、QPKG ID `QnapLibrary`、旧データ領域、port 17871は**互換性維持**。Codexが一括rename/移管することを禁止。改名はユーザー向け表示と新Linux aliasから開始する。リポジトリ分割・改名は別途設計/許可。
 
-## 配置と数据フロー
+## 配置とデータフロー
 ```text
 開発/結合試験:
  Linux PC (Ryzen 9700X, ControlDeck, local LLM)
