@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS documents(
   hash TEXT NOT NULL DEFAULT '', created REAL NOT NULL, updated REAL NOT NULL,
   UNIQUE(collection_id, ext_id));
 CREATE INDEX IF NOT EXISTS documents_coll ON documents(collection_id, updated);
+CREATE INDEX IF NOT EXISTS documents_coll_id ON documents(collection_id, id DESC);
 CREATE TABLE IF NOT EXISTS chunks(
   id INTEGER PRIMARY KEY, doc_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
   collection_id INTEGER NOT NULL, ord INTEGER NOT NULL, section TEXT NOT NULL DEFAULT '', text TEXT NOT NULL);
@@ -182,14 +183,14 @@ class Store:
         kinds = [kinds] if isinstance(kinds, str) else list(kinds)
         return [r[0] for r in self.q("SELECT id FROM collections WHERE kind IN (%s)" % ",".join("?" * len(kinds)), kinds)] if kinds else []
 
-    def get_collection(self, ref):
+    def get_collection(self, ref, counts=True):
         if isinstance(ref, int) or (isinstance(ref, str) and ref.isdigit()):
             row = self.one("SELECT * FROM collections WHERE id=?", (int(ref),))
         else:
             row = self.one("SELECT * FROM collections WHERE name=?", (str(ref),))
         if not row:
             raise StoreError("collection not found: %s" % ref)
-        return self.collection_row(row)
+        return self.collection_row(row, counts=counts)
 
     def create_collection(self, name, kind="generic", description="", settings=None):
         name = (name or "").strip()
@@ -267,18 +268,27 @@ class Store:
 
     def add_documents(self, cid, docs, actor="system"):
         """Insert or replace documents (by ext_id). Returns counts. One transaction per call."""
-        c = self.get_collection(cid)
+        c = self.get_collection(cid, counts=False)
         if not isinstance(docs, list):
             raise StoreError("documents must be a list")
         if len(docs) > 5000:
             raise StoreError("max 5000 documents per request")
+        if any(not isinstance(doc, dict) for doc in docs):
+            raise StoreError("each document must be an object")
         added = updated = unchanged = 0
         ids, added_ids = [], []
         t = now()
         with self.tx() as db:
+            identifiers = list(dict.fromkeys(str(d.get("id") or d.get("ext_id") or "") for d in docs))
+            identifiers = [ext for ext in identifiers if ext]
+            existing = {}
+            for n in range(0, len(identifiers), 400):
+                batch = identifiers[n:n + 400]
+                sql = "SELECT ext_id, id, hash FROM documents WHERE collection_id=? AND ext_id IN (%s)" % (
+                    ",".join("?" * len(batch)))
+                for found in db.execute(sql, [c["id"]] + batch):
+                    existing[found["ext_id"]] = {"id": found["id"], "hash": found["hash"]}
             for doc in docs:
-                if not isinstance(doc, dict):
-                    raise StoreError("each document must be an object")
                 title = str(doc.get("title") or "")[:1000]
                 body = str(doc.get("body") or "")
                 meta = dict(doc.get("meta")) if isinstance(doc.get("meta"), dict) else {}
@@ -294,8 +304,7 @@ class Store:
                 ext_id = str(doc.get("id") or doc.get("ext_id") or "") or None
                 digest = hashlib.sha256(json.dumps([title, body_view, meta, doc.get("url"), doc.get("date")],
                                                    ensure_ascii=False, sort_keys=True).encode()).hexdigest()
-                row = db.execute("SELECT id, hash FROM documents WHERE collection_id=? AND ext_id=?",
-                                 (c["id"], ext_id)).fetchone() if ext_id else None
+                row = existing.get(ext_id) if ext_id else None
                 if row and row["hash"] == digest:
                     unchanged += 1
                     ids.append(row["id"])
@@ -316,6 +325,9 @@ class Store:
                     added += 1
                     added_ids.append(doc_id)
                 ids.append(doc_id)
+                if ext_id:
+                    # Keep sequential upsert semantics for repeated external IDs in a batch.
+                    existing[ext_id] = {"id": doc_id, "hash": digest}
                 title_tok = textproc.index_text((ext_id or "") + " " + title)
                 for ord_, (section, text) in enumerate(self._sections(doc, c["kind"])):
                     cur = db.execute("INSERT INTO chunks(doc_id,collection_id,ord,section,text) VALUES(?,?,?,?,?)",
@@ -323,7 +335,8 @@ class Store:
                     if self.fts:
                         db.execute("INSERT INTO chunks_fts(rowid,title,tok) VALUES(?,?,?)",
                                    (cur.lastrowid, title_tok, textproc.index_text(section + " " + text)))
-            db.execute("UPDATE collections SET updated=? WHERE id=?", (t, c["id"]))
+            if added or updated:
+                db.execute("UPDATE collections SET updated=? WHERE id=?", (t, c["id"]))
         if added or updated:
             self.vector_version += 1
             if self.on_change:
@@ -351,7 +364,7 @@ class Store:
         if body:
             d["body"] = row["body"]
         else:
-            d["body_chars"] = len(row["body"] or "")
+            d["body_chars"] = row["body_chars"] if "body_chars" in row.keys() else len(row["body"] or "")
         return d
 
     def get_document(self, doc_id, with_chunks=False):
@@ -363,19 +376,38 @@ class Store:
             d["chunks"] = [dict(r) for r in self.q("SELECT id, ord, section, text FROM chunks WHERE doc_id=? ORDER BY ord", (d["id"],))]
         return d
 
-    def list_documents(self, cid, offset=0, limit=50, q=""):
-        c = self.get_collection(cid)
+    def list_documents(self, cid, offset=0, limit=50, q="", cursor=None):
+        """Legacy offset listing or opt-in stable descending-ID keyset listing."""
         limit = max(1, min(int(limit), 500))
+        c = self.get_collection(cid, counts=cursor is None)
+        projection = ("id, collection_id, ext_id, title, url, source, doc_date, meta, "
+                      "created, updated, length(body) AS body_chars")
+        args = [c["id"]]
+        where = "collection_id=?"
         if q:
-            rows = self.q("SELECT * FROM documents WHERE collection_id=? AND (title LIKE ? OR ext_id LIKE ?) ORDER BY updated DESC LIMIT ? OFFSET ?",
-                          (c["id"], "%" + q + "%", "%" + q + "%", limit, int(offset)))
-        else:
-            rows = self.q("SELECT * FROM documents WHERE collection_id=? ORDER BY updated DESC LIMIT ? OFFSET ?",
-                          (c["id"], limit, int(offset)))
+            where += " AND (title LIKE ? OR ext_id LIKE ?)"
+            args.extend(["%" + q + "%", "%" + q + "%"])
+        if cursor is not None:
+            try:
+                point = int(cursor)
+            except (TypeError, ValueError):
+                raise StoreError("cursor must be a positive document ID")
+            if not 0 < point <= 9223372036854775807:
+                raise StoreError("cursor must be a positive document ID")
+            where += " AND id<?"
+            args.append(point)
+            rows = self.q("SELECT " + projection + " FROM documents WHERE " + where +
+                          " ORDER BY id DESC LIMIT ?", args + [limit + 1])
+            more = len(rows) > limit
+            page = rows[:limit]
+            return {"total": None, "items": [self.doc_row(r, body=False) for r in page],
+                    "has_more": more, "next_cursor": page[-1]["id"] if more else None}
+        rows = self.q("SELECT " + projection + " FROM documents WHERE " + where +
+                      " ORDER BY updated DESC LIMIT ? OFFSET ?", args + [limit, max(0, int(offset))])
         return {"total": c["documents"], "items": [self.doc_row(r, body=False) for r in rows]}
 
     def iter_documents(self, cid, batch=200):
-        c = self.get_collection(cid)
+        c = self.get_collection(cid, counts=False)
         last = 0
         while True:
             rows = self.q("SELECT * FROM documents WHERE collection_id=? AND id>? ORDER BY id LIMIT ?", (c["id"], last, batch))
