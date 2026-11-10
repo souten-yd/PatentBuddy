@@ -83,7 +83,7 @@ def select(release, current, mode):
 
 def fetch_latest(timeout=15):
     req = urllib.request.Request(API, headers={"Accept": "application/vnd.github+json",
-                                               "User-Agent": "QnapLibrary-updater/%s" % VERSION})
+                                               "User-Agent": "QnapPatentBuddy-updater/%s" % VERSION})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return json.loads(resp.read(4 * 1024 * 1024))
@@ -98,7 +98,7 @@ def download(asset, directory):
     directory.mkdir(parents=True, exist_ok=True)
     target = directory / asset["name"]
     tmp = directory / (asset["name"] + ".part")
-    req = urllib.request.Request(asset["url"], headers={"User-Agent": "QnapLibrary-updater/%s" % VERSION})
+    req = urllib.request.Request(asset["url"], headers={"User-Agent": "QnapPatentBuddy-updater/%s" % VERSION})
     digest, count = hashlib.sha256(), 0
     with urllib.request.urlopen(req, timeout=60) as resp, open(tmp, "wb") as out:
         while True:

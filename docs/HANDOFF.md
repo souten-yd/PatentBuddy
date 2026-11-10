@@ -82,3 +82,19 @@
 - `PYTHONPATH=. python3 scripts/test-local-llm.py --verified-local`: ControlDeck管理のllama.cpp/Qwen3.8-27Bに合成案件のassistを実API送信、42.58秒、回答1137文字、案件の変更なし。初回はテスト側の応答キーをcontentと誤指定し失敗、実APIのanswerへ修正して再実行合格。法的品質/実案件品質は未評価。
 - PR-Aは薄い入口/表示/配布のみで新規DBスキーマ・常駐I/Oなし。testは明示実行時だけ一時DBへ書込み、doctorはメモリのみ。
 - Release公開・旧版からの自己更新は次の検証。iPhone実パスキー、QNAP本番、PR-B〜G、性能ベンチ、Host署名/結合、GraphRAG、NAS移行は**未完了**。
+
+
+## PR-B / PR #11 — v0.5.3 開発中
+
+- PR-A #17はmain `4170acd`へマージ、**v0.5.2公開済み**。release run `42809839947`成功、Linux/QPKG資産公開を確認。
+- 公開済みv0.5.1を一時非rootインストールし、管理APIの更新確認が「想定外のダウンロードURL」で失敗することを再現。公開済みv0.5.2をSHA-256照合後に手動インストールすると、healthが0.5.2/ResearchDataHub、既存管理者ログイン/コレクション保持を確認。
+- 公開配布のrdh.shを別チェックアウトから呼ぶとcwd内のPython packageを誤読する問題も検出。PR #11で明示した配布ルートをsys.path先頭にして修正、偽packageを置いたcwdからの回帰試験を追加。
+- PR #11を現mainへマージして旧ブランド/機密保護の競合を解消。既存機密ガードとResearchDataHub表示を保持。セッションはSHA-256 IDのみSQLiteへ保存、RAM/DB最大128件。通常の認証/期限切れGETは書込みなし。ログイン時の清掃/追加のみトランザクション、ログアウトとパスワード変更は必要な失効書込み。
+- **501再現と修正**: 本文を消費しない更新確認POSTの後に同じHTTP接続でGETすると501になる実テストを追加し、修正前FAILを確認。未読本文がある応答はConnection: closeとして修正後PASS。一般リトライは追加していない。QTS側の別要因は未確認。
+- リポジトリ名を実際のsouten-yd/PatentBuddyへ合わせ、実GitHub metadataからv0.5.2の資産/digestを選べることを確認。配布済み旧クライアントには手動更新が必要。
+- 再起動後のcookie/CSRF継続・パスキー登録レコード/ユーザーハンドル/RP ID・ログアウト後の再起動失効を実HTTPで検証。パスキーは合成登録レコードであり、iPhone実署名検証ではない。
+- PR-Bの最終verify/配布ビルド/リリースは進行中。PR-C〜Gは未完了。次は公開資料API #15の実diffと権限分離検証。
+
+- PR-B候補: `scripts/verify.sh` **67 tests＋全静的検査合格**。旧版v0.5.1→ローカル候補v0.5.3の手動更新で管理者/コレクション保持、新入口4 smoke tests合格。Linux/QPKG最終ビルドを実施中。全体目標は継続中で、PR-C以降を完了と扱わない。
+
+- v0.5.3最終Linux/QPKGビルドとpayload検査成功。QPKGをLinux一時領域へ展開しstart/status/health(0.5.3)/stop合格。ローカル確認済み、QTS実機は未実施。

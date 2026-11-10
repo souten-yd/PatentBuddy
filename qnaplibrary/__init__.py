@@ -1,6 +1,6 @@
 """QnapPatentBuddy — private patent research and invention support on QNAP/Linux."""
 
 APP_NAME = "ResearchDataHub"
-VERSION = "0.5.2"
-REPO = "souten-yd/QnapPatentBuddy"
+VERSION = "0.5.3"
+REPO = "souten-yd/PatentBuddy"
 DEFAULT_PORT = 17871

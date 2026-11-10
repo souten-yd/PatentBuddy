@@ -103,3 +103,13 @@ class EntrySmoke(unittest.TestCase):
                                     cwd=tmp, env=env, capture_output=True, check=True)
             self.assertEqual(json.loads(result.stdout)["app"], "ResearchDataHub")
             self.assertEqual(list(Path(tmp).iterdir()), [])
+
+    def test_shell_entry_ignores_other_checkout_in_cwd(self):
+        root = Path(__file__).resolve().parent.parent
+        with tempfile.TemporaryDirectory() as tmp:
+            fake = Path(tmp) / "researchdatahub"
+            fake.mkdir()
+            (fake / "__init__.py").write_text("raise RuntimeError('wrong checkout')")
+            result = subprocess.run([str(root / "rdh.sh"), "doctor"], cwd=tmp,
+                                    capture_output=True, check=True)
+            self.assertEqual(json.loads(result.stdout)["app"], "ResearchDataHub")
