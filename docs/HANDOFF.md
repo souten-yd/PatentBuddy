@@ -4,8 +4,8 @@
 
 ## 現在地
 
-- Repo: `souten-yd/PatentBuddy`。最新公開 **v0.5.6**、main `73ae466`。
-- 作業ブランチ **feat/scale-document-ingestion-pagination**、Draft **PR #13 / PR-D**。PR-C #15はマージ・v0.5.4公開・自動更新確認済み。
+- Repo: `souten-yd/PatentBuddy`。最新公開 **v0.5.7**、main `11c500b`。
+- 作業ブランチ **feat/patentbuddy-host-ai-jobs**。PR #13 / PR-Dはマージ・公開・更新済み。PR-C #15はマージ・v0.5.4公開・自動更新確認済み。
 - ユーザー目標は計画全体の完了。**PR-D〜G、QNAP実機は未完了**。勝手にPR-Cだけを全体完了としない。
 - 内部package `qnaplibrary`、QPKG ID `QnapLibrary`、port17871、Cookie/パスキーRP ID、Release資産名を維持する。ResearchDataHubは唯一の正本、PatentBuddyはPC上のControlDeck Add-on。SQLiteをSMB/NFSで共有・同時二重書込みしない。
 - 未公開情報は検証済みローカルLLMのみ。既存privacy gateを弱めない。NAS↔PCの認証/TLS通信とクラウドLLM送信は区別する。
@@ -103,3 +103,12 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - v0.5.7最終全verify108 tests成功25.034秒（/tmp/pb-scale-057-verify.log）、Linux/QPKG build/payload成功。10万件のStore実装は計測候補eb6354dと同一。ControlDeckローカルLLMテストPID143325稼働を確認、結果待ち。
 
 - ControlDeck Host Gateway経由のローカルQwen3.8-27Bテスト成功、50.02秒/1206文字、案件不変（/tmp/pb-scale-host-llm.json）。既存Host認証キーは出力せず、ローカルGGUF/runtime確認後にHost admission経由で使用。AI品質やAddon principal AI結合の完了とはしない。
+
+## PR-D完了とPR-E続行（最新）
+
+- PR #13はmain `11c500bb4d1985aa457961ccab1f5254fde02052`へ統合、v0.5.7 / Release run42821949480成功。mainのStore/API/Searchは検証済み候補と差分なし。README最終文書確認で存在しないtest_docs_rules名を誤指定したが、実在のtests.test_updater_docs 7件を再実行して成功（全108 testsは先行成功）。
+- 公式v0.5.6配布から管理API check/apply→download/SHA→再起動→v0.5.7へ自己更新成功。Cookie/CSRF/文献保持、cursor/外部ID一致/無変更再投入を確認。`/tmp/pb-autoupdate-057.json`、一時プロセス停止済み。
+- 実Linuxサービスも公式資産SHA検証後v0.5.7へ更新。`/data1tb/ResearchDataHub/backups/pre-0.5.7`に一貫SQLite backup/quick_checkと秘密保全。既存設定/秘密一致を確認。ControlDeck正規Feature updateでv0.5.7、installed/enabled/managed=true/healthy、署名付き三資産公開。SHA eb31ee045416de6c34b2b7306790a964910e92257b5554f8d0937d8e37d65092。
+- 実AddonClientからserver v0.5.7/local_peer自動認証と読取API成功、addon health healthy/ready。実Hostブラウザでのログイン後受入とAI/Jobs/GraphRAGはまだ未完。
+- 次はPR-E A3: Host capability-scoped AI/Jobs/Broker。稼働Hostのai_gatewayはllama.cpp/Ollama選択のみだが、capabilities応答はlocal-onlyを証明せずOllamaのremote/cloud設定を排除できない。機密入力の前にHostでlocal-only要求を検証する契約を追加し、Addonはその応答/拒否を使う必要がある。ローカルURLだけを証明にしない。
+- 稼働ControlDeck checkoutにはユーザーのpasskey作業が引き続き存在。触らない。Host側変更は隔離worktree/別PRで行う。PatentBuddyの独自永続文献DBは作らず、研究結果/案件の正本はResearchDataHubに保存。現在ro自動tokenの書込み権限を無条件rwへ広げない。
