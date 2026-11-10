@@ -233,6 +233,31 @@ class Providers:
         return [{"id": m.get("id"), "name": m.get("name") or m.get("id"),
                  "price": (m.get("pricing") or {}).get("prompt")} for m in items or [] if isinstance(m, dict)]
 
+    def rerank_config(self):
+        return self.config.get("llm", "rerank", default={}) or {}
+
+    def rerank_enabled(self):
+        cfg = self.rerank_config()
+        return bool(cfg.get("enabled") and cfg.get("provider") and cfg.get("model"))
+
+    def rerank(self, query, documents, top_n=None):
+        """Return [(index, score)] best first. Cohere/Jina-compatible /rerank endpoint."""
+        cfg = self.rerank_config()
+        p = self.get(cfg["provider"])
+        body = {"model": cfg["model"], "query": query, "documents": [d[:4000] for d in documents]}
+        if top_n:
+            body["top_n"] = int(top_n)
+        data = self._request(p, "/rerank", body, timeout=60)
+        results = data.get("results") or data.get("data") or []
+        out = []
+        for r in results:
+            idx = r.get("index")
+            score = r.get("relevance_score", r.get("score"))
+            if isinstance(idx, int) and score is not None:
+                out.append((idx, float(score)))
+        out.sort(key=lambda x: -x[1])
+        return out
+
     def _embed_raw(self, cfg, texts, query):
         p = self.get(cfg["provider"])
         prefix = (cfg.get("query_prefix") or "") if query else ""

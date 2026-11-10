@@ -115,6 +115,7 @@ class Store:
         self.fts = self._init_fts()
         self.vector_version = 0  # bumped on vector change; vector cache invalidation
         self.on_change = None    # callback after documents were added/updated (auto-embedding)
+        self.on_vectors = None   # callback(rows) after vectors were stored (Qdrant mirror)
         with self.lock:
             self.db.execute("INSERT OR IGNORE INTO meta(key,value) VALUES('schema_version',?)", (str(SCHEMA_VERSION),))
 
@@ -423,6 +424,7 @@ class Store:
     def put_vectors(self, items, model):
         """items: [(chunk_id, [floats])]."""
         n = 0
+        mirrored = []
         with self.tx() as db:
             for chunk_id, vec in items:
                 row = db.execute("SELECT collection_id FROM chunks WHERE id=?", (int(chunk_id),)).fetchone()
@@ -431,10 +433,27 @@ class Store:
                 blob = array("f", [float(x) for x in vec]).tobytes()
                 db.execute("INSERT OR REPLACE INTO vectors(chunk_id,collection_id,model,dim,vec) VALUES(?,?,?,?,?)",
                            (int(chunk_id), row[0], model, len(vec), blob))
+                mirrored.append((int(chunk_id), row[0], model, vec))
                 n += 1
         if n:
             self.vector_version += 1
+            if self.on_vectors:
+                self.on_vectors(mirrored)
         return n
+
+    def iter_vectors(self, batch=500):
+        last = 0
+        while True:
+            rows = self.q("SELECT chunk_id, collection_id, model, vec FROM vectors WHERE chunk_id>? ORDER BY chunk_id LIMIT ?", (last, batch))
+            if not rows:
+                return
+            out = []
+            for r in rows:
+                v = array("f")
+                v.frombytes(r["vec"])
+                out.append((r["chunk_id"], r["collection_id"], r["model"], list(v)))
+                last = r["chunk_id"]
+            yield out
 
     def chunks_missing_vectors(self, cid=None, limit=64, model=None):
         """Chunks without a vector (of `model` when given). cid=None: any collection."""

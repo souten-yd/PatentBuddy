@@ -51,7 +51,11 @@ class App:
         self.store = Store(self.data_dir / "library.sqlite3")
         self.auth = Auth(self.config, self.store)
         self.providers = Providers(self.config)
-        self.searcher = Searcher(self.store, self.config, self._embedder, self._vector_model)
+        self._qdrant = None
+        self.qdrant_sync = {"running": False, "done": 0, "error": None}
+        self.searcher = Searcher(self.store, self.config, self._embedder, self._vector_model,
+                                 backend_fn=self.qdrant, reranker=self.providers)
+        self.store.on_vectors = self._mirror_vectors
         self.embedder = EmbedWorker(self.store, self.providers, self.config)
         self.store.on_change = self.embedder.kick
         self.notifier = Notifier(self.config, self.store)
@@ -70,6 +74,50 @@ class App:
             return None
         return self.providers.embed(texts, query=query)
 
+    def qdrant(self):
+        """Qdrant client when vector_backend.type == 'qdrant', else None (RAM index)."""
+        vb = self.config.get("vector_backend", default={}) or {}
+        if vb.get("type") != "qdrant" or not vb.get("url"):
+            self._qdrant = None
+            return None
+        from .qdrant import Qdrant
+        key = (vb["url"], vb.get("collection") or "qnaplibrary")
+        if self._qdrant is None or (self._qdrant.url, self._qdrant.collection) != (key[0].rstrip("/"), key[1]):
+            self._qdrant = Qdrant(key[0], key[1], self.config.secret("qdrant_api_key"))
+        return self._qdrant
+
+    def _mirror_vectors(self, rows):
+        q = self.qdrant()
+        if q is None or self.qdrant_sync["running"]:
+            return
+        try:
+            q.upsert(rows)
+        except Exception as error:  # SQLite keeps the vectors; a later sync repairs Qdrant
+            LOG.warning("qdrant mirror failed: %s", error)
+
+    def sync_qdrant(self, recreate=False):
+        q = self.qdrant()
+        if q is None:
+            raise ValueError("vector_backend.type が qdrant ではありません")
+        if self.qdrant_sync["running"]:
+            raise ValueError("同期中です")
+
+        def run():
+            self.qdrant_sync.update(running=True, done=0, error=None)
+            try:
+                first = True
+                for rows in self.store.iter_vectors():
+                    if first:
+                        q.ensure(len(rows[0][3]), recreate=recreate)
+                        first = False
+                    self.qdrant_sync["done"] += q.upsert(rows)
+            except Exception as error:
+                self.qdrant_sync["error"] = str(error)[:300]
+            finally:
+                self.qdrant_sync["running"] = False
+        threading.Thread(target=run, daemon=True).start()
+        return self.qdrant_sync
+
     def _vector_model(self):
         return self.providers.embedding_tag() if self.providers.embedding_enabled() else None
 
@@ -83,6 +131,7 @@ class App:
             "version": VERSION, "app": APP_NAME, "data_dir": str(self.data_dir),
             "install_mode": self.updater.mode, "update": self.updater.status(),
             "store": self.store.stats(), "vectors": self.searcher.vectors.info(),
+            "vector_backend": self.config.get("vector_backend"), "qdrant_sync": self.qdrant_sync,
             "embedding": self.embedder.info(), "vector_models": self.store.vector_models(),
             "scheduler": self.scheduler.status,
             "watches": [{k: w[k] for k in ("id", "name", "connector", "last_run", "last_status", "new_hits")} for w in self.watches.list()],

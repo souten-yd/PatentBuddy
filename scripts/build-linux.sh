@@ -14,7 +14,9 @@ mkdir -p "$DIR"
 cp -R "$ROOT/qnaplibrary" "$DIR/qnaplibrary"
 find "$DIR" -name '__pycache__' -prune -exec rm -rf {} +
 cp "$ROOT/packaging/linux/install.sh" "$ROOT/packaging/linux/qnaplibrary.service.in" "$ROOT/README.md" "$ROOT/CHANGELOG.md" "$DIR/"
-chmod 755 "$DIR/install.sh"
+cp "$ROOT/scripts/client/qnaplibrary_client.py" "$DIR/"
+cp "$ROOT/scripts/client/qnaplibrary_client.py" "$OUT/qnaplibrary_client.py"
+chmod 755 "$DIR/install.sh" "$DIR/qnaplibrary_client.py"
 echo "$VERSION" > "$DIR/VERSION"
 name="qnaplibrary-$VERSION-linux.tar.gz"
 # reproducible-ish archive: fixed owner, sorted names, mtime from the last commit if available

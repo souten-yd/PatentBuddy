@@ -32,7 +32,10 @@ DEFAULTS = {
         "embedding": {"provider": "openrouter", "model": "qwen/qwen3-embedding-8b", "dimensions": None,
                       "truncate_dim": 1024, "batch": 32, "auto": True, "query_prefix": "", "doc_prefix": ""},
         "rag_top_k": 8,
+        # optional reranker: POST {base_url}/rerank (Cohere/Jina style: {model, query, documents, top_n})
+        "rerank": {"enabled": False, "provider": "openrouter", "model": "", "top_n": 30},
     },
+    "vector_backend": {"type": "memory", "url": "http://127.0.0.1:6333", "collection": "qnaplibrary"},
     "notify": {"webhooks": [], "deadline_days": [60, 30, 7],
                "email": {"enabled": False, "host": "", "port": 587, "user": "", "from": "", "to": "", "starttls": True}},
     "connectors": {"epo_ops": {"enabled": False}, "jpo": {"enabled": False, "base_url": "https://ip-data.jpo.go.jp"},
