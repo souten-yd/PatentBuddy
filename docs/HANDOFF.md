@@ -4,8 +4,8 @@
 
 ## 現在地
 
-- Repo: `souten-yd/PatentBuddy`。最新公開 **v0.5.10**、main `7fd0cda`。最新受入は末尾「v0.5.10実導入」を参照。
-- 作業ブランチ **feat/patentbuddy-host-ai-jobs**。PR #13 / PR-Dはマージ・公開・更新済み。PR-C #15はマージ・v0.5.4公開・自動更新確認済み。
+- Repo: `souten-yd/PatentBuddy`。最新公開 **v0.5.10**、main `193f53a`（remote再確認済み）。公開版の受入は「v0.5.10実導入」を参照。
+- 作業場所 **`/data1tb/PatentBuddy-graph` / feat/evidence-graph / Draft PR #23**。Host統合/PDF/OCRは公開版へ導入済み。候補では索引Jobs・vector/graph/rerankチャートとgraph承認変更の依存管理まで実装/検証済みだが未配布。次は生成モデル版の記録と人手レビュー/graph管理UI。
 - ユーザー目標は計画全体の完了。**PR-E残作業・PR-F/G、QNAP実機は未完了**。勝手にPR-Cだけを全体完了としない。
 - 内部package `qnaplibrary`、QPKG ID `QnapLibrary`、port17871、Cookie/パスキーRP ID、Release資産名を維持する。ResearchDataHubは唯一の正本、PatentBuddyはPC上のControlDeck Add-on。SQLiteをSMB/NFSで共有・同時二重書込みしない。
 - 未公開情報は検証済みローカルLLMのみ。既存privacy gateを弱めない。NAS↔PCの認証/TLS通信とクラウドLLM送信は区別する。
@@ -293,3 +293,13 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - 実fixtureのgraphは空、非空graph候補の検証は前turnのAPI回帰範囲。fixture PID500256はSIGINTで終了し、一時addon/user/session/grants/DB/secret除去済み（`/tmp/pb-chart-full-ui-fixture.log`）。本番0.5.10や接続/資料は変更なし。
 - 次: 生成LLMのモデル版の確実な保存/Host attestation、graph承認変更・削除に対するチャート依存管理、人手レビューとgraph提案・管理UIを実装する。大量検索性能/物理I/O、配布更新受入、P2一般メタデータ、PR-G NAS最終移行までgoal active。PR23はDraftで未配布。
 - 全verify後の変更は再照合後メッセージ/phaseの整合と案内文、receipt境界テスト。関連12 tests再成功、receipt含むchart5 tests成功2.931秒。receiptの未認証401/published403/本文なし・GET更新0を確認。最終HTML案内追加は文言のみ。
+
+## グラフ承認変更に対するチャート依存管理（2026-11-11）
+
+- 前turnは73eee43の全検索経路チャート/実Host UI成功のprogress。今回graph_revisionとanalysis_graph_dependencies、保存時graph snapshot検証、変更/削除時の不可逆stale/unreviewedを追加。同一review再送は版を変えず、取消→再承認は別版。引用していない探索端点の原文更新でもgraph stale経由でチャートを無効化。
+- graph旧候補schemaは列追加/版付与をatomic transaction、再openで書換えなし。旧chart graph引用は初回のみ32件ずつ読み、本文を保持しstale化。移行markerで毎起動の全chart scanを避ける。追加書込み理由は承認版/依存索引と変更時失効。新Storeインストールはgraph→chart→vectorの順を維持。
+- 全verify **187 tests成功61.999秒**（`/tmp/pb-chart-graph-deps-verify.log`）。追加6 testsで取消/再承認、関係削除、非引用の端点文献更新、snapshot欠落/偽造・原子的拒否、同一再送0更新、旧チャート本文保持/一度だけ移行、既存edge入り旧schema→版付与/reopen/quick_checkを確認。
+- 実Host fixture `/tmp/pb-chart-graph-ui-fixture.py` で承認済みfactual edgeを作り、実BGE/Qwen3-reranker/Qwen3.8生成を通したchartを保存。graph依存1件、chartのテスト承認後にedge承認取消→stale/unreviewed、再承認後もstaleを確認（`/tmp/pb-chart-graph-ui-fixture.log`）。1280/320px生成・引用表示・全検索経路、横溢れ/JS例外0（`/tmp/pb-chart-graph-ui-browser.log`）。`.data/chart-graph-stale-320.png`で根拠変更表示と未確認・引用を目視、API stateと一致。
+- 最初のfixture生成コマンドはcwd誤りでFileNotFoundErrorとなり起動前に停止。絶対pathへ修正して実行。途中の新表示文言テストは起動済みStaticCacheの旧JSを参照してtimeout、文言変更を本差分から外して既存根拠変更表示で再検証成功。状態変更の不具合ではない。
+- fixture PID504352をSIGINTで終了し一時addon/user/session/grants/DB/secret除去を確認、Host jobs/audit保持。本番0.5.10は不変。remote main193f53aを再確認し、HANDOFF冒頭の旧作業branch表記を現PR23へ訂正。
+- 次は生成LLMのmodel versionのHost attestationと保存、人手レビュー/graph提案・管理UI。検索traceの保存境界検証、graphの推測表示/逆方向要否、性能/物理I/O・配布更新、P2一般メタデータ、PR-G最終NAS移行は未完。goal active、PR23 Draft。

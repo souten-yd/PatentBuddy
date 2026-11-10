@@ -72,3 +72,13 @@ EmbeddingJobsを追加し、独立した「検索索引を構築・更新」ボ�
 AnalysisJobsのchartだけComputeHostSession/CPU leaseを使用。request/lease IDを即時保存し、取消後も解放前にterminalへ移さない。monitor停止→CPU解放→Host terminal照合の順で、再起動時は未同期として保持する。チャート同時実行は1件、未同期チャートは履歴から自動除去しない。私用receipt APIはID/doc/kind/source_revisionだけ返し、保存POST応答消失や再起動後に同一結果を再生成せず確認する。
 
 実ControlDeck画面で、合成2文の索引構築→BGE検索/Qwen3 reranker→ローカルQwen生成→3要件のチャート保存・Host終了同期と資源解放まで成功。1280/320pxで引用表示・検索経路・横溢れ/JS例外なし、320pxチャート本体の目視確認済み。graphは実fixtureでは空であり、非空graph候補は別API回帰テストの範囲。生成モデル版の固定/保存、人手レビューUI、graph承認変更の依存管理、大量性能と配布は引き続き未完。
+
+## グラフ承認版とチャート失効（未配布）
+
+graph_edgesにgraph_revision（ランダムな承認状態の版）を追加。新規作成、review_status/stale/fingerprint変更時だけ更新し、同じ承認状態の再送は更新しない。旧候補DBは列追加と既存関係の版付与を1 transactionで実施、次回起動で全件書き換えない。
+
+graph経由の候補には関係ID・承認版・fingerprint・basis・relation・取得法/日時・model/confidenceのsnapshotを付ける。正本チャート保存transaction内で、現存/approved/factual/非stale・同一承認版と引用範囲の一致を要求する。analysis_graph_dependenciesで利用関係を保持し、承認取消/原文変更によるgraph stale/関係削除時は参照チャートを不可逆にstale/unreviewedへ戻す。グラフを再承認しても過去のチャートを復活させない。
+
+旧チャートに承認版がないgraph引用があれば、初回のみ32件ずつ読み、本文を変えずstaleにする。移行済みmarkerにより毎起動の走査を避ける。追加書込みは承認状態の版・関係依存索引・変更時失効に必要。同一chart/同一reviewの再送、通常GETで更新しない。
+
+実Hostの非空graph→BGE/rerank/LLMチャート生成でgraph依存1件を保存し、テスト用の承認→根拠承認取消→再承認後もchart stale/unreviewedを確認。320pxの既存根拠変更表示もAPIと目視で確認。これは合成資料の結合検証で、人間による実案件の法的確認ではない。

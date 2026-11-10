@@ -145,10 +145,10 @@ class Store:
                        "wal_autocheckpoint=2000", "busy_timeout=30000"):
             self.db.execute("PRAGMA " + pragma)
         self.db.executescript(SCHEMA)
-        from .evidence_graph import SCHEMA as GRAPH_SCHEMA
-        self.db.executescript(GRAPH_SCHEMA)
-        from .chart_storage import SCHEMA as CHART_SCHEMA
-        self.db.executescript(CHART_SCHEMA)
+        from .evidence_graph import install as install_graph
+        install_graph(self.db)
+        from .chart_storage import install as install_chart_storage
+        install_chart_storage(self.db)
         from .host_vectors import SCHEMA as HOST_VECTOR_SCHEMA
         self.db.executescript(HOST_VECTOR_SCHEMA)
         self.fts = self._init_fts()
@@ -453,6 +453,8 @@ class Store:
             if kind == "chart":
                 from . import claim_chart
                 chart = claim_chart.validate(json.loads(content), self.get_document(doc_id)['body'], self.get_document)
+                from .chart_storage import validate_graph
+                validate_graph(db, chart)
             old = db.execute("SELECT * FROM document_analyses WHERE id=?", (identifier,)).fetchone()
             if old:
                 if (old["doc_id"], old["source_revision"], old["kind"], old["content"]) != (doc_id, revision, kind, content):

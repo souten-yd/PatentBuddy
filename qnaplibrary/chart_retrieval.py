@@ -95,6 +95,7 @@ class ChartRetrieval:
                 if value.get('quote') != edge['quote'][:650]:
                     raise AddonError(409, 'グラフの引用が変更されました')
                 if append(value, 'graph:' + edge['id']):
+                    candidates[-1]['graph'] = {k: edge[k] for k in ('id', 'graph_revision', 'fingerprint', 'basis', 'relation', 'model', 'confidence', 'retrieved_at', 'method')}
                     added += 1
                 if added == 4:
                     break

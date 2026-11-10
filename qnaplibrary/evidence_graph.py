@@ -22,7 +22,8 @@ CREATE TABLE IF NOT EXISTS graph_edges(
  revision TEXT NOT NULL, start INTEGER NOT NULL, end INTEGER NOT NULL, quote TEXT NOT NULL,
  retrieved_at TEXT NOT NULL, method TEXT NOT NULL, model TEXT NOT NULL, confidence REAL NOT NULL,
  fingerprint TEXT NOT NULL, review_status TEXT NOT NULL DEFAULT 'unreviewed', reviewer TEXT NOT NULL DEFAULT '',
- reviewed_at REAL, stale INTEGER NOT NULL DEFAULT 0, created REAL NOT NULL);
+ reviewed_at REAL, stale INTEGER NOT NULL DEFAULT 0, created REAL NOT NULL,
+ graph_revision TEXT NOT NULL DEFAULT '');
 CREATE INDEX IF NOT EXISTS graph_edges_source ON graph_edges(source_node,stale,review_status,id);
 CREATE INDEX IF NOT EXISTS graph_edges_source_basis ON graph_edges(source_node,stale,review_status,basis,id);
 CREATE INDEX IF NOT EXISTS graph_edges_target ON graph_edges(target_node,id);
@@ -35,6 +36,31 @@ WHEN OLD.hash != NEW.hash OR OLD.source != NEW.source BEGIN
  OR target_node IN (SELECT id FROM graph_nodes WHERE doc_id=NEW.id));
 END;
 '''
+
+
+def install(db):
+    db.executescript(SCHEMA)
+    # One atomic migration for existing candidate databases; no recurring
+    # all-edge rewrite or scan after the column has been installed.
+    if 'graph_revision' not in {r[1] for r in db.execute('PRAGMA table_info(graph_edges)')}:
+        db.execute('BEGIN IMMEDIATE')
+        try:
+            db.execute("ALTER TABLE graph_edges ADD COLUMN graph_revision TEXT NOT NULL DEFAULT ''")
+            db.execute("UPDATE graph_edges SET graph_revision=lower(hex(randomblob(16)))")
+            db.execute('COMMIT')
+        except Exception:
+            db.execute('ROLLBACK')
+            raise
+    db.executescript("""
+CREATE TRIGGER IF NOT EXISTS graph_revision_added AFTER INSERT ON graph_edges
+WHEN NEW.graph_revision='' BEGIN
+ UPDATE graph_edges SET graph_revision=lower(hex(randomblob(16))) WHERE id=NEW.id;
+END;
+CREATE TRIGGER IF NOT EXISTS graph_revision_changed AFTER UPDATE OF review_status,stale,fingerprint ON graph_edges
+WHEN OLD.review_status!=NEW.review_status OR OLD.stale!=NEW.stale OR OLD.fingerprint!=NEW.fingerprint BEGIN
+ UPDATE graph_edges SET graph_revision=lower(hex(randomblob(16))) WHERE id=NEW.id;
+END;
+""")
 
 
 def _text(value, limit, name):
