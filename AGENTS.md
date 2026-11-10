@@ -1,6 +1,6 @@
 # AGENTS.md — AI エージェント／開発者向けガイド
 
-> **2026-11-10の開発方針（最優先）**: 汎用データ保存・収集・検索APIサーバーの新しい表示名は**ResearchDataHub**、ControlDeck特許専用アドオンは**PatentBuddy**。まずRyzen 7 9700XのLinux PCで両方を開発・結合し、完成後にResearchDataHubの唯一の正本DB/実行先をQNAPへ移行する。旧QPKG/SQLite/パスキーを維持し、未公開発明・請求項を外部LLMに渡さない（ローカルLLMへの入力、認証済みPC↔NASの転送は可）。正本は `docs/researchdatahub-plan.md`、Codex指示は `docs/CODEX_NEXT.md`、進捗は `docs/HANDOFF.md`。**PR #16はdocs-only、Linux別名入口は未実装。**
+> **2026-11-10の開発方針（最優先）**: 汎用データ保存・収集・検索APIサーバーの新しい表示名は**ResearchDataHub**、ControlDeck特許専用アドオンは**PatentBuddy**。まずRyzen 7 9700XのLinux PCで両方を開発・結合し、完成後にResearchDataHubの唯一の正本DB/実行先をQNAPへ移行する。旧QPKG/SQLite/パスキーを維持し、未公開発明・請求項を外部LLMに渡さない（ローカルLLMへの入力、認証済みPC↔NASの転送は可）。正本は `docs/researchdatahub-plan.md`、**保存/低I/O受入契約は `docs/researchdatahub-performance.md`**、Codex指示は `docs/CODEX_NEXT.md`、進捗は `docs/HANDOFF.md`。**PR #16はdocs-only、Linux別名入口は未実装。**
 
 ## 最初に読む順番
 
@@ -32,6 +32,7 @@ bash scripts/build-linux.sh dist                      # Linux 配布物
 ## 新アーキテクチャの絶対条件
 
 - ResearchDataHubのDB正本は常に1個。開発中はPC SSD、完成後にQNAPのローカルディスクへ移す。**同時二重書込みとSMB/NFS共有上の稼働SQLiteは禁止**。
+- 大容量データの保存と検索は**物理read/write bytes・DB/WAL増分・P50/P95/P99・CPU/RSS・復元**を測定し、無変更再投入や検索・アイドル時の不要なディスク書き込みを最小化する。WAL/同期/監査を切って見かけの速度を上げない。
 - 未公開アイデア・発明・請求項・調査履歴をOpenRouterなどの外部LLMへ入力しない。ローカルに見えてもクラウド中継するモデルは不可。公開資料だけ別権限で手動確認して扱う。
 - QNAP↔PC間は認証/暗号化されたAPI経由でデータ交換し、PatentBuddyの高度なLLM/GPU処理はControlDeckのHost権限とジョブ契約に従う。
 - PR #10/#11/#13/#14/#15の未マージコードを、mainの実装済み機能と混同しない。次のCodex作業では必ずmainとPR diffを直接読む。
