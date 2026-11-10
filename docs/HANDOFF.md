@@ -206,4 +206,6 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - ControlDeck正規Feature CLIで0.5.9→0.5.10更新、installed/enabled/managed=true・healthy。正規enable APIでfiles.pick/resources.acquireを含む7権限を承認。3ユーザーサービスはactive。
 - 本番connection.jsonを作らず同一UID自動認証で、指定PDFを実Host Files pickerから正本DBへ保存。15ページ・13画像、PNG表示/保存・原本SHA一致、1280/320pxで横溢れ/JS例外ゼロ・320px取消が成功。ローカルLLM要約も保存成功（/tmp/pb-pdf-installed-browser.log）。未確認のOCR/分析結果を自動的に承認済みとはしない。
 - URL: PatentBuddy https://souten-linux.tailc8e858.ts.net/x/patent-buddy/workspace / ResearchDataHub http://192.168.68.200:17871/ 。NAS自体は未更新・未移行。
-- 請求項分析と一時ユーザー/ジョブ履歴の後片付けは実行中。原本・抽出結果・分析は本番正本に残す。PR-F/P2/PR-Gは未完了、全体goalはactive。
+- 請求項分析も保存成功。正本DBは文献1件・原本1件・画像参照13件・要約3775文字/請求項確認6510文字を保持、quick_check成功。15ページのうち直接抽出10、直接抽出+OCR5。OCR/AIの内容精度は人手未承認。請求項ブラウザ試験初回は既存要約の表示完了前の件数取得で誤判定したため、再生成せず「請求項の確認」の表示待ちに修正して成功（/tmp/pb-pdf-installed-claims-recheck.log）。
+- 一時ユーザー/session/grantと試験ジョブ履歴を正常除去（remaining_jobs=0）。原本・抽出結果・分析は本番正本に保持。利用者は文献検索で「JPA」などから開ける。connection.jsonなし、同一UID自動認証を維持。
+- docs-only追記の全verifyも143 tests成功39.361秒。古いガイド記載のtest_docs_rulesは存在せずimport失敗、実際のtest_updater_docs 7 testsと全verifyで検証した。PR-F/P2/PR-Gは未完了、全体goalはactive。
