@@ -439,7 +439,7 @@ class Store:
         identifier, kind, content = value.get("id"), value.get("kind"), value.get("content")
         revision = value.get("source_revision")
         if (not isinstance(identifier, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", identifier)
-                or kind not in ("summary", "claims", "chart") or not isinstance(content, str)
+                or kind not in ("summary", "claims", "chart", "relations") or not isinstance(content, str)
                 or not content.strip() or len(content) > 100000
                 or not isinstance(revision, str) or not re.fullmatch(r"[a-f0-9]{64}", revision)):
             raise StoreError("invalid analysis fields")
@@ -449,6 +449,9 @@ class Store:
                 raise StoreError("document not found")
             if self.document_revision(doc) != revision:
                 raise StoreError("source revision changed; rerun analysis")
+            if kind == "relations":
+                from .relation_proposals import validate
+                validate(json.loads(content), self.get_document(doc_id))
             chart = None
             if kind == "chart":
                 from . import claim_chart

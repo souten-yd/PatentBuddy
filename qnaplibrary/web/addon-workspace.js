@@ -78,7 +78,7 @@ async function loadAnalyses(id) {
   for (const item of data.items) {
     const box = document.createElement('div'); box.className = 'analysis';
     const title = document.createElement('h3');
-    title.textContent = (item.kind === 'chart' ? 'クレームチャート' : item.kind === 'claims' ? '請求項の確認' : '要約') + (item.stale ? ' — 根拠が更新・削除されています' : item.review_status === 'approved' ? ' — 確認済み' : item.review_status === 'rejected' ? ' — 却下' : ' — 未確認');
+    title.textContent = (item.kind === 'relations' ? '関係の提案（推定）' : item.kind === 'chart' ? 'クレームチャート' : item.kind === 'claims' ? '請求項の確認' : '要約') + (item.stale ? ' — 根拠が更新・削除されています' : item.review_status === 'approved' ? ' — 確認済み' : item.review_status === 'rejected' ? ' — 却下' : ' — 未確認');
     const text = document.createElement('pre');
     if (item.kind === 'chart') {
       const chart = JSON.parse(item.content);
@@ -88,6 +88,11 @@ async function loadAnalyses(id) {
         (chart.retrieval?.vector_truncated || chart.retrieval?.graph_truncated ? '検索上限に達したため、候補は一部の範囲です。\n' : '') +
         chart.rows.map(row => `${row.element.label}: ${row.element.text}\n${row.assessment.judgment} ${row.assessment.reason}\n引用: ${row.assessment.citations.join(', ') || 'なし'}\n候補の根拠:\n` +
           row.evidence.map(e => `${e.ref} · 文献${e.doc_id} [${e.start},${e.end})\n${e.quote}`).join('\n')).join('\n\n');
+    } else if (item.kind === 'relations') {
+      const value = JSON.parse(item.content);
+      const names = {problem:'課題', solution:'解決手段', effect:'効果', substitution:'置換可能性'};
+      text.textContent = 'ローカル生成モデル版を記録済み。全候補は推定・未確認です。\n' +
+        (value.proposals.length ? value.proposals.map(p => `${names[p.relation]}: ${p.concept}\n信頼度: ${p.confidence} · 範囲 [${p.start},${p.end})\n${p.quote}`).join('\n\n') : '根拠に基づく候補はありません。');
     } else { text.textContent = item.content; }
     box.append(title, text); el('analyses').append(box);
   }

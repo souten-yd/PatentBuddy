@@ -100,3 +100,26 @@ class ChartJobsTests(unittest.TestCase):
         result = restarted.reconcile({}, again['id'])
         self.assertEqual(result['status'], 'succeeded'); self.assertFalse(result['host_sync_pending'])
         self.assertEqual(FakeHost.last.events, ['release', 'finish'])
+
+    def test_relation_job_recovers_lost_save_and_releases_cpu(self):
+        def stream(session, messages, require_provenance=False):
+            self.assertTrue(require_provenance)
+            session.generation_provenance = dict(execution_policy='local_only', revision_kind='host_process_file_metadata_v1', model_ref=MODEL, runtime_ref='b'*64)
+            return json.dumps({'proposals':[dict(relation='solution',concept='電池構成',confidence=0.8,quote='正極と、負極とを備える電池。')]})
+        original = self.jobs.client.data
+        def lose(method, path, body=None):
+            value = original(method, path, body)
+            if method == 'POST' and path.endswith('/analyses'):
+                raise AddonError(502, 'synthetic lost response')
+            return value
+        self.jobs.client.data = lose
+        with patch.object(ChartHost, 'stream', stream):
+            job = self.jobs.start({}, self.did, 'relations')
+            session = FakeHost.last
+            state = self.wait(job['id'])
+        self.assertEqual(state['status'], 'succeeded')
+        self.assertFalse(state['host_sync_pending'])
+        self.assertEqual(session.events, ['acquire', 'release', 'finish'])
+        saved = self.hub.app.store.list_analyses(self.did)['items']
+        self.assertEqual(len(saved), 1); self.assertEqual(saved[0]['kind'], 'relations')
+        self.assertEqual(self.hub.app.store.one('SELECT COUNT(*) FROM graph_edges')[0], 0)

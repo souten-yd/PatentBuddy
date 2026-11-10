@@ -5,7 +5,7 @@
 ## 現在地
 
 - Repo: `souten-yd/PatentBuddy`。最新公開 **v0.5.10**、main `193f53a`（remote再確認済み）。公開版の受入は「v0.5.10実導入」を参照。
-- 作業場所 **`/data1tb/PatentBuddy-graph` / feat/evidence-graph / Draft PR #23**。Host統合/PDF/OCRは公開版へ導入済み。候補では索引Jobs・vector/graph/rerankチャートとgraph承認変更の依存管理まで実装/検証済みだが未配布。次は生成モデル版の記録と人手レビュー/graph管理UI。
+- 作業場所 **`/data1tb/PatentBuddy-graph` / feat/evidence-graph / Draft PR #23**。Host統合/PDF/OCRは公開版へ導入済み。候補では索引Jobs・vector/graph/rerankチャートとgraph承認変更の依存管理まで実装/検証済みだが未配布。生成モデル版記録・管理Webレビュー・手動事実関係登録・Host関係提案Jobsまで候補実装済み。次は提案の人手採用/graph登録と残受入。
 - ユーザー目標は計画全体の完了。**PR-E残作業・PR-F/G、QNAP実機は未完了**。勝手にPR-Cだけを全体完了としない。
 - 内部package `qnaplibrary`、QPKG ID `QnapLibrary`、port17871、Cookie/パスキーRP ID、Release資産名を維持する。ResearchDataHubは唯一の正本、PatentBuddyはPC上のControlDeck Add-on。SQLiteをSMB/NFSで共有・同時二重書込みしない。
 - 未公開情報は検証済みローカルLLMのみ。既存privacy gateを弱めない。NAS↔PCの認証/TLS通信とクラウドLLM送信は区別する。
@@ -345,3 +345,14 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - 一時fixture PID546705はSIGINT停止/cleaned確認。本番v0.5.10・原資料は不変。最後の「文献番号」表示追加はJS構文チェック済み、ブラウザfixtureは追加前のstatic cacheなので同表示自体のブラウザ受入は未実施。LLM処理は変更なし、30054f1でのControlDeck実LLM受入を維持。
 - PR23 Draft/未配布。次はHost local-onlyでの推定関係提案・根拠検証/限定保存/Jobs・UI接続、PatentBuddyからレビューへの認証導線、分析履歴ページング、trace保存境界、性能I/O、配布更新、P2/PR-G。全体goal active。
 - 全verify191 tests成功64.098秒（/tmp/pb-proposal-verify.log）、最終JS構文・diff whitespace成功。実差分レビュー済み。
+
+## ControlDeck実LLMによる推定関係の提案Jobs（2026-11-11）
+
+- 前turn0a57f04は手動事実関係登録のprogress。今回はrelation_proposals.pyでproblem/solution/effect/substitutionを最大12件抽出するstrict JSON契約を実装。本文10万文字上限/無断切詰めなし、引用最大2000文字/一意な原文一致/Unicode範囲を検証。種類・概念長・有限confidence・重複・余剰field・不正範囲を拒否。Host require_provenance=true、local-only model/runtime指紋必須。候補0件も空配列として扱う。
+- 新analysis kind=relationsを正本の既存analysis保存へ追加。保存境界で文献ID/版/引用/モデル版/inferred/unreviewedを再検証。原文変更でstale、新しい分析IDの再生成を必要とする。提案をgraph_edgesへ自動登録せず、既存analysis scope以上へ権限昇格しない。追加書込みは上限付き提案JSON/既存audit/Job metadataに限り、新DBテーブルなし。
+- AnalysisJobsの既存chart向けComputeHostSession/CPU lease/開始・終了同期/中断/再起動照合/応答消失receiptをrelationsへ共用。チャートのclaim_noとretrievalは専用のまま。証明失敗時は結果保存しない。PatentBuddy分析メニュー・推定関係/引用範囲/信頼度表示へ接続。人手採用してグラフへ登録する画面は未実装。
+- core3 tests成功1.749秒（/tmp/pb-relations-tests.log）、既存Jobs含む11 tests成功7.420秒、relations保存応答消失/CPU release→finish/重複なしを追加したJobs4 tests成功3.195秒（/tmp/pb-relations-job-final.log）。偽引用・曖昧引用・過剰件数・重複・勝手なapproved/factual・非有限confidence・改版・冪等保存・graph自動登録0を確認。
+- 実ControlDeck正規一時addon/Job/CPU leaseのHost streamで合成電池資料から4提案(problem/solution/effect/effect)を生成し引用検証/正本保存成功。local-onlyモデル/実行版指紋記録、graph_edges=0（/tmp/pb-relations-live.log）。一時addon/user/session除去済み、Host jobs/audit保持。
+- 実Host Chrome1280/320pxでも分析メニューから関係提案→実LLM→正本保存→引用表示に成功、overflow/JS例外0（/tmp/pb-relations-ui-browser.log、.data/relations-*.png）。正本DBで4件/inferred/unreviewed/graph_edges0、PC metadataでjob succeeded/host_sync_pending=false/request_idとlease_id=nullを確認。一時fixture PID549330停止、temporary_addon_user_session_grants_removed=true。secretもcleanup。本番0.5.10/利用者資料は不変。
+- 次: 管理者が提案の根拠を照合して個別採用/却下し、推定区分を維持してgraphへ登録する導線、PatentBuddy→管理Web認証導線、履歴ページング、trace保存境界、性能I/O・配布更新、P2/PR-G。PR23 Draft、全体goal active。
+- 全verify **195 tests成功67.414秒**（/tmp/pb-relations-verify.log）、workspace JS構文/diff whitespace/変更diff確認成功。
