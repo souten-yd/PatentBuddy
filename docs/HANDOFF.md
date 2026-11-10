@@ -5,7 +5,7 @@
 ## 現在地（確認済み事実）
 
 - GitHub: `souten-yd/PatentBuddy`、default branch `main`。
-- **公開済みの最新バージョンはv0.5.1**: https://github.com/souten-yd/QnapPatentBuddy/releases/tag/v0.5.1（2026-11-10）。バイナリは旧互換名 `QnapLibrary_0.5.1_x86_64.qpkg`, `qnaplibrary-0.5.1-linux.tar.gz`。QNAP実機での更新・パスキー・保存先継続の動作は未確認。
+- **公開済みの最新バージョンはv0.5.3**: https://github.com/souten-yd/PatentBuddy/releases/tag/v0.5.3（2026-11-10）。バイナリは旧互換名 `QnapLibrary_0.5.3_x86_64.qpkg`, `qnaplibrary-0.5.3-linux.tar.gz`。QNAP実機での更新・パスキー・保存先継続の動作は未確認。
 - PR #12（未公開発明をクラウドへ送らないガード）は**mainにマージ済み**。出入口のネットワーク境界は `docs/privacy-boundary.md` を参照。
 - **PR #16はdocs-onlyとしてマージ済み**。PR-AのLinux入口はPR #17で実装・検証済み、リリース待ち。Host結合/NAS移行は未実装。
 - 既存v0.5.0 release workflowはPython 52件テスト成功＋Linux/QPKGビルド成功（当時）。今回のPR #16に関してローカル完全 `scripts/verify.sh`、Linux/QPKGビルド、ControlDeck実機、PC→QNAP移行テストを実施したとは主張しない。
@@ -98,3 +98,14 @@
 - PR-B候補: `scripts/verify.sh` **67 tests＋全静的検査合格**。旧版v0.5.1→ローカル候補v0.5.3の手動更新で管理者/コレクション保持、新入口4 smoke tests合格。Linux/QPKG最終ビルドを実施中。全体目標は継続中で、PR-C以降を完了と扱わない。
 
 - v0.5.3最終Linux/QPKGビルドとpayload検査成功。QPKGをLinux一時領域へ展開しstart/status/health(0.5.3)/stop合格。ローカル確認済み、QTS実機は未実施。
+
+
+## 最新チェックポイント — PR-C開始（2026-11-10）
+
+- PR-B #11はmain `b14ed77`へマージ、**v0.5.3公開済み**。release run `42810849292`成功、Linux/QPKG/sha256資産確認。公開済みLinux資産を再ダウンロードしてSHA-256照合、旧公開v0.5.1から非root手動更新し管理者/コレクション保持と配布4 smoke tests合格。旧版の自動更新URL失敗は再現済みなので、初回手動更新が必要。修正後クライアントから次版への自動更新は次リリースで検証する。
+- **現在ブランチ `feat/nas-public-patent-catalog` / 既存Draft PR #15**。main v0.5.3をマージ済み（未公開APIはまだmainにない）。統合直後の `scripts/verify.sh` は74 tests＋全静的検査合格。
+- `docs/CODEX_NEXT.md` のPR-Cを実行中。public_catalog.py/API/server/auth/UI/テストの実diffを読了。まだ受入完了ではない。
+- **次に直す点**: タイトル/公開番号/抜粋をまとめたサーバー生成プレビューと、その版に対する承認を実装し、プレビュー後の文献変更を拒否する。現Draftはexcerptの確認だけで、タイトル等の最新状態との競合を検出できない。
+- **追加検証点**: 公開後に原文を変更→元の内容へ戻した場合、source_hashだけの一致で以前の承認が復活しないかをテストして対処する。公開tokenの全private API/MCP/debug/export遮断、TLS、CSRF/Origin、FTSなし、失効/文献削除/再起動、外部LLM送信0件も網羅する。現7テストだけで権限境界全体の完成とはしない。
+- PR-Dの性能計測、PR-E Host結合、PR-F GraphRAG/特許機能、PR-G NAS移行は未着手。ControlDeck/MediaForge/SonicForgeの最新main契約確認はPR-E着手前に必要。QNAP/iPhone実機・実LLM法的品質は未検証。
+- ControlDeck LLM検証は `scripts/test-local-llm.py --verified-local`（PYTHONPATH=.）で合成データのみ。モデルはloopback 8097のControlDeck管理llama.cpp/Qwen3.8-27B。既存実モデルプロセスを使い、ロード/アンロードは行っていない。
