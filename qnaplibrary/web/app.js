@@ -270,6 +270,27 @@ async function openDoc(id) {
     h("div", { class: "card" }, h("div", { class: "row" }, h("h2", {}, "本文"), h("span", { class: "spacer" }),
       h("button", { class: "btn", onclick: guard(() => addRefDialog(d)) }, "特許案件の先行文献に追加")), h("div", { class: "pre" }, d.body || "(本文なし)")),
     h("div", { class: "card" }, h("h2", {}, "チャンク（索引単位） " + d.chunks.length), d.chunks.map(c => h("details", {}, h("summary", {}, "#" + c.ord + " " + c.section), h("div", { class: "pre" }, c.text)))));
+  const excerpt = h("textarea", { placeholder: "公開公報本文から、外部AIにも共有してよい箇所だけを貼り付け（最大12000文字）" });
+  const approvalCheck = h("input", { type: "checkbox" });
+  const approveButton = h("button", { class: "btn primary", disabled: !d.ext_id, onclick: guard(async () => {
+    if (!approvalCheck.checked) throw new Error("公開資料であることを確認してください");
+    if (!confirm("指定した抜粋を外部AIアプリ用の公開データAPIへ登録しますか？")) return;
+    await api("POST", "/api/v1/publications", { doc_id: d.id, excerpt: excerpt.value, confirm_public: true });
+    toast("公開資料として登録しました");
+    excerpt.value = "";
+    approvalCheck.checked = false;
+  }) }, "公開抜粋を登録");
+  const revokeButton = h("button", { class: "btn danger", onclick: guard(async () => {
+    if (!confirm("この文献の公開登録を取り消しますか？")) return;
+    await api("DELETE", "/api/v1/publications/" + d.id);
+    toast("公開登録を取り消しました");
+  }) }, "公開を取り消す");
+  main.append(h("div", { class: "card" },
+    h("h2", {}, "外部AIアプリ用の公開資料"),
+    h("p", { class: "small muted" }, "この操作はNAS・ControlDeck間の共有とは別です。未公開発明・社内メモや未公開の請求項案は登録しないでください。外部AIアプリに共有するのは、手動で確認・選択した抜粋だけです。"),
+    excerpt,
+    h("label", {}, approvalCheck, " 公開済み文献の抜粋で、外部AIに渡してよいことを確認"),
+    h("div", { class: "row end" }, approveButton, revokeButton)));
 }
 async function addRefDialog(d) {
   const pats = (await api("GET", "/api/v1/patents")).projects;
@@ -599,7 +620,7 @@ async function settingsView(main) {
         h("button", { class: "btn", onclick: guard(async () => { await api("POST", "/api/auth/logout", {}); S.me = null; render(); }) }, "ログアウト")));
   } else if (tab === "devices") {
     const d = await api("GET", "/api/devices");
-    const pc = h("input", { type: "password", placeholder: "8文字以上" }), dn = h("input", { placeholder: "デバイス名" }), out = h("div", {});
+    const pc = h("input", { type: "password", placeholder: "8文字以上" }), dn = h("input", { placeholder: "デバイス名" }), out = h("div", {}), scope = sel([["published", "外部AI用・公開資料のみ"], ["ro", "全データの読み取り"], ["rw", "全データの読み書き"]], "published");
     body.append(h("div", { class: "card" }, h("h2", {}, "LAN ペアリング用パスコード"), h("p", { class: "small muted" }, "別PC・AI アシスタント・ControlDeck が POST /api/v1/pair {\"passcode\":\"…\",\"name\":\"…\"} で長期トークンを取得します（LAN / Tailscale からのみ、取得後は無制限に利用可）。"),
       h("p", {}, "状態: ", h("span", { class: "tag " + (d.pairing_enabled ? "ok" : "warn") }, d.pairing_enabled ? "有効" : "未設定")),
       h("div", { class: "row" }, pc, h("button", { class: "btn primary", onclick: guard(async () => { await api("PUT", "/api/devices/pairing", { passcode: pc.value }); toast("設定しました"); render(); }) }, "設定"),
@@ -607,7 +628,11 @@ async function settingsView(main) {
       h("details", {}, h("summary", {}, "接続例"), h("div", { class: "pre" }, 'curl -X POST http://<NAS>:' + location.port + '/api/v1/pair -H "Content-Type: application/json" -d \'{"passcode":"…","name":"my-pc"}\'\n\n# 以降\ncurl -H "Authorization: Bearer qlt_…" http://<NAS>:' + location.port + '/api/v1/collections\n# MCP: POST http://<NAS>:' + location.port + '/mcp （同じトークン）'))),
       h("div", { class: "card" }, h("h2", {}, "接続済みデバイス"), h("table", {}, d.devices.map(x => h("tr", {}, h("td", {}, x.name), h("td", {}, h("span", { class: "tag" }, x.scopes)), h("td", { class: "small muted" }, "最終 " + fmtDate(x.last_seen) + " " + (x.last_ip || "")),
         h("td", {}, h("button", { class: "btn danger", onclick: guard(async () => { await api("DELETE", "/api/devices/" + x.id); render(); }) }, "失効"))))),
-        h("div", { class: "row" }, dn, h("button", { class: "btn", onclick: guard(async () => { const r = await api("POST", "/api/devices", { name: dn.value }); clear(out).append(h("p", {}, "トークン（一度だけ表示）: ", h("code", {}, r.token))); }) }, "トークンを直接発行")), out));
+        h("p", { class: "small muted" }, "公開資料専用トークンは明示承認した抜粋だけを検索できます。外部LLMへトークン自体を送らず、HTTPSで中継するアプリ側で保管してください。"),
+        h("div", { class: "row" }, dn, scope, h("button", { class: "btn", onclick: guard(async () => {
+          const r = await api("POST", "/api/devices", { name: dn.value, scopes: scope.value });
+          clear(out).append(h("p", {}, "トークン（一度だけ表示）: ", h("code", {}, r.token)));
+        }) }, "トークンを直接発行")), out));
   } else if (tab === "ai") {
     await aiSettings(body);
   } else if (tab === "keys") {
