@@ -28,11 +28,11 @@ QNAP NAS と Linux で動く**特許創出・先行技術調査・請求項・�
 ## インストール
 
 ### QNAP
-1. [Releases](https://github.com/souten-yd/QnapPatentBuddy/releases) から `QnapLibrary_<版>_x86_64.qpkg` を取得
+1. [Releases](https://github.com/souten-yd/QnapPatentBuddy/releases) から `QnapLibrary_<版>_x86_64.qpkg` を取得。**リポジトリ改名前のv0.5.0等の自己更新機能は旧URLを前提としているため、v0.5.1への初回更新はQPKGの手動インストールが必要になる場合があります。**
 2. App Center → 手動インストール で選択
 3. `http://<NAS>:17871/` を開き、管理者パスワードを設定（LAN から）
 
-データは QPKG の隣の `QnapLibrary-data` フォルダに保存され、更新しても残ります。
+データは従来通り QPKG の隣の `QnapLibrary-data` フォルダに保存され、更新しても残ります。**表示名は QnapPatentBuddy ですが、既存のQPKG識別子・配布ファイル名・ポートは互換性のためQnapLibraryのままです。**
 
 ### Linux
 ```bash
