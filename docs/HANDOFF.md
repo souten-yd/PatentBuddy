@@ -209,3 +209,9 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - 請求項分析も保存成功。正本DBは文献1件・原本1件・画像参照13件・要約3775文字/請求項確認6510文字を保持、quick_check成功。15ページのうち直接抽出10、直接抽出+OCR5。OCR/AIの内容精度は人手未承認。請求項ブラウザ試験初回は既存要約の表示完了前の件数取得で誤判定したため、再生成せず「請求項の確認」の表示待ちに修正して成功（/tmp/pb-pdf-installed-claims-recheck.log）。
 - 一時ユーザー/session/grantと試験ジョブ履歴を正常除去（remaining_jobs=0）。原本・抽出結果・分析は本番正本に保持。利用者は文献検索で「JPA」などから開ける。connection.jsonなし、同一UID自動認証を維持。
 - docs-only追記の全verifyも143 tests成功39.361秒。古いガイド記載のtest_docs_rulesは存在せずimport失敗、実際のtest_updater_docs 7 testsと全verifyで検証した。PR-F/P2/PR-Gは未完了、全体goalはactive。
+
+## 公式特許取得元の追加（2026-11-11・進行中）
+
+- ユーザー追加要求: パワエレ異常検知の約10件調査と、PATENTSCOPE/無料APIの特許ダウンロード機能。候補一覧は /home/souten/ダウンロード/power-electronics-anomaly-patents/ 。本文/図未取得。公開ミラー利用可否への明示回答はまだないため、まず公式API経路を実装。
+- main193f53aから独立worktree /data1tb/PatentBuddy-sources、feat/patent-download-sources。PR23 graphとは分離。公式条件と実装計画は docs/patent-download-sources.md。PATENTSCOPE自動robotは禁止、SOAPは有料。登録不要のEPO Publication Server REST v1.2を先行実装する。API鍵は既存設定に未登録、値は出力していない。
+- 本番0.5.10不変。全体計画PR-F/P2/PR-Gと10件原本抽出は未完。
