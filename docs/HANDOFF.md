@@ -97,3 +97,7 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 ## PR-D再開
 
 最新main v0.5.6を統合。HANDOFF競合はPR-D測定履歴と実導入の最新記録を保持して解消。10万件測定は両方完了、候補commit eb6354d、無変更再投入DB更新/process write/device writeすべて0。最終比較文書・一般メタデータ設計・全verify・公開/更新を続ける。
+
+- v0.5.7候補へ版を統一。P0/P1最終比較と生JSONをdocsへ保存（合成データのみ）、P2一般識別子/版/日付/出典/ライセンス設計を追加。追加索引2,469,888 bytes、登録write増約13.17MBを深いcursorアクセスの費用として明記。PR-Dはコード/配布最終検証中、まだ公開しない。ControlDeck GatewayローカルLLMの再テストも進行中。
+
+- v0.5.7最終全verify108 tests成功25.034秒（/tmp/pb-scale-057-verify.log）、Linux/QPKG build/payload成功。10万件のStore実装は計測候補eb6354dと同一。ControlDeckローカルLLMテストPID143325稼働を確認、結果待ち。
