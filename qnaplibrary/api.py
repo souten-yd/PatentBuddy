@@ -636,6 +636,17 @@ def patents_chart(req):
     return req.app.patents.claim_chart(req.params["pid"], b.get("collections") or None, b.get("claim_no", 1))
 
 
+@route("POST", "/api/v1/patents/{pid}/chart/assess", "admin")
+def patents_chart_assess(req):
+    """Propose temporary per-element AI judgments, with verified library citations."""
+    b = req.json()
+    try:
+        return req.app.patents.assess_claim_chart(req.params["pid"], b.get("collections") or None,
+                                                  b.get("claim_no", 1), b.get("provider"))
+    except LLMError as error:
+        raise _err(502, str(error))
+
+
 @route("POST", "/api/v1/patents/{pid}/assist", "user")
 def patents_assist(req):
     b = req.json()
