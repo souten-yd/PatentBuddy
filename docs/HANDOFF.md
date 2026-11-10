@@ -67,3 +67,10 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - scale testsは10件成功。SQLite変数上限500で850件batch再投入、コレクション間同一IDの独立性、FTS無効時の検索/再投入/カーソルを追加。
 - ControlDeck既存Gateway APIキーをメモリ内で取得して一時テストの0600 secretsへ渡し、`http://127.0.0.1:8765/api/v1/llm/v1` 経由で実LLMテスト成功。APIキーは出力していない。`resolve_instance('auto')`でローカルGGUF Qwen3.8-27Bを確認、Hostのadmission/起動経由、68.44秒/1169文字、案件不変。`/tmp/pb-host-llm-test.json`。直接モデルプロセスを起動していない。これはAdd-on principal結合の完了ではない。
 - PR-E事前調査は `docs/host-integration-review.md`。最新mainと稼働checkoutが異なるため実装時に双方の実契約を再確認。未コミットのControlDeck作業を変更していない。
+
+## 今回の追加修正・ユーザーの管理体系指定
+
+- ユーザーはPatentBuddyをControlDeckオプション機能の導入/更新ボタンで管理し、ResearchDataHubサーバーと明確に区別することを再指定。PR-Eの必須受入に反映する。Hostのtrusted-catalog登録、署名付きrelease-bundle、install/update/enable/disable/uninstallとデータ保持、サーバー接続先/役割/各versionの別表示が必要。現在のPR #14だけでは未達。
+- `bench_datahub_restart.py`の設定ファイル名を実物のsettings.jsonへ修正し、秘密・非default RP ID/session期限・syntheticパスキーの明示照合を追加。旧結果ではsettings保持を証明できていなかった。修正版の全6ケース成功、`.data/bench/restart-v2-*.json` / `/tmp/rdh-restart-v2.log`。これは実パスキー署名ではない。
+- ディスク上限でSQLITE_FULLを起こしたところ自動rollback後の二重rollbackで本来のエラーが隠れる問題を再現。transaction cleanupを修正。またBEGIN IMMEDIATE失敗時にPython lockを解放する。scale12 tests成功（容量不足後の既存内容保持/再開、別writer競合後のlock解放）。
+- 直前の全verifyはREADMEのversion見出し規則で1件失敗。ユーザー向け更新対処をdocs/upgrade.mdへ移しREADMEからリンク、テスト規則は維持。修正後の全verify待ち。

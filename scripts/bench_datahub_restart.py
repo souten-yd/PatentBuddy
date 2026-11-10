@@ -32,12 +32,15 @@ def main():
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='rdh-restart-', dir=args.workdir) as tmp:
         root = Path(tmp).resolve(); data = root / 'data'; data.mkdir()
-        Config(data).update({'update': {'auto_check': False}})
+        Config(data).update({'update': {'auto_check': False}, 'auth': {'rp_id': 'synthetic.example.invalid', 'session_hours': 123}})
+        Config(data).set_secret('passkey_user_handle', 'synthetic-stable-handle')
         store = Store(data / 'library.sqlite3')
         cid = store.create_collection('synthetic')['id']
         for start in range(0, args.documents, 200):
             store.add_documents(cid, [{'id': 'SYN%d' % i, 'body': '電池の構造。' * 40,
                 'meta': {'license': 'synthetic-only'}} for i in range(start, min(start + 200, args.documents))])
+        store.db.execute("INSERT INTO passkeys(credential_id,public_key,alg,sign_count,name,created) VALUES(?,?,?,?,?,?)",
+                         (b'synthetic-credential', b'synthetic-key', -7, 0, 'fixture', time.time()))
         store.close()
         with socket.socket() as sock:
             sock.bind(('127.0.0.1', 0)); port = sock.getsockname()[1]
@@ -75,6 +78,8 @@ def main():
             assert next(c['documents'] for c in collections['collections'] if c['id'] == cid) == args.documents
             status, found = client.call('POST', '/api/v1/search', {'q': '電池', 'mode': 'keyword', 'collections': [cid]})
             assert status == 200 and len(found['results']) == min(20, args.documents)
+            status, me = client.call('GET', '/api/auth/me')
+            assert status == 200 and me['passkeys'] == 1
             return [r['doc_id'] for r in found['results']]
         result = {'documents': args.documents, 'repo': str(args.repo.resolve()),
             'commit': subprocess.check_output(['git', '-C', str(args.repo), 'rev-parse', 'HEAD'], text=True).strip()}
@@ -92,9 +97,13 @@ def main():
         restored = root / 'restored'; restored.mkdir()
         original = data / backup['snapshot']['path']
         shutil.copyfile(original, restored / 'library.sqlite3')
-        for name in ('config.json', 'secrets.json'):
-            if (data / name).exists():
-                shutil.copyfile(data / name, restored / name)
+        for name in ('settings.json', 'secrets.json'):
+            assert (data / name).is_file()
+            shutil.copy2(data / name, restored / name)
+            assert (data / name).read_bytes() == (restored / name).read_bytes()
+        assert Config(restored).get('auth', 'rp_id') == 'synthetic.example.invalid'
+        assert Config(restored).get('auth', 'session_hours') == 123
+        assert Config(restored).secret('passkey_user_handle') == 'synthetic-stable-handle'
         assert hashlib.sha256(original.read_bytes()).digest() == hashlib.sha256((restored / 'library.sqlite3').read_bytes()).digest()
         with sqlite3.connect(restored / 'library.sqlite3') as db:
             assert db.execute('PRAGMA quick_check').fetchone()[0] == 'ok'
@@ -103,7 +112,7 @@ def main():
             assert check() == expected
             assert client.call('POST', '/api/v1/collections', {'name': 'restore-proof'})[0] == 200
         result.update(session_csrf_preserved=True, counts_search_preserved=True, snapshot_hash_verified=True,
-                      single_writer=True, notes='Synthetic Linux process test, not QTS; readiness polling resolution 50ms')
+                      single_writer=True, settings_secrets_preserved=True, synthetic_passkey_record_preserved=True, notes='Synthetic Linux process test, not QTS; readiness polling resolution 50ms')
         args.output.write_text(json.dumps(result, indent=2) + '\n')
         print(json.dumps(result), flush=True)
 

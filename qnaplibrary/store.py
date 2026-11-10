@@ -155,12 +155,26 @@ class Store:
         class _Tx:
             def __enter__(self_):
                 store.lock.acquire()
-                store.db.execute("BEGIN IMMEDIATE")
-                return store.db
+                try:
+                    store.db.execute("BEGIN IMMEDIATE")
+                    return store.db
+                except BaseException:
+                    store.lock.release()
+                    raise
 
             def __exit__(self_, exc_type, exc, tb):
                 try:
-                    store.db.execute("ROLLBACK" if exc_type else "COMMIT")
+                    if exc_type:
+                        # SQLITE_FULL can already have rolled the transaction back.
+                        if store.db.in_transaction:
+                            store.db.execute("ROLLBACK")
+                    else:
+                        try:
+                            store.db.execute("COMMIT")
+                        except BaseException:
+                            if store.db.in_transaction:
+                                store.db.execute("ROLLBACK")
+                            raise
                 finally:
                     store.lock.release()
         return _Tx()

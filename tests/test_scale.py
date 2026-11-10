@@ -89,6 +89,43 @@ class ScaleStoreTest(unittest.TestCase):
                             "WHERE collection_id=? AND id<? ORDER BY id DESC LIMIT 10", (self.cid, 9999))
         self.assertTrue(any("documents_coll_id" in row[3] for row in plan), [tuple(r) for r in plan])
 
+    def test_failed_begin_releases_python_lock(self):
+        other = sqlite3.connect(self.store.path, isolation_level=None)
+        self.store.db.execute("PRAGMA busy_timeout=20")
+        try:
+            other.execute("BEGIN IMMEDIATE")
+            with self.assertRaisesRegex(sqlite3.OperationalError, "locked"):
+                with self.store.tx():
+                    self.fail("writer should not enter")
+            def try_lock():
+                acquired = self.store.lock.acquire(timeout=.2)
+                if acquired:
+                    self.store.lock.release()
+                return acquired
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                self.assertTrue(pool.submit(try_lock).result(timeout=2))
+        finally:
+            other.execute("ROLLBACK")
+            other.close()
+            self.store.db.execute("PRAGMA busy_timeout=30000")
+        self.assertEqual(self.store.add_documents(self.cid, [{"id":"after-lock", "body":"再開"}])["added"], 1)
+
+    def test_disk_full_rolls_back_and_next_request_can_resume(self):
+        self.store.add_documents(self.cid, [{"id": "stable", "body": "確定本文"}])
+        pages = self.store.one("PRAGMA page_count")[0]
+        self.store.db.execute("PRAGMA max_page_count=%d" % (pages + 1))
+        with self.assertRaisesRegex(sqlite3.OperationalError, "database or disk is full"):
+            self.store.add_documents(self.cid, [
+                {"id": "stable", "body": "未確定の更新"},
+                {"id": "oversize-for-test", "body": "電池" * 100000}])
+        self.assertFalse(self.store.db.in_transaction)
+        self.assertEqual(self.store.one("SELECT COUNT(*) FROM documents")[0], 1)
+        self.assertEqual(self.store.one("SELECT body FROM documents")[0], "確定本文")
+        self.assertEqual(self.store.fts_search("未確定"), [])
+        self.store.db.execute("PRAGMA max_page_count=1000000")
+        self.assertEqual(self.store.add_documents(self.cid, [{"id": "resume", "body": "再開本文"}])["added"], 1)
+        self.assertEqual(self.store.one("PRAGMA quick_check")[0], "ok")
+
     def test_batch_lookup_respects_parameter_limit_and_collection_key(self):
         if hasattr(self.store.db, "setlimit"):
             self.store.db.setlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER, 500)
