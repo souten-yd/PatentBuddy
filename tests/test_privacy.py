@@ -50,6 +50,17 @@ class PrivacyDestinationsTest(unittest.TestCase):
             p.save(providers)
             self.assertTrue(privacy.confidential_allowed(p.get("qnapassistant"), cfg))
 
+    def test_public_scope_cannot_be_forged(self):
+        with tempfile.TemporaryDirectory() as temp:
+            p = Providers(Config(temp))
+            with mock.patch("qnaplibrary.llm._DIRECT_OPENER.open", side_effect=AssertionError("leak")):
+                with self.assertRaisesRegex(LLMError, "固定公開"):
+                    p.chat([{"role": "user", "content": "企業秘密"}],
+                           provider="openrouter", scope="public_reference")
+                with self.assertRaisesRegex(LLMError, "固定公開"):
+                    p._request(p.get("openrouter"), "/embeddings",
+                               {"input": ["秘密の実施例"]}, scope="public_reference")
+
     def test_public_reference_prompts_are_fixed_and_ignore_inventions(self):
         self.assertEqual(len(privacy.PUBLIC_REFERENCE_TOPICS), 5)
         for topic in privacy.PUBLIC_REFERENCE_TOPICS:
