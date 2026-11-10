@@ -406,10 +406,10 @@ class Handler(BaseHTTPRequestHandler):
                     from .addon import health_report
                     try:
                         client = getattr(self.server.app, 'client', None)
-                        local_connected = bool(client and client.settings().get('auth_method') == 'local_peer')
+                        connection_configured = bool(client and client.settings().get('server_token'))
                     except ValueError:
-                        local_connected = False
-                    status = self.send_json(200, health_report(local_connected))
+                        connection_configured = False
+                    status = self.send_json(200, health_report(connection_configured))
                     return
                 if method == "GET" and path in ("/addon/workspace", "/addon/style.css", "/addon/icon.svg", "/addon/workspace.js", "/addon/workspace.css"):
                     entry = {

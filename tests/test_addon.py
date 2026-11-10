@@ -27,6 +27,15 @@ class AddonManifestTest(unittest.TestCase):
         self.assertEqual(value["contributions"]["agent_tools"], [])
         self.assertEqual(value["contributions"]["workflow_executors"], [])
 
+    def test_health_contract_rejects_no_unknown_fields(self):
+        # ControlDeck AddonHealthReport has extra=forbid. Identity/version belong
+        # in the manifest and authenticated status API, not this public report.
+        allowed = {'status', 'contract_version', 'reason_code', 'message',
+                   'action', 'contributions', 'setup'}
+        for configured in (False, True):
+            self.assertLessEqual(set(health_report(configured)), allowed)
+        self.assertNotIn('reason_code', health_report(True))
+
     def test_setup_remains_explicit(self):
         response = health_report()
         self.assertEqual(response["contract_version"], "2.0")
