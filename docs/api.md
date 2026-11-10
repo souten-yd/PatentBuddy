@@ -24,7 +24,8 @@ curl -X POST http://NAS:17871/api/v1/pair -H 'Content-Type: application/json' \
 | GET | `/api/v1/collections/{c}/pending-chunks` | 埋め込み未計算のチャンク（外部ワーカー用） |
 | POST | `/api/v1/vectors` | `{model, items:[{chunk_id, vector}]}` 外部で計算した埋め込みを格納 |
 | GET/POST | `/api/v1/patents...` | 特許案件（`/meta` に段階・タスク一覧） |
-| POST | `/api/v1/connectors/{id}/run` | 外部データ収集 |
+| POST | `/api/v1/connectors/{id}/run` | 管理者専用。公開検索語の明示承認 `public_query_confirmed:true` が必要（外部APIへ検索語が送信される） |
+| POST | `/api/v1/public-patent-guidance` | 管理者専用。固定の公開特許制度ガイドのみAI利用可。 `{topic: novelty|inventive_step|claim_scope|freedom_to_operate|filing_strategy, provider}` |
 | GET | `/api/debug/bundle` | AI 向けデバッグ情報 |
 | GET | `/api/v1/schema` | 全ルート一覧（AI が自己発見に使う） |
 | GET / POST | `/api/backups` | 管理者専用。SQLite バックアップ一覧 / 手動作成（[手順](backup.md)） |
@@ -38,7 +39,9 @@ curl -X POST http://NAS:17871/api/v1/pair -H 'Content-Type: application/json' \
  "url":"https://…","date":"2024-07-01","source":"JPO","meta":{"ipc":["H01M10/0562"],"applicant":"…"}}
 ```
 
-## 3. 外部埋め込みワーカーの例（別PC・Ollama）
+## 3. 埋め込みワーカーの例（**信頼できるオフライン別PCのOllama専用**）
+
+**機密警告:** このAPIを利用した場合は機密文書本文がAPIクライアントへ渡ります。別PCの推論エンジンがクラウド中継しないことと、NAS-PC間の通信を保護することを事前に確認してください。クラウドエンベディングへ送信してはいけません。
 
 ```python
 import json, urllib.request
@@ -60,5 +63,11 @@ while True:
 ## 4. ControlDeck / AI Assistant からの利用
 
 - **ControlDeck**: HTTP ノードで `/api/v1/search` を呼ぶか、MCP 対応エージェントに `http://NAS:17871/mcp`（Bearer トークン）を登録。
-- **QnapAssistant**: QnapLibrary 側から OpenAI 互換 `http://127.0.0.1:11435/v1` をチャット/AI支援のプロバイダとして利用（既定で登録済み）。
-- **Claude Desktop 等**: MCP の HTTP トランスポートで `/mcp` を指定（ヘッダに Bearer）。
+- **QnapAssistant**: QnapPatentBuddy 側から OpenAI 互換 `http://127.0.0.1:11435/v1` をチャット/AI支援のプロバイダとして利用（既定で登録済みだが**ローカル専用と管理者が確認するまで機密利用不可**）。
+- **Claude Desktop 等**: MCP に機密情報を公開する場合は、接続先がクラウドへ記録・転送しないことを確認してください。HTTP トランスポートで `/mcp` を指定（ヘッダに Bearer）。
+
+## 5. 機密保護（v0.5.1）
+
+未公開の発明/要約/請求項/検索語/論点/引用の組み合わせはデフォルト機密。バックエンドがクラウドLLM・クラウド埋め込み・リランカへの送信を拒否します。ローカルAIはモデルの実体と中継設定を管理者が確認済みである必要があります（`local_only_verified:true`）。管理用APIに機密プロンプトを付与しただけで公開送信の例外指定はできません。
+
+**ウォッチ:** `params.public_only_confirmed:true` がない旧ウォッチは自動外部収集停止。公開検索語のみと承認したものだけ再開できます。外部検索APIの実行は管理者専用。通知には案件名/本文を含めません。詳しくは [privacy-boundary.md](privacy-boundary.md)。
