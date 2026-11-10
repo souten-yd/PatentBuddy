@@ -16,7 +16,8 @@ from .llm import LLMError
 
 ROUTES = []
 SECRET_NAMES = ("openrouter_api_key", "epo_ops_key", "epo_ops_secret", "jpo_username", "jpo_password",
-                "uspto_api_key", "openai_api_key", "smtp_password")
+                "uspto_api_key", "openai_api_key", "smtp_password", "qdrant_api_key",
+                "estat_app_id", "edinet_api_key")
 
 
 def route(method, pattern, auth="admin"):
@@ -272,7 +273,7 @@ def settings_get(req):
 @route("PUT", "/api/settings", "admin")
 def settings_put(req):
     patch = req.json()
-    allowed = {"server", "auth", "update", "search", "connectors", "notify"}
+    allowed = {"server", "auth", "update", "search", "connectors", "notify", "vector_backend"}
     bad = set(patch) - allowed
     if bad:
         raise _err(400, "変更できない項目: %s（LLMは /api/llm/providers）" % ", ".join(sorted(bad)))
@@ -463,11 +464,68 @@ def search(req):
     if not q:
         raise _err(400, "q が必要です")
     res = req.app.searcher.search(q, b.get("collections") or None, b.get("limit") or 20, b.get("mode") or "hybrid",
-                                  b.get("group_by_doc", True), b.get("vector"))
+                                  b.get("group_by_doc", True), b.get("vector"), kinds=b.get("kinds") or None,
+                                  rerank=b.get("rerank"), date_from=b.get("date_from"), date_to=b.get("date_to"))
     if not b.get("include_text"):
         for r in res["results"]:
             r.pop("text", None)
     return res
+
+
+@route("GET", "/api/v1/embedding-info", "read")
+def embedding_info(req):
+    """Embedding space used for search, so external workers store compatible vectors (model tag + truncation)."""
+    cfg = req.app.providers.embedding_config()
+    return {"enabled": req.app.providers.embedding_enabled(), "model_tag": req.app.providers.embedding_tag(),
+            "model": cfg.get("model"), "truncate_dim": cfg.get("truncate_dim"), "query_prefix": cfg.get("query_prefix") or "",
+            "doc_prefix": cfg.get("doc_prefix") or ""}
+
+
+@route("GET", "/api/vectors/backend", "admin")
+def vector_backend_status(req):
+    q = req.app.qdrant()
+    info = None
+    if q is not None:
+        try:
+            info = q.info()
+        except Exception as error:
+            info = {"error": str(error)[:200]}
+    return {"backend": req.app.config.get("vector_backend"), "qdrant": info, "sync": req.app.qdrant_sync,
+            "ram": req.app.searcher.vectors.info() if q is None else None}
+
+
+@route("POST", "/api/vectors/sync", "admin")
+def vector_backend_sync(req):
+    return req.app.sync_qdrant(bool(req.json().get("recreate")))
+
+
+@route("GET", "/api/v1/analytics", "read")
+def analytics(req):
+    """Counts by year / source / a meta field (arrays supported) and a field x year matrix."""
+    st = req.app.store
+    c = st.get_collection(req.arg("collection"))
+    field = req.arg("field", "")
+    if field and not re.fullmatch(r"[A-Za-z0-9_]{1,40}", field):
+        raise _err(400, "invalid field")
+    by_year = [dict(r) for r in st.q("SELECT substr(doc_date,1,4) AS k, COUNT(*) AS n FROM documents WHERE collection_id=? "
+                                       "AND doc_date GLOB '[12][0-9][0-9][0-9]*' GROUP BY k ORDER BY k", (c["id"],))]
+    by_source = [dict(r) for r in st.q("SELECT source AS k, COUNT(*) AS n FROM documents WHERE collection_id=? AND source!='' "
+                                         "GROUP BY k ORDER BY n DESC LIMIT 20", (c["id"],))]
+    fields = sorted({k for r in st.q("SELECT meta FROM documents WHERE collection_id=? ORDER BY id DESC LIMIT 200", (c["id"],))
+                     for k in json.loads(r["meta"] or "{}") if re.fullmatch(r"[A-Za-z0-9_]{1,40}", k)})
+    out = {"collection": c["name"], "documents": c["documents"], "by_year": by_year, "by_source": by_source, "fields": fields}
+    if field:
+        path = "$." + field
+        top = [dict(r) for r in st.q("SELECT CAST(j.value AS TEXT) AS k, COUNT(*) AS n FROM documents d, json_each(d.meta, ?) j "
+                                       "WHERE d.collection_id=? GROUP BY k ORDER BY n DESC LIMIT 25", (path, c["id"]))]
+        out["by_field"] = top
+        keys = [t["k"] for t in top[:10]]
+        if keys:
+            rows = st.q("SELECT CAST(j.value AS TEXT) AS k, substr(d.doc_date,1,4) AS y, COUNT(*) AS n FROM documents d, "
+                        "json_each(d.meta, ?) j WHERE d.collection_id=? AND d.doc_date GLOB '[12][0-9][0-9][0-9]*' "
+                        "AND CAST(j.value AS TEXT) IN (%s) GROUP BY k, y" % ",".join("?" * len(keys)), [path, c["id"]] + keys)
+            out["matrix"] = [dict(r) for r in rows]
+    return out
 
 
 @route("GET", "/api/v1/stats", "read")
@@ -638,7 +696,7 @@ def notify_deadlines(req):
 def llm_providers(req):
     cfg = req.app.config.get("llm")
     return {"providers": req.app.providers.list(), "default_provider": cfg.get("default_provider"),
-            "embedding": cfg.get("embedding"), "rag_top_k": cfg.get("rag_top_k")}
+            "embedding": cfg.get("embedding"), "rag_top_k": cfg.get("rag_top_k"), "rerank": cfg.get("rerank")}
 
 
 @route("PUT", "/api/llm/providers", "admin")
@@ -648,10 +706,12 @@ def llm_providers_put(req):
         req.app.providers.save(b.get("providers"), b.get("default_provider"))
     except LLMError as error:
         raise _err(400, str(error))
-    if isinstance(b.get("embedding"), dict) or b.get("rag_top_k"):
+    if isinstance(b.get("embedding"), dict) or b.get("rag_top_k") or isinstance(b.get("rerank"), dict):
         llm = req.app.config.get("llm")
         if isinstance(b.get("embedding"), dict):
             llm["embedding"] = b["embedding"]
+        if isinstance(b.get("rerank"), dict):
+            llm["rerank"] = {k: b["rerank"].get(k) for k in ("enabled", "provider", "model", "top_n")}
         if b.get("rag_top_k"):
             llm["rag_top_k"] = max(1, min(int(b["rag_top_k"]), 30))
         req.app.config.replace_section("llm", llm)

@@ -59,5 +59,5 @@ jobs:
           ver="${{ steps.v.outputs.version }}"
           awk -v v="## v$ver" '$0==v {on=1; next} /^## v/ && on {exit} on' CHANGELOG.md > dist/notes.md
           printf '\n---\nアセット: QPKG（QNAP x86_64）/ Linux tar.gz。SHA-256 は各 .sha256 と GitHub の digest で確認できます。\n' >> dist/notes.md
-          gh release create "v$ver" dist/*.qpkg dist/*.qpkg.sha256 dist/*.tar.gz dist/*.tar.gz.sha256 \
+          gh release create "v$ver" dist/*.qpkg dist/*.qpkg.sha256 dist/*.tar.gz dist/*.tar.gz.sha256 dist/qnaplibrary_client.py \
             --target "$GITHUB_SHA" --title "QnapLibrary v$ver" --notes-file dist/notes.md

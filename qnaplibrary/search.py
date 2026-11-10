@@ -108,13 +108,17 @@ def rrf(rankings, k=60):
 
 
 class Searcher:
-    def __init__(self, store, config, embedder=None, model_fn=None):
+    def __init__(self, store, config, embedder=None, model_fn=None, backend_fn=None, reranker=None):
         self.store = store
         self.config = config
+        self.model_fn = model_fn
+        self.backend_fn = backend_fn  # returns a Qdrant client when that backend is active, else None
+        self.reranker = reranker      # Providers (rerank/rerank_enabled) or None
         self.vectors = VectorIndex(store, model_fn)
         self.embedder = embedder  # callable(list[str]) -> list[list[float]] or None
 
-    def search(self, query, collections=None, limit=20, mode="hybrid", group_by_doc=True, qvec=None, kinds=None):
+    def search(self, query, collections=None, limit=20, mode="hybrid", group_by_doc=True, qvec=None, kinds=None,
+               rerank=None, date_from=None, date_to=None):
         t0 = time.time()
         trace = {"query": query, "mode": mode, "stages": []}
         coll_ids = None
@@ -143,13 +147,38 @@ class Searcher:
                     qvec = None
             if qvec:
                 t2 = time.time()
-                dense = self.vectors.search(qvec, coll_ids, pool, candidates=[c for c, _ in bm25])
-                trace["stages"].append({"stage": "vector", "hits": len(dense), "ms": round((time.time() - t2) * 1000, 1)})
+                backend = self.backend_fn() if self.backend_fn else None
+                if backend is not None:
+                    try:
+                        dense = backend.search(qvec, coll_ids, self.model_fn() if self.model_fn else None, pool)
+                        trace["stages"].append({"stage": "qdrant", "hits": len(dense), "ms": round((time.time() - t2) * 1000, 1)})
+                    except Exception as error:
+                        trace["stages"].append({"stage": "qdrant", "error": str(error)[:200]})
+                        dense = self.vectors.search(qvec, coll_ids, pool, candidates=[c for c, _ in bm25])
+                else:
+                    dense = self.vectors.search(qvec, coll_ids, pool, candidates=[c for c, _ in bm25])
+                    trace["stages"].append({"stage": "vector", "hits": len(dense), "ms": round((time.time() - t2) * 1000, 1)})
         if bm25 and dense:
             fused = rrf([bm25, dense], self.config.get("search", "rrf_k", default=60))
         else:
             fused = bm25 or dense
         rows = self.store.chunks_with_docs([c for c, _ in fused[:pool]])
+        if date_from or date_to:
+            fused = [(c, sc) for c, sc in fused if c in rows and rows[c]["doc_date"] and
+                     (not date_from or rows[c]["doc_date"][:10] >= date_from) and (not date_to or rows[c]["doc_date"][:10] <= date_to)]
+        use_rerank = rerank if rerank is not None else bool(self.reranker and self.reranker.rerank_enabled())
+        if use_rerank and self.reranker and self.reranker.rerank_enabled() and fused:
+            t3 = time.time()
+            top_n = int(self.config.get("llm", "rerank", "top_n", default=30) or 30)
+            head = [c for c, _ in fused[:top_n] if c in rows]
+            try:
+                order = self.reranker.rerank(query, [rows[c]["title"] + "\n" + rows[c]["text"] for c in head])
+                ranked = [(head[i], s_) for i, s_ in order if 0 <= i < len(head)]
+                seen_ids = {c for c, _ in ranked}
+                fused = ranked + [(c, s_) for c, s_ in fused if c not in seen_ids]
+                trace["stages"].append({"stage": "rerank", "hits": len(ranked), "ms": round((time.time() - t3) * 1000, 1)})
+            except Exception as error:
+                trace["stages"].append({"stage": "rerank", "error": str(error)[:200]})
         terms = textproc.query_terms(query)
         results, seen = [], {}
         for cid, score in fused:

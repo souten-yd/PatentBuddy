@@ -91,3 +91,5 @@ details summary{cursor:pointer;color:var(--muted);font-size:13px}
 label.f input:not([type=checkbox]):not([type=number]),label.f select,label.f textarea{width:100%}
 input[type=number]{width:110px}
 .row>label.f{flex:1;min-width:140px}
+.barcell{width:60%}.bar{height:12px;background:var(--accent);border-radius:3px}
+.scrollx{overflow-x:auto}.heat td,.heat th{text-align:center;font-size:12px;padding:4px 6px;border:1px solid var(--line)}

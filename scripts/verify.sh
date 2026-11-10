@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 echo "== python syntax"
-python3 -m py_compile qnaplibrary/*.py scripts/*.py
+python3 -m py_compile qnaplibrary/*.py scripts/*.py scripts/client/*.py
 echo "== js syntax"
 if command -v node >/dev/null; then node --check qnaplibrary/web/app.js; else echo "node not found: skipped"; fi
 echo "== shell syntax"

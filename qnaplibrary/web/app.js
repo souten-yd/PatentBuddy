@@ -79,13 +79,13 @@ async function boot() {
 function render() {
   clear($app); $app.className = "";
   if (!S.me) return $app.append(loginView());
-  const views = [["home", "ホーム"], ["search", "検索"], ["patents", "特許"], ["data", "データ"], ["chat", "AIチャット"], ["collect", "収集"], ["settings", "設定"]];
+  const views = [["home", "ホーム"], ["search", "検索"], ["patents", "特許"], ["data", "データ"], ["analytics", "分析"], ["chat", "AIチャット"], ["collect", "収集"], ["settings", "設定"]];
   const main = h("main", {});
   const nav = h("nav", { class: "side" }, h("div", { class: "brand" }, h("img", { src: "icon.svg", alt: "" }), "QnapLibrary"),
     views.map(([id, label]) => h("button", { class: S.view === id ? "active" : "", onclick: () => { S.view = id; render(); } }, label)),
     h("div", { class: "ver" }, "v" + S.health.version));
   $app.append(h("div", { class: "layout" }, nav, main));
-  const fn = { home: homeView, search: searchView, patents: patentsView, data: dataView, chat: chatView, collect: collectView, settings: settingsView }[S.view];
+  const fn = { home: homeView, search: searchView, patents: patentsView, data: dataView, analytics: analyticsView, chat: chatView, collect: collectView, settings: settingsView }[S.view];
   Promise.resolve(fn(main)).catch(e => main.append(h("div", { class: "card" }, "エラー: " + e.message)));
 }
 function loginView() {
@@ -154,10 +154,11 @@ async function searchView(main) {
   const q = h("input", { class: "wide", placeholder: "例: 固体電解質 電池 -液体　（スペース=AND、OR、-除外、\"フレーズ\"）", value: S.lastQuery || "" });
   const picker = collectionPicker(S.lastColls || []);
   const mode = sel([["hybrid", "ハイブリッド"], ["keyword", "キーワード"], ["vector", "ベクトル"]], S.lastMode || "hybrid");
+  const dFrom = h("input", { type: "date", value: S.dFrom || "" }), dTo = h("input", { type: "date", value: S.dTo || "" });
   const out = h("div", {});
   const run = guard(async () => {
-    S.lastQuery = q.value; S.lastColls = picker.values(); S.lastMode = mode.value;
-    const r = await api("POST", "/api/v1/search", { q: q.value, collections: S.lastColls, mode: mode.value, limit: 30 });
+    S.lastQuery = q.value; S.lastColls = picker.values(); S.lastMode = mode.value; S.dFrom = dFrom.value; S.dTo = dTo.value;
+    const r = await api("POST", "/api/v1/search", { q: q.value, collections: S.lastColls, mode: mode.value, limit: 30, date_from: dFrom.value || null, date_to: dTo.value || null });
     clear(out).append(h("div", { class: "muted small" }, r.results.length + " 件 / " + r.trace.ms + " ms ・ " + r.trace.stages.map(s => s.stage + (s.hits !== undefined ? ":" + s.hits : "") + (s.error ? "(×)" : "")).join(" → ")));
     r.results.forEach(x => out.append(h("div", { class: "result" },
       h("div", { class: "row" }, h("a", { href: "#", class: "t", onclick: e => { e.preventDefault(); openDoc(x.doc_id); } }, x.title || "(無題)"),
@@ -166,7 +167,8 @@ async function searchView(main) {
       h("div", { class: "s" }, x.snippet))));
   });
   q.addEventListener("keydown", e => { if (e.key === "Enter") run(); });
-  main.append(h("div", { class: "card" }, h("div", { class: "row" }, q, mode, h("button", { class: "btn primary", onclick: run }, "検索")), picker), h("div", { class: "card" }, out));
+  main.append(h("div", { class: "card" }, h("div", { class: "row" }, q, mode, h("button", { class: "btn primary", onclick: run }, "検索")), picker,
+    h("div", { class: "row small" }, "日付", dFrom, "〜", dTo)), h("div", { class: "card" }, out));
   if (S.lastQuery) run();
 }
 async function openDoc(id) {
@@ -340,6 +342,39 @@ async function dataView(main) {
   card.append(h("table", {}, list.items.map(d => h("tr", { class: "click", onclick: () => openDoc(d.id) }, h("td", { class: "small" }, d.ext_id || d.id), h("td", {}, d.title), h("td", { class: "small muted" }, d.date), h("td", { class: "small muted" }, (d.body_chars / 1000).toFixed(1) + "k字")))));
 }
 
+// ---------- analytics ----------
+function bars(rows, max) {
+  max = max || Math.max(1, ...rows.map(r => r.n));
+  return h("table", {}, rows.map(r => { const bar = h("div", { class: "bar" }); bar.style.width = Math.max(2, Math.round(r.n / max * 100)) + "%";
+    return h("tr", {}, h("td", { class: "small" }, r.k || "(空)"), h("td", { class: "barcell" }, bar), h("td", { class: "small" }, r.n)); }));
+}
+async function analyticsView(main) {
+  await loadCollections();
+  main.append(h("h1", {}, "分析"));
+  if (!S.collections.length) return main.append(h("p", { class: "muted" }, "コレクションがありません"));
+  const coll = sel(S.collections.map(c => [c.name, c.name + "（" + c.documents + "）"]), S.anColl || S.collections[0].name);
+  const out = h("div", {});
+  const load = guard(async (field) => {
+    S.anColl = coll.value;
+    const r = await api("GET", "/api/v1/analytics?collection=" + encodeURIComponent(coll.value) + (field ? "&field=" + encodeURIComponent(field) : ""));
+    const fsel = sel([["", "（メタデータ項目を選択）"]].concat(r.fields.map(f => [f, f])), field || "");
+    fsel.addEventListener("change", () => load(fsel.value));
+    clear(out).append(h("div", { class: "grid" }, h("div", { class: "card" }, h("h2", {}, "年別件数"), r.by_year.length ? bars(r.by_year) : h("p", { class: "muted" }, "日付なし")),
+      h("div", { class: "card" }, h("h2", {}, "出典"), r.by_source.length ? bars(r.by_source) : h("p", { class: "muted" }, "出典なし"))),
+      h("div", { class: "card" }, h("div", { class: "row" }, h("h2", {}, "項目別（出願人・IPC など）"), fsel), r.by_field ? bars(r.by_field) : h("p", { class: "small muted" }, "文書の meta にある項目（applicants, ipc など）を選ぶと上位 25 件と年別の推移を表示します。"),
+        r.matrix && r.matrix.length ? heat(r.matrix) : null));
+  });
+  coll.addEventListener("change", () => load(""));
+  main.append(h("div", { class: "card row" }, "コレクション", coll), out);
+  load(S.anField || "");
+}
+function heat(matrix) {
+  const ys = [...new Set(matrix.map(m => m.y))].sort(), ks = [...new Set(matrix.map(m => m.k))];
+  const max = Math.max(...matrix.map(m => m.n)); const get = (k, y) => (matrix.find(m => m.k === k && m.y === y) || {}).n || 0;
+  return h("div", {}, h("h3", {}, "年別の推移（濃いほど多い・空白領域の把握に）"), h("div", { class: "scrollx" }, h("table", { class: "heat" }, h("tr", {}, h("th", {}), ys.map(y => h("th", {}, y))),
+    ks.map(k => h("tr", {}, h("td", { class: "small" }, k), ys.map(y => { const n = get(k, y); const td = h("td", { title: k + " " + y + ": " + n }, n || ""); td.style.background = n ? "rgba(31,95,191," + (0.15 + 0.85 * n / max).toFixed(2) + ")" : "transparent"; if (n / max > 0.5) td.style.color = "#fff"; return td; }))))));
+}
+
 // ---------- chat ----------
 async function chatView(main) {
   await loadCollections();
@@ -406,7 +441,7 @@ async function collectView(main) {
 async function settingsView(main) {
   main.append(h("h1", {}, "設定"));
   const tab = S.setTab || "account";
-  const tabs = [["account", "アカウント"], ["devices", "デバイス接続"], ["ai", "AI"], ["keys", "外部キー"], ["notify", "通知"], ["update", "更新"], ["debug", "デバッグ"]];
+  const tabs = [["account", "アカウント"], ["devices", "デバイス接続"], ["ai", "AI"], ["keys", "外部キー"], ["notify", "通知"], ["backend", "検索基盤"], ["update", "更新"], ["debug", "デバッグ"]];
   main.append(h("div", { class: "tabs" }, tabs.map(([t, l]) => h("button", { class: tab === t ? "active" : "", onclick: () => { S.setTab = t; render(); } }, l))));
   const body = h("div", {}); main.append(body);
   if (tab === "account") {
@@ -442,7 +477,7 @@ async function settingsView(main) {
     await aiSettings(body);
   } else if (tab === "keys") {
     const s = await api("GET", "/api/settings");
-    const labels = { openrouter_api_key: "OpenRouter API キー", epo_ops_key: "EPO OPS Consumer Key", epo_ops_secret: "EPO OPS Consumer Secret", jpo_username: "JPO 特許情報取得API ID", jpo_password: "JPO 特許情報取得API パスワード", uspto_api_key: "USPTO ODP API キー", openai_api_key: "OpenAI 互換 API キー（任意）", smtp_password: "SMTP パスワード（通知メール）" };
+    const labels = { openrouter_api_key: "OpenRouter API キー", epo_ops_key: "EPO OPS Consumer Key", epo_ops_secret: "EPO OPS Consumer Secret", jpo_username: "JPO 特許情報取得API ID", jpo_password: "JPO 特許情報取得API パスワード", uspto_api_key: "USPTO ODP API キー", openai_api_key: "OpenAI 互換 API キー（任意）", smtp_password: "SMTP パスワード（通知メール）", qdrant_api_key: "Qdrant API キー（任意）", estat_app_id: "e-Stat アプリケーションID", edinet_api_key: "EDINET API キー" };
     body.append(h("div", { class: "card" }, h("p", { class: "small muted" }, "キーは secrets.json（権限 0600）に保存され、画面・API・デバッグ出力には表示されません。"),
       h("table", {}, Object.entries(labels).map(([k, l]) => { const inp = h("input", { type: "password", placeholder: s.secrets[k].configured ? "設定済み（" + s.secrets[k].fingerprint + "）" : "未設定" });
         return h("tr", {}, h("td", {}, l), h("td", {}, inp), h("td", {}, h("button", { class: "btn", onclick: guard(async () => { await api("PUT", "/api/secrets/" + k, { value: inp.value }); toast("保存しました"); render(); }) }, "保存"),
@@ -463,6 +498,14 @@ async function settingsView(main) {
           email: { enabled: e.enabled.checked, host: e.host.value, port: +e.port.value, user: e.user.value, from: e.from.value, to: e.to.value, starttls: e.starttls.checked } } }); toast("保存しました"); }) }, "保存"),
         h("button", { class: "btn", onclick: guard(async () => { const r = await api("POST", "/api/notify/test", {}); out.textContent = JSON.stringify(r.results); }) }, "テスト送信"),
         h("button", { class: "btn", onclick: guard(async () => { const r = await api("POST", "/api/notify/deadlines", {}); toast(r.sent + " 件送信"); }) }, "期限通知を今すぐ確認")), out));
+  } else if (tab === "backend") {
+    const b = await api("GET", "/api/vectors/backend"); const vb = b.backend || {};
+    const type = sel([["memory", "RAM（既定・依存なし）"], ["qdrant", "Qdrant（Container Station 等）"]], vb.type || "memory"), url = h("input", { class: "wide", value: vb.url || "" }), coll = h("input", { value: vb.collection || "qnaplibrary" });
+    body.append(h("div", { class: "card" }, h("h2", {}, "ベクトル検索の基盤"), h("p", { class: "small muted" }, "ベクトルが 10 万件を超えるまでは RAM で十分です。Qdrant を使う場合も SQLite が正本で、Qdrant は検索用の複製です（障害時は RAM に自動で戻ります）。"),
+      field("方式", type), field("Qdrant URL", url), field("Qdrant コレクション名", coll), h("p", { class: "small muted" }, "API キーが必要な場合は 外部キー に「Qdrant API キー」を保存。"),
+      h("div", { class: "row" }, h("button", { class: "btn primary", onclick: guard(async () => { await api("PUT", "/api/settings", { vector_backend: { type: type.value, url: url.value, collection: coll.value } }); toast("保存しました"); render(); }) }, "保存"),
+        h("button", { class: "btn", disabled: vb.type !== "qdrant", onclick: guard(async () => { await api("POST", "/api/vectors/sync", { recreate: true }); toast("同期を開始しました"); }) }, "SQLite → Qdrant 全同期")),
+      h("div", { class: "pre" }, JSON.stringify({ qdrant: b.qdrant, sync: b.sync, ram: b.ram }, null, 1))));
   } else if (tab === "update") {
     const u = await api("GET", "/api/update/status"), s = (await api("GET", "/api/settings")).settings;
     const auto = h("input", { type: "checkbox", checked: s.update.auto_apply }), check = h("input", { type: "checkbox", checked: s.update.auto_check });
@@ -512,6 +555,7 @@ async function aiSettings(body) {
       field("クエリ接頭辞", eQ), field("文書接頭辞", eD), h("label", {}, eAuto, " 取り込み時に自動でベクトル化"),
       h("div", { class: "row" }, h("button", { class: "btn", onclick: guard(async () => { const r = await api("GET", "/api/llm/embedding-models?provider=" + encodeURIComponent(eProv.value)); clear(eList).append(...r.models.map(m => h("option", { value: m.id }, m.name + (m.price ? " $" + m.price : "")))); toast(r.models.length + " モデル"); }) }, "モデル一覧を取得"),
         h("button", { class: "btn", onclick: guard(async () => { await api("POST", "/api/llm/embedding/run", {}); toast("ベクトル化を開始しました"); }) }, "未処理を今すぐベクトル化"))),
+    rerankCard(cfg, provs),
     jsonEditor(provs, def),
     h("div", { class: "card row" }, h("span", { class: "spacer" }), h("button", { class: "btn primary", onclick: guard(async () => {
         await api("PUT", "/api/llm/providers", { providers: cards.map(c => c.value()), default_provider: def.value, rag_top_k: +topk.value,
@@ -523,6 +567,14 @@ async function embedStatus(el) {
     clear(el).append(h("span", { class: "tag " + (st.enabled ? "ok" : "warn") }, st.enabled ? "有効" : "無効（キー未設定など）"), " 未処理 ", String(st.pending ?? "-"), " / 実行中 ", st.running ? "はい" : "いいえ",
       st.last_error ? h("div", { class: "tag bad" }, st.last_error) : null, r.vector_models.length ? h("div", {}, "保存済み: " + r.vector_models.map(m => m.model + " (" + m.dim + "次元×" + m.n + ")").join(", ")) : null);
   } catch (e) { el.textContent = e.message; }
+}
+function rerankCard(cfg, provs) {
+  const r = cfg.rerank || {};
+  const en = h("input", { type: "checkbox", checked: r.enabled }), pv = sel(provs.map(p => [p.id, p.label || p.id]), r.provider || "openrouter"),
+    md_ = h("input", { value: r.model || "", placeholder: "例: qwen/qwen3-reranker-8b / jina-reranker-v2 / bge-reranker-v2-m3" }), top = h("input", { type: "number", value: r.top_n || 30 });
+  const save = guard(async () => { await api("PUT", "/api/llm/providers", { providers: provs.map(({ secret_status, ...x }) => x), rerank: { enabled: en.checked, provider: pv.value, model: md_.value, top_n: +top.value } }); toast("保存しました"); });
+  return h("div", { class: "card" }, h("h2", {}, "リランカー（任意）"), h("p", { class: "small muted" }, "検索の上位候補を /rerank 対応 API（Cohere/Jina 形式）で並べ替えて精度を上げます。失敗時は元の順位のまま返します。"),
+    h("label", {}, en, " 有効"), h("div", { class: "row" }, field("プロバイダ", pv), field("モデル", md_), field("対象件数", top)), h("button", { class: "btn", onclick: save }, "リランカー設定を保存"));
 }
 function jsonEditor(provs, def) {
   const clean = provs.map(({ secret_status, ...rest }) => rest);
