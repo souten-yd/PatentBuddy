@@ -101,8 +101,9 @@ function loginView() {
     setup ? h("p", { class: "muted small" }, "管理者パスワードを設定します（LANからのみ）。後で設定からパスキー（Face ID 等）を登録できます。") : null,
     field(setup ? "新しい管理者パスワード" : "パスワード", pw),
     h("div", { class: "row" }, h("button", { class: "btn primary", onclick: go }, setup ? "設定して開始" : "ログイン"),
-      !setup && window.PublicKeyCredential ? h("button", { class: "btn", onclick: guard(passkeyLogin) }, "顔認証 / パスキーでログイン") : null),
-    !window.isSecureContext ? h("p", { class: "muted small" }, "※ パスキー（顔認証）は HTTPS 接続でのみ使えます。設定 > アカウント の説明を参照してください。") : null));
+      !setup && window.PublicKeyCredential && window.isSecureContext && location.protocol === "https:" ? h("button", { class: "btn", onclick: guard(passkeyLogin) }, "顔認証 / パスキーでログイン") : null),
+    location.protocol !== "https:" ? h("p", { class: "muted small" }, "※ 顔認証（パスキー）は https://<NAS名>.<tailnet>.ts.net:8443/ などの HTTPS で開いたときに使えます。",
+      S.health.https_url ? [" ", h("a", { href: S.health.https_url }, "HTTPS で開く")] : null) : null));
   setTimeout(() => pw.focus(), 50);
   return box;
 }
@@ -296,6 +297,7 @@ async function dataView(main) {
   card.append(h("div", { class: "row" }, h("h2", {}, c.name), h("span", { class: "muted small" }, c.description), h("span", { class: "spacer" }),
     h("a", { class: "btn", href: "/api/v1/collections/" + c.id + "/export", download: c.name + ".ndjson" }, "エクスポート"),
     h("button", { class: "btn", onclick: guard(async () => { const r = await api("POST", "/api/v1/collections/" + c.id + "/embed", { limit: 256 }); toast(r.embedded + " 件をベクトル化" + (r.more ? "（続きあり）" : "")); render(); }) }, "ベクトル化"),
+    h("button", { class: "btn", onclick: guard(async () => { if (!confirm(c.name + " のベクトルを削除します（埋め込みモデル変更時の作り直し用）")) return; const r = await api("DELETE", "/api/v1/collections/" + c.id + "/vectors"); toast(r.deleted + " 件削除。自動で再作成されます"); await api("POST", "/api/llm/embedding/run", {}).catch(() => {}); render(); }) }, "ベクトル再作成"),
     h("button", { class: "btn danger", onclick: guard(async () => { if (!confirm(c.name + " を削除しますか？（元に戻せません）")) return; await api("DELETE", "/api/v1/collections/" + c.id); S.collId = null; render(); }) }, "削除")));
   const fmt = sel([["ndjson", "NDJSON"], ["json", "JSON 配列"], ["csv", "CSV (id,title,body,url,date…)"], ["text", "テキスト1件"]], "ndjson");
   const data = h("textarea", { placeholder: '{"id":"JP2020-123456A","title":"…","abstract":"…","sections":{"claims":"【請求項１】…","description":"…"},"date":"2020-01-01"}' });
@@ -367,7 +369,8 @@ async function collectView(main) {
     main.append(h("div", { class: "card" }, h("div", { class: "row" }, h("h2", {}, c.label), h("span", { class: "tag" }, c.kind),
       c.key ? h("span", { class: "tag " + (c.configured ? "ok" : "warn") }, c.configured ? "キー設定済" : "キー未設定") : null), h("p", { class: "small muted" }, c.note),
       c.params.map(p => field(p.label, inputs[p.name] = h("input", { class: "wide", value: p.default ?? "" }))), field("保存先", coll),
-      h("div", { class: "row end" }, out, h("button", { class: "btn primary", onclick: guard(async (e) => { e.target.disabled = true;
+      c.key && !c.configured ? h("p", { class: "small" }, h("span", { class: "tag warn" }, "未登録のため使いません"), " 設定 > 外部キー で登録すると利用できます。") : null,
+      h("div", { class: "row end" }, out, h("button", { class: "btn primary", disabled: !!(c.key && !c.configured), onclick: guard(async (e) => { e.target.disabled = true;
         try { const params = {}; for (const k in inputs) params[k] = inputs[k].value; const r = await api("POST", "/api/v1/connectors/" + c.id + "/run", { params, collection: coll.value });
           out.textContent = r.collection + ": 取得 " + r.fetched + " / 追加 " + r.added + " / 更新 " + r.updated + "（" + r.ms + "ms）"; } finally { e.target.disabled = false; } }) }, "実行"))));
   });
@@ -385,16 +388,17 @@ async function settingsView(main) {
     const pks = await api("GET", "/api/auth/passkeys");
     const cur = h("input", { type: "password" }), nw = h("input", { type: "password" }), pkName = h("input", { placeholder: "例: iPhone Face ID" });
     body.append(h("div", { class: "card" }, h("h2", {}, "パスキー（顔認証 / 指紋）"),
-      h("p", { class: "small muted" }, "Face ID・Windows Hello などで管理Webにログインできます。ブラウザの仕様上 HTTPS 接続が必要です（例: Tailscale の https://<nas>.<tailnet>.ts.net 、myQNAPcloud 証明書、自己署名CA）。設定 server.tls_cert / tls_key に証明書を指定して再起動してください。"),
+      h("p", { class: "small muted" }, "Face ID・Windows Hello などで管理Webにログインできます。ブラウザの仕様上、名前付きの HTTPS アドレス（Tailscale の *.ts.net）で開いている必要があります。"),
       h("table", {}, pks.map(k => h("tr", {}, h("td", {}, k.name), h("td", { class: "small muted" }, "登録 " + fmtDate(k.created) + " / 最終 " + fmtDate(k.last_used)),
         h("td", {}, h("button", { class: "btn danger", onclick: guard(async () => { await api("DELETE", "/api/auth/passkeys/" + k.id); render(); }) }, "削除"))))),
-      h("div", { class: "row" }, pkName, h("button", { class: "btn primary", disabled: !window.isSecureContext || !window.PublicKeyCredential, onclick: guard(async () => {
+      h("div", { class: "row" }, pkName, h("button", { class: "btn primary", disabled: !S.meInfo.passkey_ready || !window.PublicKeyCredential, onclick: guard(async () => {
         const o = (await api("POST", "/api/auth/passkey/register/options", {})).publicKey;
         o.challenge = unb64u(o.challenge); o.user.id = unb64u(o.user.id); o.excludeCredentials = o.excludeCredentials.map(c => ({ ...c, id: unb64u(c.id) }));
         const cred = await navigator.credentials.create({ publicKey: o });
         await api("POST", "/api/auth/passkey/register/verify", { id: b64u(cred.rawId), clientDataJSON: b64u(cred.response.clientDataJSON), attestationObject: b64u(cred.response.attestationObject), name: pkName.value });
         toast("登録しました"); render(); }) }, "この端末を登録")),
-      !window.isSecureContext ? h("p", { class: "tag warn" }, "現在 HTTP 接続のため登録できません") : null),
+      !S.meInfo.passkey_ready ? h("p", { class: "tag warn" }, "現在の接続（" + location.origin + "）では登録できません。下の HTTPS 設定を行い https の名前で開いてください") : null),
+      httpsCard(),
       h("div", { class: "card" }, h("h2", {}, "パスワード変更"), field("現在のパスワード", cur), field("新しいパスワード（10文字以上）", nw),
         h("button", { class: "btn", onclick: guard(async () => { await api("POST", "/api/auth/password", { current: cur.value, password: nw.value }); toast("変更しました"); }) }, "変更"),
         h("button", { class: "btn", onclick: guard(async () => { await api("POST", "/api/auth/logout", {}); S.me = null; render(); }) }, "ログアウト")));
@@ -438,6 +442,16 @@ async function settingsView(main) {
     pre.textContent = JSON.stringify({ errors: b.errors.slice(-20), slow: b.slow, searches: b.searches.slice(-10), store: b.store, update: b.update }, null, 1);
   }
 }
+function httpsCard() {
+  const cmd = "tailscale serve --bg --https=8443 http://127.0.0.1:" + (location.port || "17871");
+  return h("div", { class: "card" }, h("h2", {}, "HTTPS（Tailscale Serve）"),
+    h("p", {}, "現在: ", h("span", { class: "tag " + (S.meInfo.https ? "ok" : "warn") }, S.meInfo.https ? "HTTPS" : "HTTP"), " ", S.meInfo.https_url ? h("a", { href: S.meInfo.https_url }, S.meInfo.https_url) : null),
+    h("ol", { class: "small" }, h("li", {}, "Tailscale 管理画面で MagicDNS と HTTPS 証明書を有効にする"),
+      h("li", {}, "NAS に SSH で入り次を実行（証明書の取得・更新は Tailscale が自動で行います）"),
+      h("li", {}, "https://<NAS名>.<tailnet名>.ts.net:8443/ を開き、パスワードでログインしてからパスキーを登録")),
+    h("div", { class: "row" }, h("code", {}, cmd), h("button", { class: "btn", onclick: () => { navigator.clipboard.writeText(cmd); toast("コピーしました"); } }, "コピー")),
+    h("p", { class: "small muted" }, "QnapDownloader が 443（https://<NAS名>.ts.net/）を使っているため、QnapLibrary は 8443 を使います。同じ証明書・同じ名前で共存でき、ログイン Cookie の名前も別なので干渉しません。HTTP（LAN の :" + (location.port || "17871") + "）も引き続き使えます。"));
+}
 function waitRestart(prev) {
   let n = 0; const t = setInterval(async () => { n++; try { const hh = await fetch("/api/health").then(r => r.json()); if (hh.version !== prev) { clearInterval(t); toast("v" + hh.version + " に更新されました"); setTimeout(() => location.reload(), 800); } } catch (e) {} if (n > 120) clearInterval(t); }, 3000);
 }
@@ -447,15 +461,27 @@ async function aiSettings(body) {
   const def = sel(provs.map(p => [p.id, p.label || p.id]), cfg.default_provider);
   const cards = provs.map(p => providerCard(p));
   const emb = cfg.embedding || {};
-  const eProv = sel([["", "（使わない）"]].concat(provs.map(p => [p.id, p.label || p.id])), emb.provider || ""), eModel = h("input", { value: emb.model || "", placeholder: "例: openai/text-embedding-3-small / qwen3-embedding:0.6b" }),
-    eDim = h("input", { type: "number", value: emb.dimensions || "" }), eQ = h("input", { value: emb.query_prefix || "", placeholder: "例: query: " }), eD = h("input", { value: emb.doc_prefix || "", placeholder: "例: passage: " }), topk = h("input", { type: "number", value: cfg.rag_top_k || 8 });
+  const eProv = sel([["", "（使わない）"]].concat(provs.map(p => [p.id, p.label || p.id])), emb.provider || ""), eModel = h("input", { value: emb.model || "", list: "emb-models", placeholder: "例: qwen/qwen3-embedding-8b / openai/text-embedding-3-small" }),
+    eDim = h("input", { type: "number", value: emb.dimensions || "" }), eTrunc = h("input", { type: "number", value: emb.truncate_dim || "" }), eAuto = h("input", { type: "checkbox", checked: emb.auto !== false }),
+    eList = h("datalist", { id: "emb-models" }), eStat = h("div", { class: "small muted" }), eQ = h("input", { value: emb.query_prefix || "", placeholder: "例: query: " }), eD = h("input", { value: emb.doc_prefix || "", placeholder: "例: passage: " }), topk = h("input", { type: "number", value: cfg.rag_top_k || 8 });
   body.append(h("div", { class: "card" }, field("既定のプロバイダ", def), field("RAG で渡す根拠数", topk)), ...cards.map(c => c.el),
-    h("div", { class: "card" }, h("h2", {}, "埋め込み（ベクトル検索・任意）"), h("p", { class: "small muted" }, "NAS（Celeron）での埋め込み計算は遅いため、OpenRouter / 別PCの Ollama などの /embeddings を使います。未設定でも全文検索で動作します。"),
-      field("プロバイダ", eProv), field("モデル", eModel), field("次元（任意）", eDim), field("クエリ接頭辞", eQ), field("文書接頭辞", eD)),
+    h("div", { class: "card" }, h("h2", {}, "埋め込み（ベクトル検索・任意）"), h("p", { class: "small muted" }, "既定は OpenRouter の qwen/qwen3-embedding-8b（多言語・低価格）。OpenRouter の API キーを登録すると、取り込んだ文書を自動でベクトル化します（NAS では計算しません）。別PCの Ollama なども選べます。未設定でも全文検索で動作します。"),
+      eStat, field("プロバイダ", eProv), field("モデル", eModel), eList,
+      h("div", { class: "row" }, field("次元を切り詰め（RAM節約, 推奨1024）", eTrunc), field("APIに渡す dimensions（任意）", eDim)),
+      field("クエリ接頭辞", eQ), field("文書接頭辞", eD), h("label", {}, eAuto, " 取り込み時に自動でベクトル化"),
+      h("div", { class: "row" }, h("button", { class: "btn", onclick: guard(async () => { const r = await api("GET", "/api/llm/embedding-models?provider=" + encodeURIComponent(eProv.value)); clear(eList).append(...r.models.map(m => h("option", { value: m.id }, m.name + (m.price ? " $" + m.price : "")))); toast(r.models.length + " モデル"); }) }, "モデル一覧を取得"),
+        h("button", { class: "btn", onclick: guard(async () => { await api("POST", "/api/llm/embedding/run", {}); toast("ベクトル化を開始しました"); }) }, "未処理を今すぐベクトル化"))),
     jsonEditor(provs, def),
     h("div", { class: "card row" }, h("span", { class: "spacer" }), h("button", { class: "btn primary", onclick: guard(async () => {
         await api("PUT", "/api/llm/providers", { providers: cards.map(c => c.value()), default_provider: def.value, rag_top_k: +topk.value,
-          embedding: { provider: eProv.value, model: eModel.value, dimensions: eDim.value ? +eDim.value : null, query_prefix: eQ.value, doc_prefix: eD.value, batch: 32 } }); toast("保存しました"); render(); }) }, "すべて保存")));
+          embedding: { provider: eProv.value, model: eModel.value, dimensions: eDim.value ? +eDim.value : null, truncate_dim: eTrunc.value ? +eTrunc.value : null, auto: eAuto.checked, query_prefix: eQ.value, doc_prefix: eD.value, batch: 32 } }); toast("保存しました"); render(); }) }, "すべて保存")));
+  embedStatus(eStat);
+}
+async function embedStatus(el) {
+  try { const r = await api("GET", "/api/llm/embedding"); const st = r.status;
+    clear(el).append(h("span", { class: "tag " + (st.enabled ? "ok" : "warn") }, st.enabled ? "有効" : "無効（キー未設定など）"), " 未処理 ", String(st.pending ?? "-"), " / 実行中 ", st.running ? "はい" : "いいえ",
+      st.last_error ? h("div", { class: "tag bad" }, st.last_error) : null, r.vector_models.length ? h("div", {}, "保存済み: " + r.vector_models.map(m => m.model + " (" + m.dim + "次元×" + m.n + ")").join(", ")) : null);
+  } catch (e) { el.textContent = e.message; }
 }
 function jsonEditor(provs, def) {
   const clean = provs.map(({ secret_status, ...rest }) => rest);

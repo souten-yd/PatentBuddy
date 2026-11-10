@@ -18,6 +18,9 @@ SAMPLING_KEYS = ("temperature", "top_p", "top_k", "max_tokens", "frequency_penal
                  "repetition_penalty", "min_p", "seed", "stop")
 
 
+_QUERY_CACHE = {}
+
+
 class LLMError(RuntimeError):
     pass
 
@@ -186,14 +189,53 @@ class Providers:
 
     def embedding_enabled(self):
         cfg = self.embedding_config()
-        return bool(cfg.get("provider") and cfg.get("model"))
+        if not (cfg.get("provider") and cfg.get("model")):
+            return False
+        try:
+            p = self.get(cfg["provider"])
+        except LLMError:
+            return False
+        return not p.get("secret") or bool(self.config.secret(p["secret"])) or p.get("type") != "openrouter"
+
+    def embedding_tag(self):
+        """Identifier stored with vectors: model + truncation, so different spaces never mix."""
+        cfg = self.embedding_config()
+        tag = str(cfg.get("model") or "")
+        if cfg.get("truncate_dim"):
+            tag += "@%d" % int(cfg["truncate_dim"])
+        return tag
 
     def embed(self, texts, query=False):
         cfg = self.embedding_config()
         if not self.embedding_enabled():
-            raise LLMError("埋め込みプロバイダが未設定です")
+            raise LLMError("埋め込みプロバイダが未設定です（OpenRouter の場合は API キーを設定）")
+        key = None
+        if query and len(texts) == 1:
+            key = (self.embedding_tag(), texts[0])
+            hit = _QUERY_CACHE.get(key)
+            if hit is not None:
+                return [hit]
+        vecs = self._embed_raw(cfg, texts, query)
+        trunc = int(cfg.get("truncate_dim") or 0)
+        if trunc:
+            vecs = [v[:trunc] for v in vecs]
+        if key is not None:
+            if len(_QUERY_CACHE) > 256:
+                _QUERY_CACHE.pop(next(iter(_QUERY_CACHE)))
+            _QUERY_CACHE[key] = vecs[0]
+        return vecs
+
+    def embedding_models(self, provider=None):
+        p = self.get(provider or self.embedding_config().get("provider"))
+        path = "/embeddings/models" if p.get("type") == "openrouter" else "/models"
+        data = self._request(p, path, timeout=30)
+        items = data.get("data") if isinstance(data, dict) else data
+        return [{"id": m.get("id"), "name": m.get("name") or m.get("id"),
+                 "price": (m.get("pricing") or {}).get("prompt")} for m in items or [] if isinstance(m, dict)]
+
+    def _embed_raw(self, cfg, texts, query):
         p = self.get(cfg["provider"])
-        prefix = cfg.get("query_prefix" if query else "doc_prefix") or ""
+        prefix = (cfg.get("query_prefix") or "") if query else ""
         body = {"model": cfg["model"], "input": [prefix + t[:8000] for t in texts]}
         if cfg.get("dimensions"):
             body["dimensions"] = int(cfg["dimensions"])

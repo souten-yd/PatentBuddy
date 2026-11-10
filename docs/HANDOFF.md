@@ -4,7 +4,8 @@
 
 ## 現在のバージョン
 
-- v0.1.0（PR #1 `feat/v0.1.0-foundation` → main、タグ `v0.1.0` で release.yml が QPKG / Linux tar.gz を公開）
+- v0.1.0: PR #1 をマージ済み（リリースは未作成。開発環境からのタグ push・API でのタグ作成・workflow_dispatch がプロキシで禁止されているため）
+- v0.1.1: PR #2（release.yml を「main マージでバージョンファイルが変わったら自動リリース」に変更、Tailscale Serve HTTPS、OpenRouter 既定の自動ベクトル化、未登録キーの収集元を無効表示）
 
 ## 状態（2026-11-10）
 
@@ -23,11 +24,11 @@
 
 ## 次の一手
 
-1. v0.1.0 リリース後、Linux 版 v0.1.0 → v0.1.1 の自己更新を実地確認（結果をここに記録）
+1. PR #2 マージ → v0.1.1 の自動リリース確認 → ローカルの Linux 版 v0.1.0 から v0.1.1 への自己更新を実地確認（結果をここに記録）
 2. `docs/proposals.md` の 1（特許ウォッチ）→ 2（IPC/FI 辞書）→ 3（審査基準）→ 5（期限通知）
 
 ## 既知の問題 / 未決事項
 
-- `docs/feasibility.md`「早期判断が必要な点」4 点は所有者の回答待ち（既定は推奨案で実装済み）
+- 所有者の決定事項は `docs/feasibility.md` 末尾（パスキー採用、Tailscale 8443、埋め込み既定 OpenRouter、JPO 未登録）
 - JPO API・USPTO ODP のエンドポイントは公開仕様に基づく実験実装。キー取得後に実地調整が必要
 - QTS の Python3 QPKG の SQLite に FTS5 が無い場合は LIKE 検索に自動フォールバック（遅い）。実機で `/api/v1/stats` の `fts5` を確認すること

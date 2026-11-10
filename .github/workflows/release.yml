@@ -1,21 +1,19 @@
 name: release
 
 # The ONLY workflow in this repository (DEVELOPMENT_WORKFLOW.md §2: keep GitHub Actions cost minimal).
-# Runs on a version tag push or manual dispatch. No push/PR CI: tests run locally before merge.
+# Runs only when a merge to main changes the version file (qnaplibrary/__init__.py), or manually.
+# No push/PR CI: tests run locally before merge. If the release for the version already exists it stops.
 on:
   push:
-    tags: ["v*.*.*"]
+    branches: [main]
+    paths: ["qnaplibrary/__init__.py"]
   workflow_dispatch:
-    inputs:
-      tag:
-        description: "Existing tag to (re)build, e.g. v0.1.0"
-        required: true
 
 permissions:
   contents: write
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release
   cancel-in-progress: false
 
 jobs:
@@ -25,42 +23,41 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 1
 
-      - name: Version check
+      - name: Version / skip if already released
         id: v
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          tag="${{ inputs.tag || github.ref_name }}"
           ver=$(python3 -c "import qnaplibrary; print(qnaplibrary.VERSION)")
-          [ "v$ver" = "$tag" ] || { echo "tag $tag != app version $ver" >&2; exit 1; }
           echo "version=$ver" >> "$GITHUB_OUTPUT"
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if gh release view "v$ver" >/dev/null 2>&1; then
+            echo "v$ver already released; nothing to do"
+            echo "skip=1" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Tests (fast, stdlib only)
+        if: steps.v.outputs.skip != '1'
         run: python3 -m unittest discover -s tests -t . -q
 
       - name: Build Linux package
+        if: steps.v.outputs.skip != '1'
         run: bash scripts/build-linux.sh dist
 
       - name: Build QPKG (QDK pinned)
+        if: steps.v.outputs.skip != '1'
         run: |
           command -v rsync >/dev/null || sudo apt-get install -y --no-install-recommends rsync
           bash scripts/build-qpkg.sh dist
 
-      - name: Release notes from CHANGELOG
-        run: |
-          awk -v v="## v${{ steps.v.outputs.version }}" '$0==v {on=1; next} /^## v/ && on {exit} on' CHANGELOG.md > dist/notes.md
-          printf '\n---\nアセット: QPKG（QNAP x86_64）/ Linux tar.gz。SHA-256 は各 .sha256 と GitHub の digest で確認できます。\n' >> dist/notes.md
-
-      - name: Publish
+      - name: Publish release (creates the tag on this commit)
+        if: steps.v.outputs.skip != '1'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tag="${{ steps.v.outputs.tag }}"
-          files=(dist/*.qpkg dist/*.qpkg.sha256 dist/*.tar.gz dist/*.tar.gz.sha256)
-          if gh release view "$tag" >/dev/null 2>&1; then
-            gh release upload "$tag" "${files[@]}" --clobber
-          else
-            gh release create "$tag" "${files[@]}" --title "QnapLibrary $tag" --notes-file dist/notes.md --verify-tag
-          fi
+          ver="${{ steps.v.outputs.version }}"
+          awk -v v="## v$ver" '$0==v {on=1; next} /^## v/ && on {exit} on' CHANGELOG.md > dist/notes.md
+          printf '\n---\nアセット: QPKG（QNAP x86_64）/ Linux tar.gz。SHA-256 は各 .sha256 と GitHub の digest で確認できます。\n' >> dist/notes.md
+          gh release create "v$ver" dist/*.qpkg dist/*.qpkg.sha256 dist/*.tar.gz dist/*.tar.gz.sha256 \
+            --target "$GITHUB_SHA" --title "QnapLibrary v$ver" --notes-file dist/notes.md

@@ -77,9 +77,11 @@ class DocsRulesTest(unittest.TestCase):
         flows = sorted(p.name for p in (ROOT / ".github" / "workflows").glob("*.y*ml"))
         self.assertEqual(flows, ["release.yml"])
         text = (ROOT / ".github" / "workflows" / "release.yml").read_text()
-        on = text.split("on:", 1)[1].split("permissions:", 1)[0]
+        on = text.split("\non:", 1)[1].split("permissions:", 1)[0]
         self.assertNotIn("pull_request", on)
-        self.assertNotIn("branches", on)
+        # only merges to main that change the version file may trigger it
+        self.assertIn('branches: [main]', on)
+        self.assertIn('paths: ["qnaplibrary/__init__.py"]', on)
 
     def test_readme_has_no_version_history(self):
         readme = (ROOT / "README.md").read_text()

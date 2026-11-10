@@ -21,8 +21,9 @@ PURE_PYTHON_FULL_SCAN = 20000
 
 
 class VectorIndex:
-    def __init__(self, store):
+    def __init__(self, store, model_fn=None):
         self.store = store
+        self.model_fn = model_fn  # returns the embedding tag to use (None: all vectors, first dim)
         self._lock = threading.Lock()
         self._version = -1
         self._ids = []
@@ -31,11 +32,14 @@ class VectorIndex:
         self._model = ""
         self._mat = None      # numpy matrix (n, dim) normalised, or list of arrays
         self._pos = {}
+        self._model_key = object()
 
     def _load(self):
-        if self._version == self.store.vector_version:
+        model = self.model_fn() if self.model_fn else None
+        if self._version == self.store.vector_version and self._model_key == model:
             return
-        rows = self.store.load_vectors()
+        self._model_key = model
+        rows = self.store.load_vectors(model)
         ids, colls, vecs, dim, model = [], [], [], 0, ""
         for r in rows:
             if dim and r["dim"] != dim:
@@ -104,10 +108,10 @@ def rrf(rankings, k=60):
 
 
 class Searcher:
-    def __init__(self, store, config, embedder=None):
+    def __init__(self, store, config, embedder=None, model_fn=None):
         self.store = store
         self.config = config
-        self.vectors = VectorIndex(store)
+        self.vectors = VectorIndex(store, model_fn)
         self.embedder = embedder  # callable(list[str]) -> list[list[float]] or None
 
     def search(self, query, collections=None, limit=20, mode="hybrid", group_by_doc=True, qvec=None):

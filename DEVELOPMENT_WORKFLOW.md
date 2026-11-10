@@ -17,8 +17,9 @@
 ## 2. GitHub Actions（費用最小化ルール）
 
 - **PR / push での自動 CI は置かない**。テスト・ビルドはローカル（`scripts/verify.sh`、`scripts/build-linux.sh`）で行い、結果を PR に記録する。
-- Actions で動くのは `release.yml` **1 本だけ**。起動条件は `v*` タグの push と手動実行のみ。中身は QPKG ビルド（QDK が必要なため）と
-  リリース資産の添付だけで、10 分以内で終わる構成を保つ。
+- Actions で動くのは `release.yml` **1 本だけ**。起動条件は「main へのマージでバージョンファイル `qnaplibrary/__init__.py` が変わったとき」と手動実行のみ
+  （同じ版のリリースが既にあれば即終了）。中身はテスト・Linux/QPKG ビルド（QDK が必要なため）・リリース作成だけで、10 分以内で終わる構成を保つ。
+- バージョンを上げない PR（ドキュメント・小修正の途中など）では Actions は一切動かない。
 - 新しいワークフローの追加、トリガーの拡大、マトリクス化、キャッシュ肥大化は**所有者の明示許可なしに行わない**。
 - 失敗した release ジョブの再実行は原因を直してから 1 回だけ。
 
@@ -26,8 +27,8 @@
 
 1. PR 内でバージョンを上げる（3 箇所: `qnaplibrary/__init__.py` の `VERSION`、`qpkg/qpkg.cfg` の `QPKG_VER`、`CHANGELOG.md` 先頭）。
 2. ローカルで `bash scripts/verify.sh` と `bash scripts/build-linux.sh dist` を実行。
-3. PR をマージ → main を pull → `git tag vX.Y.Z && git push origin vX.Y.Z`。
-4. `release.yml` が QPKG を作り、Linux tar.gz と合わせて Release に添付する（各資産の SHA-256 はGitHubの `digest` と `.sha256` ファイル）。
+3. PR をマージする。バージョンファイルが変わるので `release.yml` が自動でタグ `vX.Y.Z` とリリースを作る（開発環境からのタグ push は不要）。
+4. QPKG と Linux tar.gz が Release に添付される（各資産の SHA-256 は GitHub の `digest` と `.sha256` ファイル）。`gh run list` / Actions 画面で成功を確認。
 5. Release 公開後、旧バージョンを起動し管理 Web「更新」から更新して、`/api/health` の version が上がることを確認する。結果を HANDOFF に記録。
 
 資産名は固定: `QnapLibrary_<X.Y.Z>_x86_64.qpkg`、`qnaplibrary-<X.Y.Z>-linux.tar.gz`（＋各 `.sha256`）。自動更新はこの名前と SHA-256 で検証する。

@@ -42,14 +42,18 @@ tar xzf qnaplibrary-<版>-linux.tar.gz && cd qnaplibrary-<版>
 ## 初期設定
 
 1. 管理者パスワードを設定
-2. 設定 > AI: QnapAssistant（既定）や OpenRouter のモデルを選び、外部キーに OpenRouter の API キーを登録
+2. 設定 > 外部キー: OpenRouter の API キーを登録（AI 支援とベクトル化に使用。ベクトル化は既定で OpenRouter、設定 > AI で変更可）
 3. 設定 > デバイス接続: ペアリング用パスコードを設定（別PC・AI から利用する場合）
 4. データ: コレクションを作成して取り込み、または 収集 から外部データを取得
 
 ## HTTPS とパスキー（顔認証）
 
-パスキーはブラウザの仕様で HTTPS が必要です。Tailscale を使っている場合は `tailscale cert` で取得した証明書、
-または myQNAPcloud の証明書を、設定ファイル `settings.json` の `server.tls_cert` / `server.tls_key` に指定して再起動してください。
+パスキーはブラウザの仕様で HTTPS が必要です。NAS で次を実行し、`https://<NAS名>.<tailnet名>.ts.net:8443/` で開いてください
+（QnapDownloader が使う 443 とは別ポートなので共存できます）。詳しくは [docs/https.md](docs/https.md)。
+
+```sh
+tailscale serve --bg --https=8443 http://127.0.0.1:17871
+```
 
 ## 使い方
 
