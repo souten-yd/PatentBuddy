@@ -54,3 +54,12 @@ def public_reference_messages(topic):
         raise ValueError("公開情報ガイドの種類が不正です")
     return [{"role": "system", "content": "一般公開されている特許制度の説明のみ。個別案件の評価や出願の結論は行わず、公式資料確認を促してください。"},
             {"role": "user", "content": PUBLIC_REFERENCE_TOPICS[topic]}]
+
+
+def fixed_public_request(path, body):
+    """Prove externally-bound prompts equal one of our server-owned templates."""
+    if path != "/chat/completions" or not isinstance(body, dict):
+        return False
+    messages = body.get("messages")
+    return any(messages == public_reference_messages(topic)
+               for topic in PUBLIC_REFERENCE_TOPICS)
