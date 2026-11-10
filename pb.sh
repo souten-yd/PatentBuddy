@@ -22,7 +22,7 @@ PY
     ;;
   serve)
     [ "$(id -u)" -ne 0 ] || { echo "root cannot run PatentBuddy Add-on" >&2; exit 1; }
-    DATA=${PATENT_BUDDY_DATA_DIR:-"$HOME/.local/share/patentbuddy"}
+    DATA=${PATENT_BUDDY_DATA_DIR:-${CONTROL_DECK_FEATURE_DATA_DIR:-"$HOME/.local/share/patentbuddy"}}
     case "$DATA" in
       /*) ;;
       *) echo "PATENT_BUDDY_DATA_DIR must be an absolute path" >&2; exit 2 ;;
