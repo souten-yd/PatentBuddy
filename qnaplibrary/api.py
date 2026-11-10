@@ -49,7 +49,7 @@ def _err(status, message):
 @route("GET", "/api/health", "public")
 def health(req):
     a = req.app
-    return {"app": "QnapLibrary", "version": VERSION, "ok": True, "setup_required": not a.auth.admin_configured(),
+    return {"app": "QnapPatentBuddy", "version": VERSION, "ok": True, "setup_required": not a.auth.admin_configured(),
             "pairing": a.auth.pairing_enabled(), "https": req.is_https(), "https_url": a.config.get("server", "https_url", default=""), "uptime_s": round(time.time() - a.started)}
 
 
@@ -137,8 +137,8 @@ def passkey_register_options(req):
         handle = webauthn.b64url_encode(_s.token_bytes(16))
         app.config.set_secret("passkey_user_handle", handle)
     return {"publicKey": {
-        "challenge": challenge, "rp": {"id": rp_id, "name": "QnapLibrary"},
-        "user": {"id": handle, "name": "admin", "displayName": "QnapLibrary 管理者"},
+        "challenge": challenge, "rp": {"id": rp_id, "name": "QnapPatentBuddy"},
+        "user": {"id": handle, "name": "admin", "displayName": "QnapPatentBuddy 管理者"},
         "pubKeyCredParams": [{"type": "public-key", "alg": webauthn.ALG_ES256}, {"type": "public-key", "alg": webauthn.ALG_RS256}],
         "timeout": 120000, "attestation": "none",
         "authenticatorSelection": {"residentKey": "preferred", "userVerification": "required"},
