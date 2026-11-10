@@ -104,3 +104,5 @@ Linux tar.gzに同梱し、インストール後は `<prefix>/current/rdh.sh` �
 ## PatentBuddy（ControlDeckの特許アドオン）
 
 ResearchDataHubは資料の保存・収集・検索サーバーです。別のPatentBuddyアドオンはControlDeckのオプション機能として管理し、サーバーの認証APIへ接続して文献を検索・閲覧します。アドオン内に文献の正本DBは作りません。画面には各サービスの役割・接続先・バージョンを表示します。接続は [アドオン設定](docs/controldeck-addon-plan.md) を参照してください。
+
+同じLinuxユーザーで稼働するPatentBuddyとResearchDataHubは、トークン入力なしで読み取り専用接続を確立します。[ローカル自動認証の条件](docs/local-addon-auth.md)を参照してください。

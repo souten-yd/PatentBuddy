@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## v0.5.6
+- 同じLinuxユーザーで動くPatentBuddyとResearchDataHubは、OSの接続元確認で読み取り専用のローカル接続を自動確立します。トークンの手入力・永続保存は不要で、再起動すると旧認証情報は失効します。リモート接続は従来どおり明示設定が必要です。
+
 ## v0.5.5
 - PatentBuddyのControlDeck向けプレビュー画面を追加。Host認証後にResearchDataHubの文献を検索・閲覧し、アドオンと保存先サーバーの接続状態・バージョンを区別して表示します。
 - アドオンは独自の文献DBを作らず、ResearchDataHubの認証APIを利用します。AI/ジョブ操作の統合はまだ含みません。

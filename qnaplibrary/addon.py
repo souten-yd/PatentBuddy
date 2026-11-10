@@ -7,9 +7,9 @@ exposed here. The complete Host browser bridge / identity integration is A1.
 from . import VERSION
 
 
-def health_report():
+def health_report(local_connected=False):
     """Host Add-on v2 status: do not advertise an unimplemented workspace as ready."""
-    return {
+    report = {
         "app": "PatentBuddy", "version": VERSION, "service_role": "patent-addon",
         "status": "setup_required",
         "contract_version": "2.0",
@@ -27,3 +27,8 @@ def health_report():
             "action": {"kind": "documentation"},
         }],
     }
+
+    if local_connected:
+        report.update(status="healthy", reason_code="ready", message="ResearchDataHubへローカル自動認証で接続済みです。", setup=[])
+        report.pop("action", None)
+    return report

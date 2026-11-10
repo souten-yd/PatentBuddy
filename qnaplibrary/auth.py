@@ -179,6 +179,7 @@ class Auth:
         self.sessions = Sessions(config.get("auth", "session_hours", default=720), store)
         self.limiter = RateLimiter()
         self._device_seen = {}
+        self._local_token = "qll_" + secrets.token_urlsafe(32)
 
     # admin --------------------------------------------------------------
     def admin_configured(self):
@@ -221,7 +222,22 @@ class Auth:
                                         (name, token_hash(token), scopes, time.time()))
         return {"id": cur.lastrowid, "name": name, "token": token, "scopes": scopes}
 
+    def local_token(self):
+        if self.admin_configured() and self.config.get("auth", "local_auto_connect", default=True):
+            return self._local_token
+        return None
+
     def device_for_token(self, token, ip):
+        if token and token.startswith("qll_"):
+            import ipaddress
+            try:
+                loopback = ipaddress.ip_address(ip).is_loopback
+            except ValueError:
+                loopback = False
+            current = self.local_token()
+            if loopback and current and secrets.compare_digest(token, current):
+                return {"id": 0, "name": "Local same-user client", "scopes": "ro"}
+            return None
         if not token or not token.startswith("qlt_"):
             return None
         row = self.store.one("SELECT * FROM devices WHERE token_hash=?", (token_hash(token),))
