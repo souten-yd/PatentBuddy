@@ -31,11 +31,11 @@
 1. **設計チェックポイント（PR #16、docs-only）**: 名前/責務/データ正本/機密境界を `researchdatahub-plan.md` に確定。Codex向け詳細は `CODEX_NEXT.md`。**まだLinux aliasなどの新コードは未実装**。
 2. **Linux PC用ResearchDataHub（次のPR）**: `python3 -m researchdatahub` と `rdh.sh`、同じbackendのままLinux配布へ。旧`qnaplibrary` / QPKG ID / 17871 / DBパスを壊さずブランドを分離。
 3. **認証・公開資料API**: 既存Draft PR #11（パスキー/セッション/更新501）と #15（公開承認済み抜粋限定API）を再検証。未公開発明/請求項はクラウドLLMに出さない（PR #12はmain反映済み）。
-4. **大量文献API・規格対応**: Draft PR #13のバッチ冪等・カーソルを再検証し、特許・規格を問わず使える整理/索引とベンチマークを追加。
+4. **ResearchDataHub保存効率・低I/O・大量API**: [性能要件](researchdatahub-performance.md)に従って、同一再送/大量登録/索引検索/アイドル時の物理I/Oと時間を測定。Draft PR #13のバッチ冪等・必要列のみ一覧・IDカーソルをテストして汎用化。索引・圧縮・並列化は実測で利点が確認できた場合のみ採用。
 5. **ControlDeck PatentBuddy**: Draft PR #14のAdd-on v2 A0を更新し、Host認証、ResearchDataHub API接続、ローカルLLM、Jobs、GraphRAG、iPhone対応へ進む。PCに別の正本DBを作らない。
 6. **本番のQNAP移行（最後）**: PCの正本から検証済みスナップショット、設定・パスキー・秘密・文書をQNAPへ安全移動。PCとNASの同時書込は不可。ControlDeck側はそのまま利用。
 
-[決定したアーキテクチャ](researchdatahub-plan.md) / [Codex実装・受入指示](CODEX_NEXT.md)
+[決定したアーキテクチャ](researchdatahub-plan.md) / [保存・I/O性能受入基準](researchdatahub-performance.md) / [Codex実装・受入指示](CODEX_NEXT.md)
 
 ## 特許専用ロードマップ（v0.6以降）
 
