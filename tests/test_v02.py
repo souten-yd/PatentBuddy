@@ -45,7 +45,7 @@ class WatchNotifyTest(unittest.TestCase):
     def test_watch_scores_new_docs_and_promotes_hit(self):
         st, p = self.c.call("POST", "/api/v1/patents", {"title": "全固体電池"})
         self.c.call("POST", "/api/v1/patents/%d/claims" % p["id"], {"text": "【請求項１】硫化物系固体電解質層を備える全固体電池。"})
-        st, w = self.c.call("POST", "/api/v1/watches", {"name": "EPO電池", "connector": "epo_ops", "params": {"query": "x"},
+        st, w = self.c.call("POST", "/api/v1/watches", {"name": "EPO電池", "connector": "epo_ops", "params": {"query": "x", "public_only_confirmed": True},
                                                          "collection": "watch-epo", "patent_id": p["id"], "interval_hours": 1})
         self.assertEqual(w["interval_hours"], 6)  # minimum enforced
         docs = [{"id": "EP1", "title": "硫化物系固体電解質を用いた電池", "body": "固体電解質層"},
@@ -55,7 +55,7 @@ class WatchNotifyTest(unittest.TestCase):
         self.assertIn("新規 2", r["last_status"])
         st, hits = self.c.call("GET", "/api/v1/watch-hits?patent_id=%d" % p["id"])
         self.assertEqual(hits["hits"][0]["ext_id"], "EP1")
-        self.assertTrue(RECEIVED and "新しい候補" in RECEIVED[0]["title"])
+        self.assertTrue(RECEIVED and "QnapPatentBuddy 通知" in RECEIVED[0]["title"])
         with mock.patch("qnaplibrary.connectors.run", return_value=docs):  # same docs again: no new hits
             st, r = self.c.call("POST", "/api/v1/watches/%d/run" % w["id"], {})
         self.assertIn("新規 0", r["last_status"])
@@ -71,7 +71,7 @@ class WatchNotifyTest(unittest.TestCase):
         self.c.call("POST", "/api/v1/patents/%d/events" % p["id"], {"kind": "oa_dispatch", "date": oa})
         st, r = self.c.call("POST", "/api/notify/deadlines", {})
         self.assertGreaterEqual(r["sent"], 1)
-        self.assertTrue(any("期限テスト" in m["title"] for m in RECEIVED))
+        self.assertTrue(any("QnapPatentBuddy 通知" in m["title"] for m in RECEIVED))
         n = len(RECEIVED)
         self.c.call("POST", "/api/notify/deadlines", {})
         self.assertEqual(len(RECEIVED), n)  # not repeated
