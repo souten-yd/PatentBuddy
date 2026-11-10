@@ -4,7 +4,7 @@
 
 ## 現在のバージョン
 
-- **v0.5.0（リリース済み・最新）**: https://github.com/souten-yd/QnapLibrary/releases/tag/v0.5.0 — PR #8 マージ済み。手動 SQLite バックアップ、iOS ホーム画面アイコン、ホーム UI 改善と進行状況表示。
+- **v0.5.0（直近公開済み）**: https://github.com/souten-yd/QnapLibrary/releases/tag/v0.5.0 — PR #8 マージ済み。手動 SQLite バックアップ、iOS ホーム画面アイコン、ホーム UI 改善と進行状況表示。
 - v0.4.0（直前）: https://github.com/souten-yd/QnapLibrary/releases/tag/v0.4.0
 - 履歴: v0.1.1（HTTPS 8443・OpenRouter 埋め込み）→ v0.2.0（ウォッチ・通知・分類・審査基準）→ v0.3.0（Qdrant・リランカー・分析・PC クライアント）→ v0.4.0（調査ジョブ・市場データ・規格）
 - ロードマップ v0.1〜v0.5 は完了。次の候補は `docs/roadmap.md` 末尾と `docs/proposals.md`（定期バックアップ・調査の自動化など）
@@ -44,6 +44,14 @@
 - iOS ホーム画面向け 180×180 不透明 PNG アイコンとメタデータ、既存 SVG/QPKG アイコンの共通デザイン。
 - ホーム画面の KPI をモバイル 2 列表示へ整理。処理状況（埋め込み・調査・Qdrant 同期・更新）を既存 API の読み取りのみで表示し、20 秒間隔の状態更新はホーム表示中のみ実施。技術詳細は折りたたみ。
 - PR #8 は `main` にマージ済み（squash SHA `bcdc7e5f82eacb0805133f85fb16f2d0836e7933`）。2026-11-10 の GitHub Actions で 52 tests OK、Linux/QPKG 両パッケージ作成・公開を確認。QNAP/iPhone 実機確認は **未実施**。
+
+## 機密保護改修（PR #12 / v0.5.1、進行中）
+- [x] OpenRouter/クラウドAIへ未公開発明・チャット・埋め込み・リランクが流れないように送信直前で fail-closed 制限。ローカルのモデル中継の危険もチェック方式で対処。
+- [x] 公開制度の固定一般ガイド、外部コネクタの明示承認、既存ウォッチ自動収集の承認ゲート、通知の本文秘匿、Qdrant loopback 限定。
+- [x] [特許専用の段階的機能計画](patent-feature-plan.md) と [機密境界](privacy-boundary.md) を追加。
+- [ ] PR #12 の差分/全テスト/バイナリ検査、GitHub Actions、QNAP実機での実通信の確認。**未検証のまま完成・流出ゼロと断言しない**。
+- [ ] PR #11（管理ログイン永続化・パスキー/501修正）、PR #10（機密対照付きAIクレームチャート）は継続保留。#10 は #12 安全対策に依存。PR #11 の v0.5.1 競合は次のマージ前に調整が必要。
+- [ ] NAS上のローカルLLM自体が外部クラウドへ中継しないことは実機で別途検証する必要がある。アプリ単体ではOSや他プロセスの通信までは保証できない。
 
 ## 次の一手
 
