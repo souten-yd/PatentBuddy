@@ -8,6 +8,7 @@ import io
 import json
 import re
 import time
+import urllib.parse
 
 from . import VERSION, connectors, debuglog, mcp, patents as patents_mod, store as store_mod, webauthn
 from .auth import is_local_network
@@ -15,7 +16,7 @@ from .llm import LLMError
 
 ROUTES = []
 SECRET_NAMES = ("openrouter_api_key", "epo_ops_key", "epo_ops_secret", "jpo_username", "jpo_password",
-                "uspto_api_key", "openai_api_key")
+                "uspto_api_key", "openai_api_key", "smtp_password")
 
 
 def route(method, pattern, auth="admin"):
@@ -32,7 +33,7 @@ def match(method, path):
         if r["method"] == method:
             m = r["regex"].match(path)
             if m:
-                return r, m.groupdict()
+                return r, {k: urllib.parse.unquote(v) for k, v in m.groupdict().items()}
     return None, {}
 
 
@@ -271,7 +272,7 @@ def settings_get(req):
 @route("PUT", "/api/settings", "admin")
 def settings_put(req):
     patch = req.json()
-    allowed = {"server", "auth", "update", "search", "connectors"}
+    allowed = {"server", "auth", "update", "search", "connectors", "notify"}
     bad = set(patch) - allowed
     if bad:
         raise _err(400, "変更できない項目: %s（LLMは /api/llm/providers）" % ", ".join(sorted(bad)))
@@ -346,6 +347,20 @@ def parse_import(fmt, data):
             known = {k: row.pop(k, "") for k in ("id", "title", "body", "url", "date", "source", "abstract")}
             known["meta"] = {k: v for k, v in row.items() if k and v}
             docs.append(known)
+        return docs
+    if fmt == "codes":
+        # classification dictionary: "CODE<TAB or 2+ spaces>TITLE" per line (IPC / FI / F-term / CPC / ICS)
+        docs = []
+        for line in data.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = re.split(r"\t|\s{2,}", line, maxsplit=1)
+            if len(parts) != 2:
+                parts = line.split(" ", 1)
+            if len(parts) == 2:
+                code, title = parts[0].strip(), parts[1].strip()
+                docs.append({"id": code, "title": code + " " + title, "body": title, "meta": {"code": code}})
         return docs
     if fmt == "text":
         return [{"title": data.strip().splitlines()[0][:200] if data.strip() else "text", "body": data}]
@@ -555,6 +570,66 @@ def patents_parse(req):
     text = req.json().get("text", "")
     from .textproc import split_claims
     return {"claims": [{"no": n, "text": t, "elements": patents_mod.claim_elements(t)} for n, t in split_claims(text)]}
+
+
+@route("GET", "/api/v1/classify", "read")
+def classify(req):
+    """Look up classification codes (IPC/FI/F-term...) in collections of kind 'classification'."""
+    q = req.arg("q", "")
+    if not q:
+        raise _err(400, "q が必要です")
+    res = req.app.searcher.search(q, None, int(req.arg("limit", 15)), "keyword", kinds=["classification"])
+    return {"codes": [{"code": r["ext_id"], "title": r["title"], "collection": r["collection"]} for r in res["results"]]}
+
+
+# watches ----------------------------------------------------------------------
+@route("GET", "/api/v1/watches", "read")
+def watches_list(req):
+    return {"watches": req.app.watches.list(req.arg("patent_id"))}
+
+
+@route("POST", "/api/v1/watches", "user")
+def watches_create(req):
+    b = req.json()
+    return req.app.watches.create(b.get("name"), b.get("connector"), b.get("params"), b.get("collection", ""),
+                                  b.get("patent_id"), b.get("interval_hours", 168))
+
+
+@route("PATCH", "/api/v1/watches/{wid}", "user")
+def watches_patch(req):
+    return req.app.watches.update(req.params["wid"], req.json())
+
+
+@route("DELETE", "/api/v1/watches/{wid}", "user")
+def watches_delete(req):
+    return {"deleted": req.app.watches.delete(req.params["wid"])}
+
+
+@route("POST", "/api/v1/watches/{wid}/run", "user")
+def watches_run(req):
+    return req.app.watches.run(req.params["wid"])
+
+
+@route("GET", "/api/v1/watch-hits", "read")
+def watch_hits(req):
+    return {"hits": req.app.watches.hits(req.arg("watch_id"), req.arg("patent_id"), req.arg("status"))}
+
+
+@route("POST", "/api/v1/watch-hits/{hid}", "user")
+def watch_hit_set(req):
+    b = req.json()
+    return req.app.watches.set_hit(req.params["hid"], b.get("status"), b.get("category"))
+
+
+# notifications ------------------------------------------------------------------
+@route("POST", "/api/notify/test", "admin")
+def notify_test(req):
+    return {"results": req.app.notifier.send("テスト通知", "QnapLibrary からのテスト通知です。")}
+
+
+@route("POST", "/api/notify/deadlines", "admin")
+def notify_deadlines(req):
+    return {"sent": req.app.scheduler.deadline_reminders()}
 
 
 # ---------------------------------------------------------------------------
