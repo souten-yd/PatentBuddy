@@ -33,6 +33,11 @@ class Notifier:
         """Send to every destination. Returns a list of per-destination results."""
         if key and self.already(key):
             return [{"skipped": "already sent"}]
+        # Always strip inventions, patent titles, project IDs, and user-supplied
+        # URLs before sending to remote webhooks or SMTP endpoints.
+        title = "QnapPatentBuddy 通知"
+        text = "新しい確認事項があります。NASの管理画面で詳細を確認してください。"
+        url = None
         cfg = self.settings()
         results = []
         for hook in cfg.get("webhooks") or []:
@@ -64,15 +69,15 @@ class Notifier:
         elif kind == "slack":
             body = {"text": "*%s*\n%s" % (title, text)}
         else:  # generic JSON (ControlDeck webhook node etc.)
-            body = {"app": "QnapLibrary", "title": title, "text": text, "url": url, "ts": time.time()}
+            body = {"app": "QnapPatentBuddy", "title": title, "text": text, "url": url, "ts": time.time()}
         req = urllib.request.Request(hook["url"], data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
-                                     headers={"Content-Type": "application/json", "User-Agent": "QnapLibrary"}, method="POST")
+                                     headers={"Content-Type": "application/json", "User-Agent": "QnapPatentBuddy"}, method="POST")
         with urllib.request.urlopen(req, timeout=15) as resp:
             resp.read(1000)
 
     def _email(self, mail, title, text):
         msg = EmailMessage()
-        msg["Subject"] = "[QnapLibrary] " + title
+        msg["Subject"] = "[QnapPatentBuddy] " + title
         msg["From"] = mail.get("from") or mail.get("user") or "qnaplibrary@localhost"
         msg["To"] = mail["to"]
         msg.set_content(text)

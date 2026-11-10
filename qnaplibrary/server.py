@@ -84,6 +84,10 @@ class App:
         if vb.get("type") != "qdrant" or not vb.get("url"):
             self._qdrant = None
             return None
+        # A remote Qdrant index would receive raw invention-derived embeddings.
+        from .privacy import local_endpoint
+        if not local_endpoint(vb["url"]):
+            raise ValueError("機密保護: Qdrantの送信先はNAS内または明示許可されたHTTPS LANに限定されます")
         from .qdrant import Qdrant
         key = (vb["url"], vb.get("collection") or "qnaplibrary")
         if self._qdrant is None or (self._qdrant.url, self._qdrant.collection) != (key[0].rstrip("/"), key[1]):
@@ -236,7 +240,7 @@ class Request:
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "QnapPatentBuddy/" + VERSION
+    server_version = "QnapLibrary/" + VERSION
     sys_version = ""
     protocol_version = "HTTP/1.1"
 
@@ -434,7 +438,7 @@ class Server(ThreadingHTTPServer):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(prog="qnaplibrary", description="QnapPatentBuddy server")
+    parser = argparse.ArgumentParser(prog="qnaplibrary", description="ResearchDataHub server (qnaplibrary compatible)")
     parser.add_argument("--data", default=os.environ.get("QNAPLIBRARY_DATA", "./.data"), help="persistent data directory")
     parser.add_argument("--bind", default=None)
     parser.add_argument("--port", type=int, default=None)

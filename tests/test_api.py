@@ -159,7 +159,7 @@ class ApiTest(unittest.TestCase):
         self.assertEqual(r["publicKey"]["rp"]["id"], "nas.tail1234.ts.net")
 
     def test_13_connector_requires_registration(self):
-        st, r = self.c.call("POST", "/api/v1/connectors/jpo/run", {"params": {"application_number": "2024-000001"}})
+        st, r = self.c.call("POST", "/api/v1/connectors/jpo/run", {"params": {"application_number": "2024-000001"}, "public_query_confirmed": True})
         self.assertEqual(st, 409)
         self.assertIn("未登録", r["error"])
 
@@ -169,6 +169,12 @@ class ApiTest(unittest.TestCase):
         self.assertFalse(app.providers.embedding_enabled())
         self.assertEqual(app.providers.embedding_tag(), "qwen/qwen3-embedding-8b@1024")
         app.config.set_secret("openrouter_api_key", "sk-test")
+        self.assertFalse(app.providers.embedding_enabled())
+        old_llm = app.config.get("llm")
+        local_llm = app.config.get("llm")
+        local_llm["providers"][0]["local_only_verified"] = True
+        local_llm["embedding"]["provider"] = "qnapassistant"
+        app.config.replace_section("llm", local_llm)
         self.assertTrue(app.providers.embedding_enabled())
         self.c.call("POST", "/api/v1/collections", {"name": "emb", "kind": "generic"})
         self.c.call("POST", "/api/v1/collections/emb/documents", {"documents": [{"id": "e1", "title": "t", "body": "埋め込みテスト"}]})
@@ -180,6 +186,7 @@ class ApiTest(unittest.TestCase):
         dims = {m["dim"] for m in app.store.vector_models()}
         self.assertEqual(dims, {1024})
         app.config.set_secret("openrouter_api_key", "")
+        app.config.replace_section("llm", old_llm)
 
 
 if __name__ == "__main__":

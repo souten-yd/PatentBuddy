@@ -10,7 +10,7 @@ import re
 import time
 import urllib.parse
 
-from . import VERSION, connectors, debuglog, mcp, patents as patents_mod, store as store_mod, webauthn
+from . import APP_NAME, VERSION, connectors, debuglog, mcp, patents as patents_mod, store as store_mod, webauthn
 from .auth import is_local_network
 from .backup import BackupError
 from .llm import LLMError
@@ -49,7 +49,7 @@ def _err(status, message):
 @route("GET", "/api/health", "public")
 def health(req):
     a = req.app
-    return {"app": "QnapPatentBuddy", "version": VERSION, "ok": True, "setup_required": not a.auth.admin_configured(),
+    return {"app": APP_NAME, "version": VERSION, "ok": True, "setup_required": not a.auth.admin_configured(),
             "pairing": a.auth.pairing_enabled(), "https": req.is_https(), "https_url": a.config.get("server", "https_url", default=""), "uptime_s": round(time.time() - a.started)}
 
 
@@ -116,7 +116,7 @@ def change_password(req):
     if not req.app.auth.check_admin_password(body.get("current", "")):
         raise _err(401, "現在のパスワードが違います")
     req.app.auth.set_admin_password(body.get("password", ""))
-    req.app.auth.sessions.clear()  # Revoke old credentials after a password change.
+    req.app.auth.sessions.clear()
     return {"ok": True}
 
 
@@ -172,7 +172,7 @@ def passkey_login_options(req):
         raise _err(400, "パスキーは https の名前付きアドレスで開いたときだけ使えます")
     rows = _passkey_rows(app)
     if not rows:
-        raise _err(404, "このNASの現在のデータ領域にパスキーがありません。更新後に表示された場合は旧データ領域の復元が必要か確認してください（新規登録前にバックアップを推奨）。")
+        raise _err(404, "パスキーが登録されていません")
     import secrets as _s
     bind = _s.token_urlsafe(16)
     challenge = app.challenges.issue("get", bind, req.rp_id(), req.origin())
@@ -192,7 +192,7 @@ def passkey_login_verify(req):
         raw_id = webauthn.b64url_decode(str(body.get("id", "")), webauthn.CREDENTIAL_ID_MAX)
         row = app.store.one("SELECT * FROM passkeys WHERE credential_id=?", (raw_id,))
         if not row:
-            raise webauthn.WebAuthnError("iPhoneが提示したパスキーは、このNASの登録情報と一致しません。登録時と同じHTTPSホスト名を使用しているか確認してください")
+            raise webauthn.WebAuthnError("このパスキーは登録されていません")
         count = webauthn.verify_assertion(
             app.challenges, str(body.get("bind", "")), req.rp_id(), req.origin(),
             {"public_key": row["public_key"], "sign_count": row["sign_count"]},
@@ -670,14 +670,14 @@ def watches_list(req):
     return {"watches": req.app.watches.list(req.arg("patent_id"))}
 
 
-@route("POST", "/api/v1/watches", "user")
+@route("POST", "/api/v1/watches", "admin")
 def watches_create(req):
     b = req.json()
     return req.app.watches.create(b.get("name"), b.get("connector"), b.get("params"), b.get("collection", ""),
                                   b.get("patent_id"), b.get("interval_hours", 168))
 
 
-@route("PATCH", "/api/v1/watches/{wid}", "user")
+@route("PATCH", "/api/v1/watches/{wid}", "admin")
 def watches_patch(req):
     return req.app.watches.update(req.params["wid"], req.json())
 
@@ -687,7 +687,7 @@ def watches_delete(req):
     return {"deleted": req.app.watches.delete(req.params["wid"])}
 
 
-@route("POST", "/api/v1/watches/{wid}/run", "user")
+@route("POST", "/api/v1/watches/{wid}/run", "admin")
 def watches_run(req):
     return req.app.watches.run(req.params["wid"])
 
@@ -779,12 +779,27 @@ def llm_models(req):
         raise _err(502, str(error))
 
 
+# Approved public-only AI: the user can select a fixed category, but cannot
+# place invention text, project data or search hits into the prompt.
+@route("POST", "/api/v1/public-patent-guidance", "admin")
+def public_patent_guidance(req):
+    from .privacy import public_reference_messages
+    b = req.json()
+    messages = public_reference_messages(str(b.get("topic") or ""))
+    try:
+        result = req.app.providers.chat(messages, provider=b.get("provider"), scope="public_reference")
+    except LLMError as error:
+        raise _err(502, str(error))
+    return {"topic": b["topic"], "answer": result["content"], "model": result.get("model"),
+            "privacy": "固定の一般公開情報のみ。案件・ユーザー入力・検索結果・履歴は送信しません"}
+
+
 @route("POST", "/api/llm/test", "admin")
 def llm_test(req):
     b = req.json()
     try:
         r = req.app.providers.chat([{"role": "user", "content": "「OK」とだけ答えてください。"}], b.get("provider"),
-                                   {"max_tokens": 16}, timeout=60)
+                                   {"max_tokens": 16}, timeout=60, scope="public_reference")
     except LLMError as error:
         raise _err(502, str(error))
     return r
@@ -899,9 +914,11 @@ def connectors_list(req):
     return {"connectors": out}
 
 
-@route("POST", "/api/v1/connectors/{name}/run", "user")
+@route("POST", "/api/v1/connectors/{name}/run", "admin")
 def connectors_run(req):
     b = req.json()
+    if b.get("public_query_confirmed") is not True:
+        raise _err(403, "機密保護: 外部APIへの検索語送信を明示承認してください")
     name = req.params["name"]
     spec = next((c for c in connectors.CATALOG if c["id"] == name), None)
     if not spec:
