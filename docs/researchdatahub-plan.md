@@ -21,13 +21,17 @@
 - 遅い処理（OCR/埋め込み/GraphRAG/大規模RAG）はControlDeck PCへ寄せ、サーバーはデータ保存/収集/検索APIを保持する。確定した引用・特許family・文献改版などの関係データはResearchDataHubが保存する。
 - 既存 `qnaplibrary` Pythonパッケージ、`QPKG_NAME=QnapLibrary`、データディレクトリ `QnapLibrary-data`、port 17871 は互換性のため維持。表示ブランド・Linux入口だけを段階的に移す。名称の変更で既存データ・パスキーを初期化しない。
 
-## 本PRの実装境界
+## 本PRは設計・引き継ぎのみ（2026-11-10 checkpoint）
 
-1. Linux PCから `python3 -m researchdatahub` と `./rdh.sh doctor|serve|test` で利用できる入口を追加。起動処理は既存 `qnaplibrary.server.main` を再利用し、二重DB/二重実装を作らない。
-2. Server/UI/health/QPKG表示名を `ResearchDataHub` に変更。旧内部識別子・QNAP配布ファイル名・ポート・DB schema・データパス・既存REST意味論は変えない。
-3. Linux tar.gz配布に新しい入口を同梱。既存 `qnaplibrary` ランチャーとsystemdサービスは互換維持。
-4. 認証・機密防壁・収集・検索エンジン・スケジューラの機能挙動は変更しない。データ共有のためSMB/NFS上の稼働SQLiteを使わない。
-5. テストにブランド/入口/データ独立性/配布同梱/実行権限を追加。フルverifyとLinux/QPKG build、ControlDeck PC実機受入が通るまでPRはDraftにする。
+このPR #16 は **documentation-only**。ResearchDataHub のLinux実行入口、サービス起動、QPKG表示変更、データ移行、ControlDeck Host接続、公開データAPIは**実装しない**。以下の列挙は **Codex が次の実装PRで実行する仕様**であり、既に動く機能を示していない。READMEは現在の実装だけを示し、旧製品名の互換エイリアスは将来のLinux PRにて追加する。設計上の正本はこの文書、日々の進捗正本は `docs/HANDOFF.md`、Codex向け受入手順は `docs/CODEX_NEXT.md`。
+
+## 次の実装PR（予定）の範囲
+
+1. 次の実装PRで Linux PCから `python3 -m researchdatahub` と `./rdh.sh doctor|serve|test` で利用できる入口を追加。起動処理は既存 `qnaplibrary.server.main` を再利用し、二重DB/二重実装を作らない。
+2. 次の実装PRで Server/UI/health/QPKG表示名を `ResearchDataHub` に変更。旧内部識別子・QNAP配布ファイル名・ポート・DB schema・データパス・既存REST意味論は変えない。
+3. 次の実装PRで Linux tar.gz配布に新しい入口を同梱。既存 `qnaplibrary` ランチャーとsystemdサービスは互換維持。
+4. 次の実装PRでは認証・機密防壁・収集・検索エンジン・スケジューラの機能挙動は変更しない。データ共有のためSMB/NFS上の稼働SQLiteを使わない。
+5. 次の実装PRでテストにブランド/入口/データ独立性/配布同梱/実行権限を追加。フルverifyとLinux/QPKG build、ControlDeck PC実機受入が通るまでPRはDraftにする。
 
 ## 次の段階
 
@@ -36,3 +40,22 @@
 - **S3**: 大量検索・バッチ登録・文献出典/規格検索フィールドを追加。PR #13の拡張を検証・統合し、実測性能に基づき最適化。
 - **S4**: ControlDeckのローカルLLMとJobsを使うGraphRAG/請求項/引用・規格リンク。外部LLMには未公開の発明・請求項を入力しない。
 - **S5**: PC → QNAPのdry-run移行、整合性検証・切替・復元・トークン/パスキー再確認。その後にだけQNAPへ本番移設。
+
+## 確定した安全境界（Codexの実装で強制する）
+
+- QNAPとPC間のデータ送受信は認証付き・暗号化したHTTP(S)で許可する。ローカルLLMへの未公開データ入力は許可する。これは**外部LLMへの未公開情報送信禁止**とは別の境界である。
+- OpenRouterなどのクラウドLLMへの送信は、公開済みであることを確認・承認した資料に限定する。公開公報本文でも検索履歴/社内コメント/未公開の請求項案との組み合わせから機密が推定されるため、自由入力・内部注釈の丸ごと転送は禁止。既存のmainの`privacy` fail-closed制約を弱めない。
+- NASへ本番移行してもResearchDataHubの正本DBは**1つだけ**。開発PC側とQNAP側が同時に正本として動作する切り替えは不可。データ持ち出し・復旧検証・停止・切り替え・復元の全工程を明示。
+- 「ローカルLLM」は単にローカルのURLを指すのではなく**クラウド中継しない推論器として検証した接続先**を指す。環境プロキシ/HTTPリダイレクト/外向き通信を検証する。
+- 公開資料の利用許諾と著作権の確認は出典ごとに必要。特に規格の全文は公開されていても再配布可能とは限らない。
+- 初期の管理Webやパスキーの既存動作を維持する。名前・アイコンの変更でWebAuthn RP ID、QPKGパッケージID、データフォルダ、cookie名を変更しない。
+- CPU/NAS I/Oを減らすため、巨大な検索結果を丸ごとPCへ転送する代わりにクエリ・必要な証拠断片・ページング/差分同期を使う。GraphRAGは出典/方向/版/信頼度を持つ関係と候補的意味関係を区別する。
+
+## GitHub PRの位置づけ（2026-11-10）
+- PR #10: AIクレームチャートの仮判定（Draft、未マージ）
+- PR #11: セッション保持・パスキー/更新確認501修正（Draft、未マージ）
+- PR #12: 未公開発明の外部送信保護（**マージ済み、v0.5.1**）
+- PR #13: 大量特許データの取り込み/ページング（Draft、未マージ）
+- PR #14: ControlDeck Add-on v2 A0基盤（Draft、未マージ）。この文書のResearchDataHub構成を参照し、古いPC正本案を採用しない
+- PR #15: 公開承認済み文献だけの検索APIと機械トークン（Draft、未マージ）。第三者LLMへの送信機能そのものは未実装
+- PR #16: **本チェックポイント（docs-only）**。コード実装なし、マージ後にCodexが実装PRを作成する
