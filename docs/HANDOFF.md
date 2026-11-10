@@ -1,67 +1,69 @@
-# HANDOFF — 現在地と次の一手
+# HANDOFF — ResearchDataHub / PatentBuddy
 
-> 作業の区切りごとに更新すること（DEVELOPMENT_WORKFLOW.md §5）。中断した AI はここから再開する。
+**更新日**: 2026-11-10。中断後はまず `AGENTS.md` → `DEVELOPMENT_WORKFLOW.md` → 本ファイル → `docs/researchdatahub-plan.md` → `docs/CODEX_NEXT.md` を読む。
 
-## 現在のバージョン
+## 現在地（確認済み事実）
 
-- **v0.5.0（直近公開済み）**: https://github.com/souten-yd/QnapLibrary/releases/tag/v0.5.0 — PR #8 マージ済み。手動 SQLite バックアップ、iOS ホーム画面アイコン、ホーム UI 改善と進行状況表示。
-- v0.4.0（直前）: https://github.com/souten-yd/QnapLibrary/releases/tag/v0.4.0
-- 履歴: v0.1.1（HTTPS 8443・OpenRouter 埋め込み）→ v0.2.0（ウォッチ・通知・分類・審査基準）→ v0.3.0（Qdrant・リランカー・分析・PC クライアント）→ v0.4.0（調査ジョブ・市場データ・規格）
-- ロードマップ v0.1〜v0.5 は完了。次の候補は `docs/roadmap.md` 末尾と `docs/proposals.md`（定期バックアップ・調査の自動化など）
+- GitHub: `souten-yd/QnapPatentBuddy`、default branch `main`。
+- **公開済みの最新バージョンはv0.5.1**: https://github.com/souten-yd/QnapPatentBuddy/releases/tag/v0.5.1（2026-11-10）。バイナリは旧互換名 `QnapLibrary_0.5.1_x86_64.qpkg`, `qnaplibrary-0.5.1-linux.tar.gz`。QNAP実機での更新・パスキー・保存先継続の動作は未確認。
+- PR #12（未公開発明をクラウドへ送らないガード）は**mainにマージ済み**。出入口のネットワーク境界は `docs/privacy-boundary.md` を参照。
+- **このチェックポイント PR #16 はdocs-only**。新ブランドのLinux launcherやサービス名、Host本体との接続、NASへの移行は**まだ実装していない**。ソフトウェアのリリース不要。
+- 既存v0.5.0 release workflowはPython 52件テスト成功＋Linux/QPKGビルド成功（当時）。今回のPR #16に関してローカル完全 `scripts/verify.sh`、Linux/QPKGビルド、ControlDeck実機、PC→QNAP移行テストを実施したとは主張しない。
 
-## 状態（2026-11-10）
+## 2026-11-10に決定したアーキテクチャ（最優先）
 
-- [x] 開発ルール（AGENTS.md / DEVELOPMENT_WORKFLOW.md）、実現性評価、RAG DB ランキング、特許ワークフロー設計、提案、ロードマップ
-- [x] サーバー本体（REST・MCP・認証・パスキー・LAN ペアリング・検索・特許・AI チャット・コネクタ・デバッグ・自動更新）
-- [x] 管理 Web（Playwright で PC 幅 1280px / スマホ幅 390px を確認、コンソールエラー 0）
-- [x] Linux パッケージ: 非 root ユーザーで install.sh → 起動 → /api/health 確認
-- [x] QPKG: ローカルで QDK ビルド（rsync 代替シム使用）→ 展開 → qnaplibrary.sh start/status/stop を QTS 外で確認
-- [ ] QNAP 実機（TS-253Be）でのインストール・Python3 QPKG 連携・HTTPS/パスキー（**未実施**、所有者の確認待ち）
-- [ ] 実 LLM（QnapAssistant / OpenRouter）・EPO OPS・JPO API との疎通（キー未設定のため未実施。単体は mock で検証）
+| 区分 | 名称と役割 | 実行場所 |
+|---|---|---|
+| 汎用データ基盤 | **ResearchDataHub**: 特許・規格・学術/技術文献などを収集・保存・検索・版管理し、認証付きAPIを提供 | 今はControlDeck Linux PCのSSD、完成後はQNAPのローカルデータ領域 |
+| 高度な特許利用 | **PatentBuddy**: ControlDeck Add-on v2、ローカルLLM、GraphRAG、請求項、調査・AI Jobs、特許向けUI | 今後もControlDeckのPC |
+| 権限付き外部API | ResearchDataHubの**公開承認済みデータ専用API**。外部LLM本体へはユーザーの秘密プロンプトを送らない | ResearchDataHub側 |
+| データの正本 | 唯一のSQLite/原本/案件/承認情報。検索キャッシュは正本でない | 開発中PC、完成後QNAP |
 
-## 検証コマンドと結果
+**既存実装の内部識別子を変更しない**: Python package `qnaplibrary`、QPKG `QnapLibrary`、旧データ/設定/パスキー、port 17871、Release資産名。ResearchDataHubはユーザー向け名称+新Linux起動別名として実装する予定（未実装）。
 
-- **v0.5.0** の GitHub Actions release workflow（run 42749131155）で Python unit/API **52 tests OK**、Linux tar.gz・QPKG ビルド成功、QPKG payload 検査成功、Release 公開完了。
-- このチャットの実行環境では clone/DNS 制限のため `scripts/verify.sh` 全体のローカル実行は未実施。GitHub Actions 上で実行されたのは `unittest` テスト部分であり、verify.sh の Python/JS/shell 静的検査全体と同一ではない。
-- `bash scripts/build-linux.sh dist` / `bash scripts/build-qpkg.sh dist`（rsync 必須。無いと QDK が空の data を作るため inspect-qpkg.py で検出して失敗させる）
+**重要な機密境界**: 未公開の発明・請求項を**ローカルLLM以外のLLMへ渡さない**。認証/TLS保護されたResearchDataHub⇔PatentBuddy/ControlDeckのデータ通信は許可。OpenRouter等の外部LLMは公開・承認・送信プレビュー済みの資料だけ、既存`privacy`のfail-closed制限を弱めずに別実装する。QNAP/PCを同時正本化しない。SMB/NFSで稼働中SQLite/WALを直接開かない。
 
-## 自己更新の実地確認（2026-11-10）
+## 最優先の性能受入契約（ResearchDataHub）
 
-- Linux 版 v0.1.0（非 root ユーザー、`install.sh --no-service`、`qnaplibrary-run`）→ 管理 API「更新を確認」で v0.1.1 を検出 →「適用」→
-  GitHub Release から tar.gz を取得し SHA-256 一致 → `versions/0.1.1` 展開・`current` 切替 → 終了コード 75 で再起動 → `/api/health` が 0.1.1、
-  更新前に登録した文書が検索で見つかる（データ保持）。旧版 `versions/0.1.0` は残りロールバック可能。
-- release.yml（main マージでバージョン変更時）: v0.1.1 で成功（テスト→Linux→QPKG（payload 検査込み）→リリース作成）。
-- 見つけた不具合: ランチャーを `qnaplibrary/` フォルダのあるディレクトリから起動すると `python -m` がそちらを読み込む。
-  `fix/launcher-cwd` で修正（Linux ランチャーと QPKG ランナーが自分のインストール先へ cd）。v0.2.0 以降に含まれる（既存 Linux インストールでは更新後の install.sh を再実行しないと旧ランチャーが残る可能性あり）。
+[ストレージ効率・低ディスクI/O・大量データ性能仕様](researchdatahub-performance.md) をCodexの強制的な受入基準とする。単なる速度向上ではなく、**保存容量、CPU/RSS、物理ディスクread/write bytes、WAL増分、検索/取り込み P50/P95/P99、バックアップ復元**を変更前後で計測する。
 
-## 複数版をまたぐ自己更新の確認（2026-11-10）
+- 現在の`main`はWAL・FTS5・ハッシュ重複判定がある一方、文献ごとの重複SELECT、一覧の`SELECT *`、無変更バッチでもコレクションUPDATE、共有RLockなど改善余地あり。
+- PR #13でこれらの一部をDraft実装済みだが**未マージ・全テスト/実機ベンチ未検証**。性能改善を実装済みや100万件対応済みと主張しない。
+- **P0計測→P1 PR #13レビュー/冪等・軽量一覧/カーソル→P2索引/保存最適化→P3並行性・NAS移行時のHDD計測**の順とし、安易なDB分割・圧縮・無制限インデックス追加はしない。
+- アイドル15分、無変更再投入、大量登録、検索、WALチェックポイントを別々に測り、NASでのガリガリ音につながるランダムI/Oも検証する。見かけの高速化目的で`journal_mode=OFF`、`synchronous=OFF`、監査の削除、起動時の毎回の全索引再構築を行わない。
+- PC上Linux実機とQNAP TS-253Beの測定はまだない。計測コマンド/環境/結果/未実施をPR本文と本ファイルへ残す。
 
-- Linux 版 v0.1.1 → v0.4.0 を管理 API から一度で更新。新しいテーブル（watches / watch_hits / notify_log）は起動時に自動作成され、既存データは保持。`versions/` に 0.1.0・0.1.1・0.4.0 が残り（直近3版）、`current` は 0.4.0。
+## 未マージの開発PR（mainには入っていない）
 
-## v0.5.0 引き継ぎ内容（PR #8）
+| PR | 内容 | 状態/注意 |
+|---|---|---|
+| #10 | LLMによる根拠付きクレームチャート | Draft。PR #12の新しい機密ポリシーへ整合させてから再検証 |
+| #11 | セッション保持/Face IDパスキー更新後問題/一時501 | Draft。main v0.5.1とのバージョン競合・実機再現を確認 |
+| #13 | 大量文献の一括冪等/低書込/カーソルAPI | Draft。実データ100万件の速度は未実測 |
+| #14 | ControlDeck Add-on v2 A0/Feature bundle | Draft。**旧設計からの経緯あり**。新しいResearchDataHub API正本方針を優先し、PC上の別SQLite正本を作らない |
+| #15 | 外部AI向け公開資料の承認・限定検索API | Draft。公開専用トークンの権限分離/出典・タイトル・抜粋の確認など要再テスト。外部LLMへ自動送信する機能ではない |
+| #16 | ResearchDataHubとPatentBuddyの分離・PC→QNAP移行・Codex引継ぎ | 本docs-onlyチェックポイント。Linux CLI等は**次のPR** |
 
-- SQLite 管理者専用の手動スナップショット（VACUUM INTO + quick_check、権限 0600、容量確認、Web 画面、API テスト）。
-- iOS ホーム画面向け 180×180 不透明 PNG アイコンとメタデータ、既存 SVG/QPKG アイコンの共通デザイン。
-- ホーム画面の KPI をモバイル 2 列表示へ整理。処理状況（埋め込み・調査・Qdrant 同期・更新）を既存 API の読み取りのみで表示し、20 秒間隔の状態更新はホーム表示中のみ実施。技術詳細は折りたたみ。
-- PR #8 は `main` にマージ済み（squash SHA `bcdc7e5f82eacb0805133f85fb16f2d0836e7933`）。2026-11-10 の GitHub Actions で 52 tests OK、Linux/QPKG 両パッケージ作成・公開を確認。QNAP/iPhone 実機確認は **未実施**。
+## Codexの次の作業（優先順）
+1. **mainを取得、上記PRの実diffを読む**。`docs/CODEX_NEXT.md`記載のPR-Aから実装する。基本は1PR=1目的、早期Draft作成。
+2. Linux PCで `python3 -m researchdatahub` と `./rdh.sh doctor|serve|test` を既存サーバーの**薄い別名入口**として実装する。ResearchDataHub表示/API health/管理Webのブランディング、Linux tar.gz同梱とテストを同じPRで扱う。旧package/DB/QPKG/port/cookie/パスキーRP IDの互換を守る。
+3. PR #11を更新後認証/保持/501修正として検証し、PR #15の公開専用API、PR #13の高速化、PR #14のControlDeck接続を**新しい設計に合わせて**順次取り込む。PR #10のAIはローカルLLMだけで処理。
+4. 特許/規格の文献実体とAPIの境界を整理し、GraphRAGは確定した引用/ファミリー等の関係から導入。出典/改版と推測関係の区別を必須にする。
+5. **最後に**PC側のSQLite正本/原本/設定/秘密/パスキーをQNAPへdry-run→backup→hash/quick_check/件数照合→ロールバック可能な停止・切替を実施する。QNAP既存データを上書き・削除しない。
 
-## 機密保護改修（PR #12 / v0.5.1、進行中）
-- [x] OpenRouter/クラウドAIへ未公開発明・チャット・埋め込み・リランクが流れないように送信直前で fail-closed 制限。ローカルのモデル中継の危険もチェック方式で対処。
-- [x] 公開制度の固定一般ガイド、外部コネクタの明示承認、既存ウォッチ自動収集の承認ゲート、通知の本文秘匿、Qdrant loopback 限定。
-- [x] [特許専用の段階的機能計画](patent-feature-plan.md) と [機密境界](privacy-boundary.md) を追加。
-- [ ] PR #12 の差分/全テスト/バイナリ検査、GitHub Actions、QNAP実機での実通信の確認。**未検証のまま完成・流出ゼロと断言しない**。
-- [ ] v0.5.0以前の自己更新コードは旧GitHubリポジトリ名をURL一致判定に使う。改名後のリリースを自動選択できない可能性があるため、初回のみQPKG手動更新を案内。旧QPKG_NAME/QnapLibrary-data は保持。
-- [ ] PR #11（管理ログイン永続化・パスキー/501修正）、PR #10（機密対照付きAIクレームチャート）は継続保留。#10 は #12 安全対策に依存。PR #11 の v0.5.1 競合は次のマージ前に調整が必要。
-- [ ] NAS上のローカルLLM自体が外部クラウドへ中継しないことは実機で別途検証する必要がある。アプリ単体ではOSや他プロセスの通信までは保証できない。
+## マージ前に必ず確認する内容
 
-## 次の一手
+- 前回指示のscope/Allowed/Do NOT/expected final stateと、**mainの実ファイル**、diff、docs、manifest、tests、runtimeの一致
+- `bash scripts/verify.sh`、`bash scripts/build-linux.sh dist`、Linux非root実起動/API・セッション/パスキー回帰、必要なQPKGビルド/検査（実施できなければ未実施と記録）
+- 機密用トークン/公開資料専用トークンのスコープ漏れ、外部AIへ流れるデータのリクエスト本文、プロキシ経路、秘密ログ、無断Web公開の有無
+- 認証・Cookie・CSRF・RP ID・旧データの後方互換、不要な自動実行/npm build/外部依存/過剰機能追加の有無
+- 低ディスクI/O・書込負荷、バックアップ復元、1000/10000/100000レコードのベンチ、iPhone UIと既存管理Webの動作
+- docs-only PRなら **バージョンを上げずRelease不要**。コード変更をマージする場合はバージョン・CHANGELOG・QPKG設定整合とRelease、更新確認を行う。
 
-1. TS-253Be 実機で v0.5.0 を更新/導入し、アプリ画面と iPhone のホームアイコン、SQLite スナップショット、設定・秘密ファイルの外部保全を確認する。
-2. 必要なら開発環境で `bash scripts/verify.sh` 全体（Python/JS/shell 静的検査を含む）を別途実行する。
-3. 週次バックアップ、保存世代管理、設定・秘密を含めた完全バックアップ、定期調査とレポート差分を検討する。
+## 既存の未解決事項
+- iPhoneのパスキーが更新後に登録なし表示されること、ログイン保持、更新確認の一時501：PR #11の**未マージの修正候補**。解決したと主張しない。
+- QNAP TS-253Beでの本番動作/自動更新/HTTPS・WebAuthn、各公的APIの実キー疎通、Host Feature署名・publisher登録は未検証。
+- 古い自己更新クライアントはリポジトリ改名前のURLを使う場合がある。Release assetと手動導入手順を確認。
+- 規格(JIS/ISO/IEC)の全文はライセンスに制約があり得る。APIから公開する前に権利確認が必要。
 
-## 既知の問題 / 未決事項
-
-- 所有者の決定事項は `docs/feasibility.md` 末尾（パスキー採用、Tailscale 8443、埋め込み既定 OpenRouter、JPO 未登録）
-- JPO API・USPTO ODP のエンドポイントは公開仕様に基づく実験実装。キー取得後に実地調整が必要
-- QTS の Python3 QPKG の SQLite に FTS5 が無い場合は LIKE 検索に自動フォールバック（遅い）。実機で `/api/v1/stats` の `fts5` を確認すること
+これまでの詳細な旧版の検証・変更履歴は各GitHub Release、PR #6/#8/#9/#12と`CHANGELOG.md`を参照。**今後のCodexの実装完了条件を満たしたものだけこのファイルの完了欄へ移す。**
