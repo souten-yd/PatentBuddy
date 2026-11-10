@@ -39,8 +39,7 @@ class ScaleStoreTest(unittest.TestCase):
         self.assertEqual(len(self.store.list_documents(self.cid)["items"]), 3)
         current = self.store.one("SELECT body FROM documents WHERE ext_id='JP0002'")
         self.assertEqual(current["body"], "負極")
-        self.assertEqual(self.store.search_chunks("不存在") if hasattr(self.store, "search_chunks") else
-                         self.store.fts_search("正極"), [])
+        self.assertEqual(self.store.fts_search("正極"), [])
 
     def test_cursor_pages_are_disjoint_across_new_insert(self):
         docs = [{"id": "JP%04d" % i, "title": "公開公報 %d" % i,
