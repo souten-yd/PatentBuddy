@@ -20,6 +20,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from . import APP_NAME, DEFAULT_PORT, VERSION, api, debuglog, webauthn
 from .auth import Auth
+from .backup import Backups
 from .config import Config
 from .embedworker import EmbedWorker
 from .notify import Notifier
@@ -50,6 +51,7 @@ class App:
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.config = Config(self.data_dir)
         self.store = Store(self.data_dir / "library.sqlite3")
+        self.backups = Backups(self.store)
         self.auth = Auth(self.config, self.store)
         self.providers = Providers(self.config)
         self._qdrant = None

@@ -16,6 +16,8 @@ QNAP NAS と Linux で動く「戦略的データベース基盤」です。特�
 - **ログイン**: パスワード、パスキー（Face ID / Windows Hello などの顔認証。HTTPS 接続時）
 - **AI 向けデバッグ出力**: 状態・直近エラー・検索トレースを JSON で取得（秘密は除去）
 - **自動更新**: GitHub Releases から SHA-256 を検証して更新
+- **バックアップ**: 管理 Web からSQLiteの一貫したスナップショットを手動作成（設定・秘密情報は別途保全が必要）
+- **iPhoneホーム画面**: Safariの「ホーム画面に追加」で専用アイコンから起動。ホームは主要件数をコンパクト表示し、ベクトル化・調査・更新の処理状況を確認できます
 - **低負荷**: 標準ライブラリのみ、ディスク書き込み最小、ログはメモリのみ
 
 ## 必要環境
@@ -64,7 +66,7 @@ tailscale serve --bg --https=8443 http://127.0.0.1:17871
 ## データと更新
 
 - 設定 > 更新 で確認・適用（自動適用も選べます）。Linux 版は旧版を残すので `install.sh rollback` で戻せます
-- バックアップ対象: データフォルダ（`library.sqlite3*`、`settings.json`、`secrets.json`）
+- バックアップ対象: データフォルダ（`library.sqlite3*`、`settings.json`、`secrets.json`）。管理 Web「設定 > バックアップ」のスナップショットは SQLite のみ。詳しくは [docs/backup.md](docs/backup.md)
 
 ## トラブルシューティング
 

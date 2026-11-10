@@ -21,9 +21,9 @@ def inside_round_rect(x, y, size, r):
     return (x - cx) ** 2 + (y - cy) ** 2 <= r * r
 
 
-def pixel(px, py, size, gray):
+def pixel(px, py, size, gray, ios=False):
     x, y = (px + 0.5) * 64 / size, (py + 0.5) * 64 / size
-    if not inside_round_rect(x, y, 64, 14):
+    if not ios and not inside_round_rect(x, y, 64, 14):
         return (0, 0, 0, 0)
     color = BG
     for bx, by, bw, bh, c in BARS:
@@ -39,8 +39,8 @@ def pixel(px, py, size, gray):
     return color + (255,)
 
 
-def png(size, gray=False):
-    rows = b"".join(b"\x00" + b"".join(struct.pack("4B", *pixel(x, y, size, gray)) for x in range(size)) for y in range(size))
+def png(size, gray=False, ios=False):
+    rows = b"".join(b"\x00" + b"".join(struct.pack("4B", *pixel(x, y, size, gray, ios)) for x in range(size)) for y in range(size))
 
     def chunk(kind, data):
         return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xffffffff)
@@ -58,4 +58,7 @@ def main(out):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1] if len(sys.argv) > 1 else "qpkg/icons")
+    if sys.argv[1:] == ["--ios"]:
+        (Path(__file__).resolve().parents[1] / "qnaplibrary/web/apple-touch-icon.png").write_bytes(png(180, ios=True))
+    else:
+        main(sys.argv[1] if len(sys.argv) > 1 else "qpkg/icons")
