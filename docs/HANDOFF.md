@@ -4,10 +4,10 @@
 
 ## 現在のバージョン
 
-- **ソース版 v0.5.0（PR #8）**: 手動 SQLite バックアップと iOS ホーム画面アイコン。GitHub Release と QNAP 実機更新はマージ後に確認が必要
-- **直近確認済みリリース v0.4.0**: https://github.com/souten-yd/QnapLibrary/releases/tag/v0.4.0
+- **v0.5.0（リリース済み・最新）**: https://github.com/souten-yd/QnapLibrary/releases/tag/v0.5.0 — PR #8 マージ済み。手動 SQLite バックアップ、iOS ホーム画面アイコン、ホーム UI 改善と進行状況表示。
+- v0.4.0（直前）: https://github.com/souten-yd/QnapLibrary/releases/tag/v0.4.0
 - 履歴: v0.1.1（HTTPS 8443・OpenRouter 埋め込み）→ v0.2.0（ウォッチ・通知・分類・審査基準）→ v0.3.0（Qdrant・リランカー・分析・PC クライアント）→ v0.4.0（調査ジョブ・市場データ・規格）
-- ロードマップ v0.1〜v0.4 は完了。次の候補は `docs/roadmap.md` 末尾と `docs/proposals.md`（バックアップ機能など）
+- ロードマップ v0.1〜v0.5 は完了。次の候補は `docs/roadmap.md` 末尾と `docs/proposals.md`（定期バックアップ・調査の自動化など）
 
 ## 状態（2026-11-10）
 
@@ -21,7 +21,8 @@
 
 ## 検証コマンドと結果
 
-- v0.4.0 の最終確認は `bash scripts/verify.sh` → 45 tests OK（PR #6 記録）。v0.5.0 追加テストは未実行
+- **v0.5.0** の GitHub Actions release workflow（run 42749131155）で Python unit/API **52 tests OK**、Linux tar.gz・QPKG ビルド成功、QPKG payload 検査成功、Release 公開完了。
+- このチャットの実行環境では clone/DNS 制限のため `scripts/verify.sh` 全体のローカル実行は未実施。GitHub Actions 上で実行されたのは `unittest` テスト部分であり、verify.sh の Python/JS/shell 静的検査全体と同一ではない。
 - `bash scripts/build-linux.sh dist` / `bash scripts/build-qpkg.sh dist`（rsync 必須。無いと QDK が空の data を作るため inspect-qpkg.py で検出して失敗させる）
 
 ## 自己更新の実地確認（2026-11-10）
@@ -42,12 +43,12 @@
 - SQLite 管理者専用の手動スナップショット（VACUUM INTO + quick_check、権限 0600、容量確認、Web 画面、API テスト）。
 - iOS ホーム画面向け 180×180 不透明 PNG アイコンとメタデータ、既存 SVG/QPKG アイコンの共通デザイン。
 - ホーム画面の KPI をモバイル 2 列表示へ整理。処理状況（埋め込み・調査・Qdrant 同期・更新）を既存 API の読み取りのみで表示し、20 秒間隔の状態更新はホーム表示中のみ実施。技術詳細は折りたたみ。
-- 本環境は GitHub ソースをローカルに clone できないため、全リポジトリの verify.sh / Linux / QPKG ビルドは **未実施**。未確認の工程を完了と記載しない。
+- PR #8 は `main` にマージ済み（squash SHA `bcdc7e5f82eacb0805133f85fb16f2d0836e7933`）。2026-11-10 の GitHub Actions で 52 tests OK、Linux/QPKG 両パッケージ作成・公開を確認。QNAP/iPhone 実機確認は **未実施**。
 
 ## 次の一手
 
-1. PR #8 の全 diff とローカル verify.sh を確認し、失敗時は修正してからマージ。版 0.5.0 の release.yml 成否と成果物のハッシュを確認する。
-2. TS-253Be 実機でインストール、ホーム画面アイコン、バックアップ生成と復元手順を確認。QNAP実機は未実施。
+1. TS-253Be 実機で v0.5.0 を更新/導入し、アプリ画面と iPhone のホームアイコン、SQLite スナップショット、設定・秘密ファイルの外部保全を確認する。
+2. 必要なら開発環境で `bash scripts/verify.sh` 全体（Python/JS/shell 静的検査を含む）を別途実行する。
 3. 週次バックアップ、保存世代管理、設定・秘密を含めた完全バックアップ、定期調査とレポート差分を検討する。
 
 ## 既知の問題 / 未決事項
