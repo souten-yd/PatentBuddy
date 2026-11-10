@@ -10,6 +10,17 @@
 - `souten-yd/QnapPatentBuddy` を既存コードの継続元とし、別の新規リポジトリへ複製しない。改名はブランド/配布の層から段階的に変更する。
 - 未公開発明/クレームを外部APIへ自動送信しない。ローカル専用AIをデフォルトとする。既存のPR #12の安全方針を優先。
 
+## 配布・ライフサイクル（MediaForge / SonicForge方式を踏襲）
+
+- Add-onの宣言は `addon.json`、ControlDeck汎用 Feature の配布契約は `control-deck-feature.json`。後者は `feature_id`、`version`、`entrypoint`、`service_args`、`smoke_args`、`health_url` を固定する。
+- Host-managed配布の場合、`CONTROL_DECK_FEATURE_DATA_DIR` に専用の持続領域を置く。パッケージ更新でその領域を消さない。コアは別環境・外部サービスであり、ControlDeckのPythonモジュールやvenvを共有しない。
+- `./pb.sh doctor` は読み取り専用、`./pb.sh serve` は非rootのloopback専用、`./pb.sh test` は既存検証。A0ではAI・収集・更新の自動タスクを起動しない。
+- `python3 scripts/build_cd_feature.py --out dist` は固定allowlistによる **未署名の再現可能なtar.gz** を作るだけ。未署名の成果物を信頼済みリリースと呼ばず、公開・自動導入もしない。
+- 本番ではControlDeckの汎用Release Bundleが検証する形式に合わせ、配布manifest `schema_version=1, feature_id, version, platform, architecture, artifact_name, sha256, size_bytes` を規範JSONで生成し、発行者Ed25519秘密鍵で署名する。署名鍵はリポジトリ/一般CI/バンドルへ入れない。Hostのtrusted publisher公開鍵・能力allowlistに基づく検証を通って初めてインストールする。
+- Hostは署名/一致確認 → 制限付き展開 → smoke/health → systemd user service登録 → atomically active version切替 → 前版ロールバックを担当。Add-onは自前のrootインストーラを作らない。
+- 現在Hostの `backend/app/features/release_bundle.py` に署名検証と汎用systemd lifecycleがある。ただしPatentBuddyのpublisher鍵登録、リリース公開、Host実機受入は未実施。
+- リリースとAddon/Feature/Pythonのversionを常に一致させる。既存QPKG版のリリース処理は安全な移行完了まで別扱いとする。
+
 ## Add-on Contract v2 と所有権
 | 主体 | 責務 |
 | --- | --- |
