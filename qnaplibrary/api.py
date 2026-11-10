@@ -1190,3 +1190,15 @@ def host_vectors_save(req):
 def host_vectors_remove(req):
     from .host_vectors import remove
     return remove(req.app.store, req.params['model_ref'], req.actor)
+
+
+@route('GET', '/api/v1/host-vectors/{model_ref}/manifest', 'read')
+def host_vector_manifest(req):
+    from .host_vectors import manifest
+    return manifest(req.app.store,req.params['model_ref'])
+
+
+@route('GET', '/api/v1/host-vectors/{model_ref}/page', 'read')
+def host_vector_page(req):
+    from .host_vectors import page
+    return page(req.app.store,req.params['model_ref'],req.arg('etag'),int(req.arg('after','0')),int(req.arg('limit','128')))

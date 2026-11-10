@@ -247,3 +247,12 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - pending readは最大32/cursor、space削除adminのみ。一般CRUD/admin/publicとのscope分離、無効数/float32 overflow/重複id・モデル分離・改変/削除・batchrollback・Unixsocket再起動失効を検証。関連8 tests成功3.463秒（その後embedding socket test追加）、全160 tests成功48.414秒（/tmp/pb-host-vector-verify.log）。diff末尾空行のみ全test後に修正。
 - 実Hostの埋め込み2件を一時RDHへembedding tokenで保存し、再送unchanged2/DB変更0を確認。warm観測0.11秒（保存往復含む）/rerank1.79秒、synthetic2件のみ。/tmp/pb-host-vector-storage-live.log。実client→Host→model→canonical serverの結合成功。一時RDH/addon/user/sessionを除去、本番文献DB不変。
 - 次はこの正本vectorのbounded検索/索引・再構築Host Jobsを実装し、keyword→vector→graph→rerankと画面へ接続。現在chart生成はkeyword/graphのみで、vector/rerank未実装表示を残している。推論モデル版保存/人手review UI/graph管理/性能I/O/配布も未完。PR23 Draft、本番PatentBuddy/RDHは0.5.10のまま。Host docsの実機前記録はPR351時点の履歴で、最新live結果は本節。P2/PR-Gを含めgoal active。
+
+## ベクトルsnapshotと再構築可能cache（2026-11-11・最新）
+
+- 前turnはprogress（1cf253d、実Host検索AI/正本vector保存まで確認）。今回最新worktree clean/HEADを確認して継続。
+- 正本host_vector_versionsにepoch/generation/countを追加。既存モデル空間の不足行だけ初期化。vector変更と同一transactionのtriggerで識別子/件数更新、rollbackで戻る。manifest/page GET、同一vector再送は書込みなし。ページ128件/float32-le/base64、本文を転送しない。page前後のetag照合。
+- vector_cache.pyはPCの0700 vector-cache配下に0600 SQLiteで再生成可能なvector/ID/revisionのみ保存。最大2GiB/100万件/完成2ファイル、一時ファイルで整合性・件数・最終manifestを検証してatomic replace。部分同期の公開禁止/取消・変更時のscratch除去。warm syncはmanifestのみ。検索は128行ずつのexact cosine/top-k heap、最大30秒、超過truncated。大量RAMロード・常時server全vector転送なし。ANNや大規模性能の合格とは扱わない。
+- 関連7 tests成功4.162秒、全164 tests成功51.563秒（/tmp/pb-vector-cache-tests.log、/tmp/pb-vector-cache-verify.log）。snapshot途中変更の拒否、削除/rollback/epoch再生成、warm転送なし、private API、取消/time limit、cacheが本文を持たないことを確認。
+- 実Hostの2GiB CPU/RAM leaseとlocal-only BGEを使い、2文を一時RDHへ保存→PCcache同期→query embedding→関連文上位を確認。warm syncはGET manifest1回のみ、cache20,480 bytes。/tmp/pb-vector-cache-live.log。一時addon/user/session/DB/cacheを除去、audit/Jobs履歴保持。これは2件の機能受入で、タイミングは性能保証ではない。
+- 本番PatentBuddy/RDHは0.5.10のまま。PR23 Draft。次はEmbeddingJobs（全資料の版検証・小バッチ・取消/再開/Host CPU lease/Model ref保持）と構築ボタン、vector/graph/Host rerankへのchart接続。cacheの大規模物理I/O/CPU/RSS、source更新競合・応答消失の復旧、generation model provenance、人手承認UI、PR-F残、P2/PR-Gも未完、goal active。

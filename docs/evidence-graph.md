@@ -34,3 +34,13 @@ ControlDeck PR351のlocal-only埋め込み/再順位付けAPIを実Hostへ反映
 原文変更時とチャンク削除時に派生ベクトルを除去。同一チャンク/モデルへ異なる結果を上書きせず明示再構築を要求し、同一結果の再送は書込みゼロ。途中で1件でも版/hash/次元/有限数の検証が失敗すれば空間作成も含め全体rollback。GET pendingは最大32件のcursor形式で全本文を一括転送しない。
 
 embedding scopeはベクトル保存だけ、research_analysisはPDF/分析/ベクトル保存の明示的な新scope。既存pdf_analysis等の権限は増やさない。同一UID自動認証は独立qle_ tokenと専用Unix socket、loopback限定、再起動で失効。検索用のベクトル走査/索引と、アドオンからの再構築Jobs・graph/rerankへの接続は次の実装。
+
+## ベクトルのsnapshot転送とPCキャッシュ（未配布）
+
+正本にモデル空間ごとのランダムepoch・generation・件数を保持し、vector INSERT/DELETE/UPDATEと同じtransactionで更新する。無変更再投入やmanifest/page GETでは更新しない。モデル空間の削除/再作成はepochが変わる。配布済みDBからの移行は最大8空間の不足version行だけを作成し、毎起動全vectorを再構築しない。
+
+認証付きmanifest/page APIは最大128件、float32-le/base64とchunk/doc ID・revisionだけを返す。pageごとにetagを照合。PCはprivate0600の一時SQLiteへ書き、全件数と最終etagを確認してからatomic replaceする。正本変更/取消/不正応答は部分cacheを公開しない。cacheに本文/タイトル/秘密は保持しない。
+
+キャッシュは1ファイル2GiB/100万vector以内、完成済み最大2ファイル（構築中に追加の一時領域が必要）。通常の検索時はmanifest照合だけで、全vectorを再転送しない。PC上で128行ずつ読み、cosine exact top-kを固定サイズheapで集計する。最大30秒の時間制限でtruncatedを返す。これはANNではない。大量データの時間/物理I/O/RSS、Host CPU leaseとの製品Jobs接続とスマホUIは未完。
+
+実Host CPU/RAM lease下で、実BGEの2vectorを一時RDHへ保存→cache同期→query embedding→cosine検索・関連文上位、再同期manifestのみを確認。cache20,480 bytes。これは合成2文の結合試験で、大量検索性能の保証ではない。
