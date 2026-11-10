@@ -75,6 +75,25 @@ class PDFStoreTests(unittest.TestCase):
             finally:
                 store.close()
 
+    def test_persistent_processing_tokens_do_not_grant_general_write(self):
+        server = LiveServer()
+        try:
+            admin = Client(server.base); admin.login_setup()
+            for scope in ('analysis', 'pdf_import', 'pdf_analysis'):
+                token = server.app.auth.create_device('narrow-' + scope, scope)['token']
+                client = Client(server.base); client.token = token
+                body = {'title': 'narrow', 'pdf_base64': base64.b64encode(CONTENT).decode(), 'extraction': extraction()}
+                status, result = client.call('POST', '/api/v1/pdf-imports', body)
+                self.assertEqual(status, 403 if scope == 'analysis' else 200)
+                self.assertEqual(client.call('POST', '/api/v1/collections', {'name': 'forbidden'})[0], 403)
+                self.assertEqual(client.call('GET', '/api/settings')[0], 403)
+                if scope != 'analysis':
+                    doc = client.call('GET', '/api/v1/documents/%d' % result['doc_id'])[1]
+                    payload = {'id': 'persistent-' + scope, 'source_revision': doc['revision'], 'kind': 'summary', 'content': '合成結果'}
+                    self.assertEqual(client.call('POST', '/api/v1/documents/%d/analyses' % result['doc_id'], payload)[0], 200 if scope == 'pdf_analysis' else 403)
+                    self.assertEqual(client.call('DELETE', '/api/v1/documents/%d' % result['doc_id'])[0], 403)
+        finally: server.close()
+
     def test_authenticated_import_only_scope_and_original_read(self):
         server = LiveServer()
         try:

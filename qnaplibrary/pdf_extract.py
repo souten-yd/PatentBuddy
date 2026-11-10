@@ -109,7 +109,7 @@ def _ocr_words(tsv):
     }
 
 
-def extract_pdf(source, cancel=None, force_pages=(), progress=None, scratch_parent=None):
+def extract_pdf(source, cancel=None, force_pages=(), progress=None, scratch_parent=None, image_directory=None):
     """Return all pages or raise; no partial-success or silent truncation.
 
     force_pages uses 1-based page numbers. OCR confidence is an engine score,
@@ -160,6 +160,10 @@ def extract_pdf(source, cancel=None, force_pages=(), progress=None, scratch_pare
         versions = {tool: _run(tool, ['-v'], directory, cancel, version=True)
                     .decode('utf-8', 'replace').splitlines()[0][:200]
                     for tool in ('pdfinfo', 'pdftotext', 'pdfimages')}
+        images = []
+        if image_directory is not None:
+            from .pdf_images import extract_images
+            images = extract_images(pdf, image_directory, image_listing, cancel, _run)
         started = time.monotonic()
         pages, total = [], 0
         for page in range(1, count + 1):
@@ -200,7 +204,7 @@ def extract_pdf(source, cancel=None, force_pages=(), progress=None, scratch_pare
                 progress(page, count)
         _check_cancel(cancel)
         return {'sha256': digest.hexdigest(), 'size_bytes': size, 'page_count': count,
-                'pages': pages, 'tool_versions': versions, 'schema_version': 1}
+                'pages': pages, 'images': images, 'tool_versions': versions, 'schema_version': 1}
 
 
 def _worker():
@@ -211,7 +215,8 @@ def _worker():
     resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
     resource.setrlimit(resource.RLIMIT_CPU, (90, 90))
     resource.setrlimit(resource.RLIMIT_AS, (1024 ** 3, 1024 ** 3))
-    resource.setrlimit(resource.RLIMIT_FSIZE, (MAX_OUTPUT, MAX_OUTPUT))
+    file_limit = 2 * 1024 * 1024 if executable.name == 'pdfimages' else MAX_OUTPUT
+    resource.setrlimit(resource.RLIMIT_FSIZE, (file_limit, file_limit))
     os.execv(str(executable), [str(executable)] + sys.argv[3:])
 
 

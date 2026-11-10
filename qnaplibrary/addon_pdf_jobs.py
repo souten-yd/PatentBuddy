@@ -153,7 +153,7 @@ class PDFJobs(AnalysisJobs):
                                  message='PDF読み取り・OCR %d / %dページ' % (page, total))
                     last[0] = time.monotonic()
             result = extract_pdf(source, cancel=session.aborted, force_pages=forced, progress=progress,
-                                 scratch_parent=scratch)
+                                 scratch_parent=scratch, image_directory=scratch / "images")
             raw = source.read_bytes()
             source_hash, extraction_hash, _ = validate(raw, result, metadata['name'][:300])
             state = session.heartbeat()
@@ -166,7 +166,8 @@ class PDFJobs(AnalysisJobs):
                 self._update(identifier, phase='saving', source_sha256=source_hash,
                              extraction_sha256=extraction_hash, message='原本と抽出結果を保存しています')
                 saved = self.client.data('POST', '/api/v1/pdf-imports', {
-                    'title': metadata['name'][:300], 'pdf_base64': base64.b64encode(raw).decode(), 'extraction': result})
+                    'title': metadata['name'][:300], 'pdf_base64': base64.b64encode(raw).decode(), 'extraction': result,
+                    'images': [{'id': image['id'], 'data_base64': base64.b64encode((scratch / 'images' / ('%d.png' % image['id'])).read_bytes()).decode()} for image in result.get('images', [])]})
                 self._update(identifier, status='succeeded', phase='done', doc_id=saved['doc_id'],
                              message='PDFを取り込みました。OCR結果は原本と照合してください。')
         except Exception as error:

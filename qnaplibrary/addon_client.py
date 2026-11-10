@@ -119,23 +119,29 @@ class AddonClient:
                             max_bytes=16 * 1024 * 1024 if path.endswith('/pdf-extraction') else 8 * 1024 * 1024)
 
     def original_pdf(self, doc_id):
+        return self._document_bytes(doc_id, 'original.pdf', 50 * 1024 * 1024, b'%PDF-')
+
+    def image_png(self, doc_id, image_id):
+        return self._document_bytes(doc_id, 'images/%d' % image_id, 2 * 1024 * 1024, b'\x89PNG\r\n\x1a\n')
+
+    def _document_bytes(self, doc_id, suffix, limit, signature):
         config = self.settings()
         token = config.get('server_token')
         if not isinstance(token, str) or not token or '\r' in token or '\n' in token:
             raise AddonError(503, 'ResearchDataHubの認証設定を確認してください')
-        url = validate_url(config['server_url']) + '/api/v1/documents/%d/original.pdf' % doc_id
+        url = validate_url(config['server_url']) + '/api/v1/documents/%d/%s' % (doc_id, suffix)
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
         try:
             with opener.open(urllib.request.Request(url, headers={'Authorization': 'Bearer ' + token}), timeout=30) as response:
-                raw = response.read(50 * 1024 * 1024 + 1)
-            if len(raw) > 50 * 1024 * 1024 or not raw.startswith(b'%PDF-'):
-                raise AddonError(502, '原本PDFの応答が不正です')
+                raw = response.read(limit + 1)
+            if len(raw) > limit or not raw.startswith(signature):
+                raise AddonError(502, '資料の応答が不正です')
             return raw
         except urllib.error.HTTPError as error:
             error.close()
-            raise AddonError(error.code if error.code in (401, 403, 404) else 502, '原本PDFを取得できません') from None
+            raise AddonError(error.code if error.code in (401, 403, 404) else 502, '資料を取得できません') from None
         except OSError:
-            raise AddonError(502, '原本PDFとの通信に失敗しました') from None
+            raise AddonError(502, '資料との通信に失敗しました') from None
 
     def status(self):
         config = self.settings()

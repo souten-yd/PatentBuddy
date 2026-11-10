@@ -15,3 +15,10 @@ HTTP loopbackの同一PC構成が対象。TLS専用サーバー、root、別OS�
 ## 分析結果保存の限定権限
 
 読み取り用の既存ソケット/tokenは変更しない。分析結果を保存するときだけ、同じUID確認を行う `<port>-analysis.sock` から独立したRAM内認証を取得する。この権限は通常の読取と `POST /api/v1/documents/{id}/analyses` だけに使用でき、文献/案件の書換えや管理操作は許可しない。サーバー再起動・local_auto_connect=falseで停止する。別端末には自動適用しない。
+
+
+## PDF取り込み・分析結果の保存
+
+読み取り用に加え、分析保存専用とPDF取り込み専用の独立したUnix socket/RAM tokenを使用します。読み取りtokenを一般rwへ昇格させません。これらも同一UID確認、管理者設定済み、loopback限定、再起動失効、無効化設定を共有します。原本・OCR結果・画像はResearchDataHubの正本SQLiteだけに保存します。
+
+リモート接続では永続device scope `pdf_analysis`（PDF取り込み＋分析結果保存）、`pdf_import`（取り込みのみ）、`analysis`（分析保存のみ）を選べます。いずれも既存資料を読み取れますが、一般文献の上書き/削除、任意コレクション作成、管理設定変更はできません。接続先には検証済みHTTPSが必要です。

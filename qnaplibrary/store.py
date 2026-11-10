@@ -48,6 +48,17 @@ CREATE TRIGGER IF NOT EXISTS document_pdfs_gc AFTER DELETE ON document_pdfs BEGI
   DELETE FROM source_pdfs WHERE sha256=OLD.source_sha256
     AND NOT EXISTS(SELECT 1 FROM document_pdfs WHERE source_sha256=OLD.source_sha256);
 END;
+CREATE TABLE IF NOT EXISTS pdf_image_blobs(
+  sha256 TEXT PRIMARY KEY, content BLOB NOT NULL);
+CREATE TABLE IF NOT EXISTS document_pdf_images(
+  doc_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+  image_id INTEGER NOT NULL, sha256 TEXT NOT NULL REFERENCES pdf_image_blobs(sha256),
+  PRIMARY KEY(doc_id,image_id));
+CREATE INDEX IF NOT EXISTS document_pdf_images_sha ON document_pdf_images(sha256);
+CREATE TRIGGER IF NOT EXISTS pdf_images_gc AFTER DELETE ON document_pdf_images BEGIN
+  DELETE FROM pdf_image_blobs WHERE sha256=OLD.sha256
+    AND NOT EXISTS(SELECT 1 FROM document_pdf_images WHERE sha256=OLD.sha256);
+END;
 CREATE TABLE IF NOT EXISTS chunks(
   id INTEGER PRIMARY KEY, doc_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
   collection_id INTEGER NOT NULL, ord INTEGER NOT NULL, section TEXT NOT NULL DEFAULT '', text TEXT NOT NULL);

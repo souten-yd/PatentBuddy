@@ -60,6 +60,7 @@ class AddonModeTest(unittest.TestCase):
             with anon.opener.open(srv.base + "/addon/workspace") as response:
                 self.assertEqual(response.headers["X-Frame-Options"], "SAMEORIGIN")
                 self.assertIn("frame-ancestors 'self'", response.headers["Content-Security-Policy"])
+                self.assertIn("img-src 'self' data: blob:", response.headers["Content-Security-Policy"])
             self.assertEqual(anon.call("GET", "/addon/style.css", raw=True)[0], 200)
             self.assertEqual(anon.call("GET", "/addon/icon.svg", raw=True)[0], 200)
             for method, path, body in (

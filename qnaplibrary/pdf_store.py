@@ -44,8 +44,9 @@ def validate(content, extraction, title):
     return digest, hashlib.sha256(canonical.encode()).hexdigest(), canonical
 
 
-def import_pdf(store, content, extraction, title, actor='system'):
+def import_pdf(store, content, extraction, title, actor='system', images=None):
     source_hash, extraction_hash, canonical = validate(content, extraction, title)
+    image_values = validate_images(extraction, images or {})
     with store.tx() as db:
         previous = db.execute('SELECT doc_id FROM document_pdfs WHERE extraction_sha256=?', (extraction_hash,)).fetchone()
         if previous:
@@ -75,6 +76,9 @@ def import_pdf(store, content, extraction, title, actor='system'):
                    (source_hash, content, stamp))
         db.execute('INSERT INTO document_pdfs(doc_id,source_sha256,extraction_sha256,extraction,created) VALUES(?,?,?,?,?)',
                    (doc_id, source_hash, extraction_hash, canonical, stamp))
+        for image_id, image_hash, raw in image_values:
+            db.execute('INSERT OR IGNORE INTO pdf_image_blobs(sha256,content) VALUES(?,?)', (image_hash, raw))
+            db.execute('INSERT INTO document_pdf_images(doc_id,image_id,sha256) VALUES(?,?,?)', (doc_id, image_id, image_hash))
         store.audit(actor, 'pdf.import', 'doc:%d source:%s extraction:%s' % (doc_id, source_hash, extraction_hash))
     store.vector_version += 1
     if store.on_change:
@@ -95,4 +99,42 @@ def original_for(store, doc_id):
     row = store.one('SELECT s.content FROM source_pdfs s JOIN document_pdfs p ON p.source_sha256=s.sha256 WHERE p.doc_id=?', (doc_id,))
     if not row:
         raise StoreError('PDFの原本がありません')
+    return bytes(row[0])
+
+
+def validate_images(extraction, images):
+    from .pdf_images import MAX_IMAGES, MAX_TOTAL_BYTES, png_size
+    metadata = extraction.get('images', [])
+    if not isinstance(metadata, list) or len(metadata) > MAX_IMAGES or not isinstance(images, dict) or len(images) != len(metadata):
+        raise StoreError('画像と抽出根拠の数が一致しません')
+    result, seen, size = [], set(), 0
+    for item in metadata:
+        if not isinstance(item, dict):
+            raise StoreError('画像の根拠が不正です')
+        image_id = item.get('id')
+        if type(image_id) is not int or not 0 <= image_id < MAX_IMAGES or image_id in seen:
+            raise StoreError('画像IDが不正または重複しています')
+        seen.add(image_id)
+        raw = images.get(image_id)
+        try:
+            width, height = png_size(raw)
+        except ValueError as error:
+            raise StoreError(str(error)) from None
+        digest = hashlib.sha256(raw).hexdigest()
+        if (item.get('sha256') != digest or item.get('size_bytes') != len(raw)
+                or item.get('width') != width or item.get('height') != height
+                or type(item.get('page')) is not int or not 1 <= item['page'] <= extraction['page_count']
+                or item.get('method') != 'pdfimages_png' or item.get('review_status') != 'unreviewed'):
+            raise StoreError('画像の内容・ページと抽出根拠が一致しません')
+        size += len(raw)
+        if size > MAX_TOTAL_BYTES:
+            raise StoreError('画像の合計は32MiB以内にしてください')
+        result.append((image_id, digest, raw))
+    return result
+
+
+def image_for(store, doc_id, image_id):
+    row = store.one('SELECT b.content FROM pdf_image_blobs b JOIN document_pdf_images i ON b.sha256=i.sha256 WHERE i.doc_id=? AND i.image_id=?', (doc_id, image_id))
+    if not row:
+        raise StoreError('画像がありません')
     return bytes(row[0])

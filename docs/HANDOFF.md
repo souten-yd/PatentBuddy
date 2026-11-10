@@ -182,3 +182,18 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - 次はこのHost復旧契約、原本からの図/ページ画像の保存・閲覧、狭い永続PDF取込token（NAS接続でrwを要求しない）、リリース用docs/版整合・Linux/QPKG/署名Featureビルド、実更新・導入済み画面受入。その後PR-F/P2/PR-Gを続ける。現在本番はPatentBuddy v0.5.9 / RDH v0.5.8のまま。
 
 - 2回目の実Host UI fixtureも停止・一時addon/user/session/grant除去を確認。本番Addon healthはhealthyのまま。最後にPDF取込のJSON配列を400で拒否する型検査を追加し、保存/Jobs/client関連12 testsを再検証。全体139 tests以降の変更はこの入力検証とテストだけ。
+
+## v0.5.10候補・画像と復旧の仕上げ
+
+- ControlDeck PR350はmain5e1dde7へ統合。scoped GET lease追加/所有者DB照合をto_thread化。35関連tests成功4.69秒。初回全体1件失敗は新worktreeにfrontend/distがなくSPA route不在だったため（Project Lab 404/405）、コード/テストを緩めずfrontend build21.32秒後に同一test成功。全1226 tests成功112.41秒/2skip/既存warning。実Hostのresources.pyが元mainと一致すること・active Jobsゼロを確認して当該1ファイルだけ反映、ユーザーpasskey変更を保持して正常再起動。
+- 実Hostでlease GETが期限を延長しないこと、二重releaseが409→GET released確認で復旧することを検証成功（/tmp/pb-host-lease-live2.jsonl）。初回は古い試験scriptがmanifestへ既存capabilityを二重追加して422、dedupe後成功。一時addon/user/session除去、監査/Host履歴保持。
+- 指定PDFの埋め込み画像13点/64182 bytesを抽出（表紙の画像を含む、図番号の自動確定ではない）。PDF画像のページ/index/PNG hash/寸法を保持。PNGはCRC/完結/画素上限確認、1点2MiB/200点/合計32MiB。workerのpdfimages出力も1file2MiBに制限してから実行する。原本と同様に共有BLOB+抽出版参照として原子的に保存し、最後の参照削除で削除する。
+- PNGの壊れ/偽装/頁・hash不一致拒否、atomic rollback、画像共有、無変更write0、snapshot復元/最後の参照削除、private読取境界を追加。全142 tests成功38.790秒（/tmp/pb-pdf-images-verify.log）。その後、狭い永続analysis/pdf_import/pdf_analysis scopeを追加、関連7 tests成功1.954秒。一般CRUD/admin拒否。
+- UIで13点の画像を1枚ずつ表示/保存する機能を追加。実画面でblob画像が既存img-srcポリシーに遮断されることを再現し、Addonモードのimg-srcだけblobを追加。サーバー管理WebのCSPは変更しない。関連13 tests成功3.040秒。実画像ブラウザ再試験中。
+- 版を0.5.10へ整合、README/認証/OCR仕様を更新。新規ディスク書込みは原本/抽出版/画像BLOB・参照索引・import監査と最大32件のjob状態に必要。UIの表示/GETで新しい画像を再生成しない。次は実画像UI結果確認、最終verify/build、PR21 review/merge、公式更新/署名Feature更新、導入済み画面受入。本番DBへの指定PDFの登録も配布後に行う。
+
+## PDF/OCR配布前の最終受入（2026-11-11）
+
+- 最終verifyは143 tests成功39.690秒（/tmp/pb-pdf-0510-verify.log）。Linux・QPKG・Featureビルド成功。全diff/checkを確認。
+- 実Hostブラウザ1280/320pxで、指定PDF15ページ・画像13点の新規取込、PNG表示/保存、原本SHA一致、320pxで取消が成功。横溢れ・JS例外ゼロ（.data/pdf-ui-browser.json、スクリーンショット）。回路図の実表示を目視確認。今回は画像受入のためLLM再実行を省略し、前回の実HostローカルLLM受入を維持。
+- 一時fixtureを正常停止、一時addon/user/session/grantの除去を確認。本番の接続・文献DBはまだ変更していない。v0.5.10の公開・実更新・本番PDF取込は次の工程。

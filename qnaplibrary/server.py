@@ -293,7 +293,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("X-Frame-Options", "SAMEORIGIN" if addon else "DENY")
         ancestors = "'self'" if addon else "'none'"
         self.send_header("Content-Security-Policy",
-                         "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; "
+                         "default-src 'self'; img-src 'self' data:" + (" blob:" if addon else "") + "; style-src 'self'; script-src 'self'; "
                          "connect-src 'self'; frame-ancestors " + ancestors + "; base-uri 'none'; form-action 'self'")
         # No HSTS on purpose: plain http on the LAN must keep working for the same host name.
 
@@ -445,6 +445,10 @@ class Handler(BaseHTTPRequestHandler):
                                       else self.server.app.pdf_jobs.reconcile(self.headers, identifier))
                         elif method == "GET" and re.fullmatch(r"/addon/v1/documents/[1-9][0-9]{0,17}/pdf-extraction", path):
                             result = client.data("GET", "/api/v1/documents/" + path.split('/')[-2] + "/pdf-extraction")
+                        elif method == "GET" and re.fullmatch(r"/addon/v1/documents/[1-9][0-9]{0,17}/images/[0-9]{1,3}\.png", path):
+                            raw = client.image_png(int(path.split('/')[-3]), int(path.rsplit('/', 1)[1][:-4]))
+                            status = self.send_bytes(200, raw, "image/png", {"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
+                            return
                         elif method == "GET" and re.fullmatch(r"/addon/v1/documents/[1-9][0-9]{0,17}/original.pdf", path):
                             raw = client.original_pdf(int(path.split('/')[-2]))
                             status = self.send_bytes(200, raw, "application/pdf", {"Content-Disposition": 'attachment; filename="original.pdf"', "Cache-Control": "no-store"})
@@ -512,7 +516,7 @@ class Handler(BaseHTTPRequestHandler):
                     raise HTTPError(401, "認証が必要です")
                 if access == "admin" and req.actor != "admin":
                     raise HTTPError(403, "管理者のみ実行できます")
-                if req.device and method != "GET" and req.device["scopes"] != "rw" and access not in ("read", "published") and not (access in ("analysis", "pdf_import") and req.device["scopes"] == access):
+                if req.device and method != "GET" and req.device["scopes"] != "rw" and access not in ("read", "published") and not (access in ("analysis", "pdf_import") and req.device["scopes"] in (access, "pdf_analysis")):
                     raise HTTPError(403, "読み取り専用デバイスです")
             if req.session and access != "public" and method not in ("GET", "HEAD"):
                 origin = self.headers.get("Origin")

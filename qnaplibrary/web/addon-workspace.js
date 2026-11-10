@@ -3,6 +3,8 @@ let nonce = '';
 let currentDoc = null;
 let polling = false;
 let bridgePort = null;
+let imageURL = null;
+let imageRequest = 0;
 const bridgeCalls = new Map();
 const knownJobs = new Map();
 const root = location.pathname.startsWith('/addon-frame/') ? '/' + location.pathname.split('/').filter(Boolean).slice(0, 2).join('/') : '';
@@ -178,7 +180,8 @@ el('import-pdf').onclick = async () => {
 };
 async function openDocument(id) {
   const doc = await api('documents/' + id);
-  currentDoc = id;
+  currentDoc = id; imageRequest++;
+  if (imageURL) { URL.revokeObjectURL(imageURL); imageURL = null; }
   el('title').textContent = doc.title || '文献'; el('body').textContent = doc.body || ''; el('detail').hidden = false;
   el('pdf-evidence').hidden = true; el('pdf-evidence').replaceChildren();
   await loadAnalyses(id);
@@ -202,6 +205,35 @@ async function openDocument(id) {
   const source = document.createElement('p'); source.className = 'hint';
   source.textContent = `原本 SHA-256: ${evidence.sha256} · ${evidence.page_count}ページ · OCR結果は未確認です`;
   box.append(heading, download, source);
+  if (evidence.images?.length) {
+    const gallery = document.createElement('div'); gallery.id = 'pdf-image-viewer';
+    const label = document.createElement('label'); label.textContent = 'PDF内の画像';
+    const select = document.createElement('select'); select.setAttribute('aria-label', 'PDF内の画像');
+    const placeholder = document.createElement('option'); placeholder.value = ''; placeholder.textContent = `${evidence.images.length}点から選択`; select.append(placeholder);
+    for (const item of evidence.images) {
+      const option = document.createElement('option'); option.value = String(item.id);
+      option.textContent = `ページ ${item.page} / 画像 ${item.id + 1} (${item.width}×${item.height})`; select.append(option);
+    }
+    const view = document.createElement('img'); view.hidden = true;
+    const caption = document.createElement('p'); caption.className = 'hint';
+    caption.textContent = '表紙や図面に含まれる画像です。図番号は原本と照合してください。';
+    const save = document.createElement('a'); save.hidden = true; save.textContent = '表示中の画像を保存';
+    select.onchange = async () => {
+      const request = ++imageRequest; const item = evidence.images.find(x => String(x.id) === select.value);
+      view.hidden = true; save.hidden = true;
+      if (imageURL) { URL.revokeObjectURL(imageURL); imageURL = null; }
+      if (!item) return;
+      try {
+        const response = await fetch(root + '/addon/v1/documents/' + id + '/images/' + item.id + '.png', {credentials: 'include', headers: {'X-Control-Deck-Bridge-Session': nonce}});
+        if (!response.ok) throw new Error('画像を取得できません');
+        const blob = await response.blob();
+        if (request !== imageRequest || currentDoc !== id) return;
+        imageURL = URL.createObjectURL(blob); view.src = imageURL; view.alt = `ページ${item.page}の埋め込み画像${item.id + 1}`; view.hidden = false;
+        save.href = imageURL; save.download = `page-${item.page}-image-${item.id + 1}.png`; save.hidden = false;
+      } catch (error) { el('message').textContent = error.message; }
+    };
+    label.append(select); gallery.append(label, caption, view, save); box.append(gallery);
+  }
   for (const page of evidence.pages) {
     const details = document.createElement('details'); const label = document.createElement('summary');
     const method = page.method === 'pdf_text' ? '文字を直接抽出' : page.method === 'pdf_text_and_ocr' ? '直接抽出＋OCR' : 'OCR';
