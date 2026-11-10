@@ -235,6 +235,66 @@ async function homeView(main) {
 }
 
 // ---------- search ----------
+// Human approvals stay in the authenticated ResearchDataHub management UI.
+async function documentReviews(main, d) {
+  const panel = h("section", { class: "card", id: "document-reviews" }, h("h2", {}, "分析と関係の確認"));
+  main.append(panel);
+  const statuses = { approved: "確認済み", rejected: "却下", unreviewed: "未確認" };
+  function controls(item, path, box) {
+    const select = sel(Object.entries(statuses), item.review_status);
+    const check = h("input", { type: "checkbox" });
+    const button = h("button", { class: "btn", disabled: true }, "確認状態を保存");
+    check.addEventListener("change", () => { button.disabled = !check.checked || !!item.stale; });
+    button.addEventListener("click", guard(async () => {
+      button.disabled = true;
+      try {
+        await api("POST", path, { status: select.value });
+        toast("確認状態を保存しました");
+        await openDoc(d.id);
+      } finally { button.disabled = !check.checked || !!item.stale; }
+    }));
+    box.append(h("p", {}, item.stale ? "根拠が変更されています。再生成・再登録が必要です。" : "確認状態: " + (statuses[item.review_status] || "未確認")),
+      field("変更後の状態", select), field("引用と原文を照合しました", check), button);
+    if (item.stale) { select.disabled = true; check.disabled = true; }
+  }
+  const analyses = await api("GET", "/api/v1/documents/" + d.id + "/analyses");
+  for (const item of analyses.items.filter(x => x.kind === "chart")) {
+    const chart = JSON.parse(item.content);
+    const box = h("details", { class: "review-chart" }, h("summary", {}, "クレームチャート: 請求項" + chart.claim_no),
+      h("p", {}, "人手の確認は特許性・侵害の法的な確定を意味しません。"));
+    for (const row of chart.rows) {
+      box.append(h("h3", {}, row.element.label + ": " + row.element.text),
+        h("p", {}, row.assessment.judgment + " " + row.assessment.reason));
+      for (const e of row.evidence) box.append(h("div", { class: "pre" }, e.ref + " / 文献" + e.doc_id + " / 版 " + e.revision + " / 範囲 " + e.start + "–" + e.end + "\n" + e.quote),
+        h("button", { class: "btn", onclick: guard(() => openDoc(e.doc_id)) }, "引用元の文献を開く"));
+    }
+    controls(item, "/api/v1/analyses/" + encodeURIComponent(item.id) + "/review", box);
+    panel.append(box);
+  }
+  const edges = h("div", { id: "review-edges" });
+  panel.append(h("h3", {}, "文献に関係する根拠"), edges);
+  let cursor = "";
+  const more = h("button", { class: "btn" }, "関係をさらに表示");
+  async function load() {
+    more.disabled = true;
+    try {
+      const result = await api("GET", "/api/v1/graph/documents/" + d.id + "/edges?after=" + encodeURIComponent(cursor));
+      for (const e of result.items) {
+        const box = h("details", { class: "review-edge" }, h("summary", {}, (e.basis === "inferred" ? "推定" : "事実根拠") + " · " + e.relation + " · " + e.source_label + " → " + e.target_label),
+          h("p", {}, "推定関係は確認後も推定のまま保持されます。"),
+          h("div", { class: "pre" }, "文献 " + e.evidence_doc_id + " / 版 " + e.revision + " / 範囲 " + e.start + "–" + e.end + "\n" + e.quote),
+          h("p", {}, "取得: " + e.retrieved_at + " / 方法: " + e.method + " / モデル版: " + (e.model || "なし") + " / 信頼度: " + e.confidence),
+          h("button", { class: "btn", onclick: guard(() => openDoc(e.evidence_doc_id)) }, "根拠文献を開く"));
+        controls(e, "/api/v1/graph/edges/" + encodeURIComponent(e.id) + "/review", box);
+        edges.append(box);
+      }
+      cursor = result.next_cursor || ""; more.hidden = !cursor;
+    } finally { more.disabled = false; }
+  }
+  more.addEventListener("click", guard(load)); panel.append(more);
+  await load();
+}
+
 async function searchView(main) {
   await loadCollections();
   main.append(h("h1", {}, "検索"));
@@ -270,6 +330,7 @@ async function openDoc(id) {
     h("div", { class: "card" }, h("div", { class: "row" }, h("h2", {}, "本文"), h("span", { class: "spacer" }),
       h("button", { class: "btn", onclick: guard(() => addRefDialog(d)) }, "特許案件の先行文献に追加")), h("div", { class: "pre" }, d.body || "(本文なし)")),
     h("div", { class: "card" }, h("h2", {}, "チャンク（索引単位） " + d.chunks.length), d.chunks.map(c => h("details", {}, h("summary", {}, "#" + c.ord + " " + c.section), h("div", { class: "pre" }, c.text)))));
+  await documentReviews(main, d);
   const excerpt = h("textarea", { maxlength: 12000, placeholder: "公開本文から共有してよい箇所だけを選択（最大12000文字）" });
   const approvalCheck = h("input", { type: "checkbox" });
   const previewBox = h("div", {});

@@ -325,3 +325,13 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - 実ControlDeck一時addon/一時RDHで索引→検索→実ローカルLLM→chart保存を検証。正本chart schema2/3行、generation.executed=true、model/runtime各64hexを読取確認（/tmp/pb-chart-provenance-saved.json）。1280/320pxで引用・生成版記録表示、overflow/JSエラー0（/tmp/pb-chart-provenance-browser.log、.data/chart-provenance-*.png）。UI表示検証であり指紋値の視認性改善は今後検討。
 - fixture PID540215をSIGINTで終了、temporary_addon_user_session_grants_removed=trueを確認。Host jobs/auditは保持。本番PatentBuddy/RDH 0.5.10と利用者資料は不変。PR23 Draft、未配布。
 - 次: 人手レビュー/graph提案・管理UI、検索trace保存境界の検証、graph推定表示/逆方向要否、性能/物理I/O・配布更新、P2一般メタデータ、PR-G最終NAS移行。goal active。現作業場所 /data1tb/PatentBuddy-graph。
+
+## 管理Webの人手レビュー初期画面（2026-11-11）
+
+- 前turn30054f1は生成モデル版保存のprogress。今回は管理者専用の既存review APIへResearchDataHub文献詳細UIを接続。チャートの要件/判定/理由/引用全文/版/範囲、関係のsource→target/事実根拠と推定/取得日時/抽出法/モデル版/信頼度を表示。原文画面への導線、照合checkbox、確認/却下/未確認への変更を追加。staleは操作不可。PatentBuddy自動接続tokenを管理者へ昇格していない。
+- 新GET /api/v1/graph/documents/{did}/edgesは根拠文献・incoming・outgoingの3経路を重複除去して50件keysetページング。未承認/却下/staleも管理用一覧へ含む。検索用expandは従来の承認済み条件を維持。各経路51件までの候補SQLとevidence_doc_id/id・source_node/id索引を追加。索引書込み増の理由は大規模グラフで文献別レビューの走査/ソートを抑えるため。GET自体に書込みなし。
+- graph関連6 tests成功3.607秒。53関係の両方向/重複除去/50+3ページ/匿名401/公開token403/不正cursor400/GET書込み0を確認。既存chart/graph関連12 tests成功7.081秒。
+- 管理Web実Chrome1280/320pxでチャート承認→未確認、推定関係承認→却下を保存。DBをread-onlyで照合しchart=unreviewed、edge=inferred/rejectedを確認。overflow/JS例外0（/tmp/pb-review-ui3.log）。一時fixture PID542989はSIGINT停止、cleanedを確認。合成データのみで、本番資料/サービスは不変。今回LLM再実行なし、前turnのControlDeck実LLM生成受入を維持。
+- 初回全verifyは新関数をホーム/検索の境界コメント前へ置いたことで既存のホームread-only検査1件が失敗。検索側へ関数配置を修正し再検証。ブラウザ試験初回は検索button複数、次は対比文献選択と保存後再描画待ち不足が原因で失敗。固有検索語/閉じたdetailsの再描画待ちで修正、製品側の承認不具合ではない。
+- まだPR23 Draft/未配布。これは管理Webの既存結果レビューであり、PatentBuddy内のレビュー認証導線、関係の新規提案/抽出UI、全分析履歴ページング（既存最新20件制限）、検索trace保存境界、性能I/O、配布更新、P2/PR-Gは未完。goal active。
+- 修正後全verify **191 tests成功67.311秒**（/tmp/pb-review-verify2.log）、JS構文・diff whitespace成功。変更diff確認済み。

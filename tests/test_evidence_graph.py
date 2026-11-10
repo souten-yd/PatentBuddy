@@ -110,3 +110,24 @@ class GraphTests(unittest.TestCase):
                 self.assertEqual(restored.one('PRAGMA quick_check')[0],'ok')
                 self.assertEqual(graph.expand(restored,[a['source_node']]),graph.expand(self.store,[a['source_node']]))
             finally:restored.close()
+
+
+    def test_review_listing_both_directions_pagination_and_private_access(self):
+        for i in range(53):
+            edge = copy.deepcopy(self.edge); edge['id'] = 'edge-%03d' % i
+            if i % 2: edge['source'], edge['target'] = edge['target'], edge['source']
+            graph.save(self.store, edge, 'admin')
+        path = '/api/v1/graph/documents/%d/edges' % self.b
+        before = self.store.db.total_changes
+        status, page = self.client.call('GET', path)
+        self.assertEqual(status, 200); self.assertEqual(len(page['items']), 50)
+        second = self.client.call('GET', path+'?after='+page['next_cursor'])[1]
+        self.assertEqual(len(second['items']), 3); self.assertIsNone(second['next_cursor'])
+        self.assertEqual(len({e['id'] for e in page['items']+second['items']}), 53)
+        self.assertTrue(all(e['review_status']=='unreviewed' for e in page['items']))
+        self.assertEqual(self.store.db.total_changes, before)
+        self.assertEqual(Client(self.server.base).call('GET', path)[0], 401)
+        external = Client(self.server.base)
+        external.token = self.server.app.auth.create_device('external','published')['token']
+        self.assertEqual(external.call('GET', path)[0], 403)
+        self.assertEqual(self.client.call('GET', path+'?after=bad!')[0], 400)

@@ -1151,6 +1151,23 @@ def graph_document(req):
         'SELECT * FROM graph_nodes WHERE doc_id=? LIMIT 1', (int(req.params['did']),))]}
 
 
+@route('GET', '/api/v1/graph/documents/{did}/edges', 'read')
+def graph_document_edges(req):
+    did = int(req.params['did'])
+    after = req.arg('after', '')
+    if not isinstance(after, str) or (after and not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', after)):
+        raise _err(400, 'invalid graph cursor')
+    # Indexed UNION bounds each adjacency path without loading the graph.
+    rows = req.app.store.q("""SELECT e.*, s.label AS source_label, t.label AS target_label
+ FROM graph_edges e JOIN graph_nodes s ON s.id=e.source_node JOIN graph_nodes t ON t.id=e.target_node
+ WHERE e.id IN (
+ SELECT id FROM (SELECT id FROM graph_edges WHERE evidence_doc_id=? AND id>? ORDER BY id LIMIT 51)
+ UNION SELECT id FROM (SELECT e.id FROM graph_edges e JOIN graph_nodes n ON n.id=e.source_node WHERE n.doc_id=? AND e.id>? ORDER BY e.id LIMIT 51)
+ UNION SELECT id FROM (SELECT e.id FROM graph_edges e JOIN graph_nodes n ON n.id=e.target_node WHERE n.doc_id=? AND e.id>? ORDER BY e.id LIMIT 51))
+ ORDER BY e.id LIMIT 51""", (did, after, did, after, did, after))
+    return {'items': [dict(r) for r in rows[:50]], 'next_cursor': rows[49]['id'] if len(rows)>50 else None}
+
+
 @route('GET', '/api/v1/graph/expand', 'read')
 def graph_expand(req):
     from . import evidence_graph

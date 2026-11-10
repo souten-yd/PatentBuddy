@@ -28,6 +28,8 @@ CREATE INDEX IF NOT EXISTS graph_edges_source ON graph_edges(source_node,stale,r
 CREATE INDEX IF NOT EXISTS graph_edges_source_basis ON graph_edges(source_node,stale,review_status,basis,id);
 CREATE INDEX IF NOT EXISTS graph_edges_target ON graph_edges(target_node,id);
 CREATE INDEX IF NOT EXISTS graph_edges_evidence ON graph_edges(evidence_doc_id);
+CREATE INDEX IF NOT EXISTS graph_edges_evidence_page ON graph_edges(evidence_doc_id,id);
+CREATE INDEX IF NOT EXISTS graph_edges_source_page ON graph_edges(source_node,id);
 CREATE TRIGGER IF NOT EXISTS graph_evidence_changed AFTER UPDATE OF hash,source ON documents
 WHEN OLD.hash != NEW.hash OR OLD.source != NEW.source BEGIN
  UPDATE graph_edges SET stale=1, review_status='unreviewed'
