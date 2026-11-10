@@ -56,3 +56,11 @@ CPU/RAM lease・更新・解放と進捗の頻度制御をComputeHostSessionへ�
 EmbeddingJobsを追加し、独立した「検索索引を構築・更新」ボタンから全資料を対象に起動する。Host Job/CPU lease・5秒heartbeat・モデル固定・取消・保存済みからの再開・所有者分離を接続。request/lease IDは取得直後に0600の最大32件メタデータへ保存し、再起動後はHost解放/terminal照合が済むまで新規実行を止める。完了照合失敗は未同期として保持。履歴除外は索引を削除しない。モデル変更後は旧ジョブ再開を拒否し、新規構築を要求する。
 
 進捗メタデータの書込みは最大5秒に1回と状態遷移時。本文/ベクトル/資格情報はジョブファイルに含めない。この書込みは再開と資源解放・Host終了照合に必要。新しいvector保存先は作らない。実ControlDeckブラウザ1280pxで合成2文のBGE索引構築・Host終了同期、320pxで再実行0チャンク、横溢れ/JS例外なしを確認。スクリーンショットでは構築ボタンを目視確認し、完了状態はDOM/API照合で確認した。チャートのvector/graph/rerank結合は引き続き未接続。
+
+## チャート候補検索エンジン（未配布・生成処理への接続前）
+
+`ChartRetrieval`はHost CPU leaseを保持する呼出元から使用する。対応モデルの全チャンクが索引済みでなければ明示的に構築を要求し、キーワードへ黙ってfallbackしない。キーワード8件→query embedding/cosine上位8件→両検索由来の最大3文献/20seed・2hop/20node/20edgeの承認済みfactual graph→Host rerankerの順。候補は各経路最大4件/計12件、重複範囲を除き最終3根拠を返す。元の請求項文献は根拠候補から除外する。
+
+新しいread APIはチャンクから原文に一致する最大650文字、または文献の明示範囲/版だけをSQLで取得する。全文をPCへ転送せず、原文に対応しないsections断片はcitable=falseとして除外。published tokenには非公開。ベクトル候補の版と原文、graphの引用範囲/版、Hostのembedding/rerank model_refを照合する。検索終了時にpendingと索引etagを再検証する。traceは両モデル指紋/版方式/索引etag・走査数・打切り・候補数を保持する。
+
+実Host BGE-M3/Qwen3-Rerankerと合成2文の全経路実行（graphは空）で関連文上位を確認。非空の承認済みgraph候補→rerank→正確な引用位置は合成APIテストで確認。現在のchart.generateはまだ旧keyword/graph経路であり、このエンジンのUI呼出・保存/取消/資源管理との接続は次の工程。大量性能・graph承認状態変更後のチャート再検証も未完。

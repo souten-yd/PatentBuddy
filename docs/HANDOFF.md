@@ -273,3 +273,12 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - 実Host UI fixture `/tmp/pb-index-ui-fixture.py` で一時ResearchDataHub+research_analysis scopeを使用。1280pxで実BGEモデル2文/1024次元の索引構築、320pxで再実行0件、両方succeeded/host_sync_pending=false、横溢れ/JS例外0（`/tmp/pb-index-ui-browser.log`）。`.data/index-320.png`で構築ボタンの目視確認。完了ジョブはスクリーンショットの下方外なので状態はDOM/API検証と区別。
 - fixture PID494273をSIGINTで正常cleanup、一時addon/user/session/grants/DBとsecret除去。末尾KeyboardInterruptは待機解除の終了で、cleanup完了行を確認。Host Job/auditは保持。本番の接続/DB/0.5.10は変更していない。
 - 次はクレームチャートへkeyword→vector→bounded graph→Host rerankを接続する。exact chunk read API、CPU lease/cache利用、原文/model revisionの保存が必要。人手承認UI/graph提案権限・管理/生成モデル版/大量検索性能/PR-F残/P2/PR-Gは未完。PR23 Draft、goal active。
+
+## チャート用のbounded候補検索（2026-11-11）
+
+- 前turnはEmbeddingJobs/UI接続e9d6610 pushのprogress。今回は`evidence_read.py`のchunk evidence/文献range read APIと`chart_retrieval.py`を追加。650文字上限、原文位置と版、本文に一致しないsection除外、公開token拒否/GET書込み0。
+- ChartRetrieval: keyword8→Host query embedding→cache上位8→keyword/vectorから最大3doc/20seed・2hop/20node/20edgeのapproved factual graph→Host reranker。各経路最大4/計12候補、最終3根拠。未索引/モデル変更/原文変更/取消は停止、黙示fallbackなし。traceにモデル版/索引etag/走査数・truncated/候補数を返す。生成UIへの接続はまだ行っていない。
+- cache旧版清掃に4世代同期→完成cache2個だけ保持の回帰を追加。途中でregex不具合と誤認したが、実diffと通常文字列のescape解釈を再確認し既存実装が正しいことを確認。vector_cache.pyのコード変更はない。
+- 実Host Job/CPU leaseでBGE-M3とQwen3-Rerankerを使用し、一時RDH2文→索引構築→新候補検索エンジン→関連文上位・引用2件・truncated=falseを確認（`/tmp/pb-chart-retrieval-live.log`、err空）。graphは実fixtureでは空、非空承認graph候補のrerankはAPI回帰テスト。fixture終了・一時addon/user/session/DB/cache除去済み、Host Job/audit保持。
+- 次は`claim_chart.generate`を新エンジンへ切替、AnalysisJobsのchartだけComputeHostSessionとCPU lease/永続request・lease/終了前解放/再起動照合へ接続する。現chart.generateのnot_implemented表示はまだ正しいので維持。最終保存時のモデル/traceとgraph承認変更の扱い、人手レビューUI、生成モデル版、性能/配布、P2/PR-Gも未完。本番0.5.10不変、PR23 Draft、goal active。
+- 最終全verify **177 tests成功55.941秒**（`/tmp/pb-chart-retrieval-verify-final.log`）。初回は「全文APIなし」テストの末尾一致判定がgraph/documents APIも誤って拾い1件失敗。正しい完全一致へ直し、モデル変更/取消停止の回帰も追加して最終全件成功。関連5 tests成功3.063秒。コードdiff確認済み、配布前の中間コミットとして保持。

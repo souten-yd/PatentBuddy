@@ -1202,3 +1202,16 @@ def host_vector_manifest(req):
 def host_vector_page(req):
     from .host_vectors import page
     return page(req.app.store,req.params['model_ref'],req.arg('etag'),int(req.arg('after','0')),int(req.arg('limit','128')))
+
+
+@route('GET', '/api/v1/chunks/{chunk_id}/evidence', 'read')
+def chunk_evidence(req):
+    from .evidence_read import chunk
+    return chunk(req.app.store, int(req.params['chunk_id']))
+
+
+@route('GET', '/api/v1/documents/{did}/evidence', 'read')
+def document_evidence(req):
+    from .evidence_read import document_range
+    return document_range(req.app.store, int(req.params['did']), int(req.arg('start', -1)),
+                          int(req.arg('end', -1)), req.arg('revision', ''))
