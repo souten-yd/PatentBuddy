@@ -287,6 +287,30 @@ async function patentsView(main) {
   await loadCollections();
   if (S.patentId) return patentDetail(main, S.patentId);
   main.append(h("h1", {}, "特許案件"));
+  const publicHelp = h("details", { class: "card" },
+    h("summary", {}, "公開特許制度の一般ガイド（外部AI利用可）"));
+  const guidanceType = sel([
+    ["novelty", "新規性"], ["inventive_step", "進歩性"], ["claim_scope", "請求項と権利範囲"],
+    ["freedom_to_operate", "FTO・侵害リスク調査"], ["filing_strategy", "出願戦略"]
+  ], "novelty");
+  const guidanceOut = h("div", {});
+  const publicProviders = await api("GET", "/api/llm/providers");
+  const guidanceProvider = sel(publicProviders.providers.map(p => [p.id, p.label || p.id]),
+    publicProviders.default_provider);
+  const guidanceButton = h("button", { class: "btn", onclick: guard(async () => {
+    if (!confirm("案件情報を一切含まない固定プロンプトの一般論のみをAIへ送信します。よろしいですか？")) return;
+    guidanceButton.disabled = true;
+    clear(guidanceOut).append(h("p", { class: "small muted" }, "公開ガイドを作成中…"));
+    try {
+      const r = await api("POST", "/api/v1/public-patent-guidance",
+        { topic: guidanceType.value, provider: guidanceProvider.value });
+      clear(guidanceOut).append(h("p", { class: "small muted" }, r.privacy), md(r.answer));
+    } finally { guidanceButton.disabled = false; }
+  }) }, "一般ガイドを確認");
+  publicHelp.append(h("p", { class: "small muted" },
+    "送信されるのはサーバーで固定した一般論の質問だけです。あなたの発明、テーマ、資料、会話は一切送信しません。"),
+    h("div", { class: "row" }, guidanceType, guidanceProvider, guidanceButton), guidanceOut);
+  main.append(publicHelp);
   const title = h("input", { class: "wide", placeholder: "発明の名称（仮）" });
   main.append(h("div", { class: "card" }, h("div", { class: "row" }, title, h("button", { class: "btn primary", onclick: guard(async () => {
     const p = await api("POST", "/api/v1/patents", { title: title.value }); S.patentId = p.id; render(); }) }, "新規案件"))));
