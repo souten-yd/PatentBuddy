@@ -335,3 +335,13 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - 初回全verifyは新関数をホーム/検索の境界コメント前へ置いたことで既存のホームread-only検査1件が失敗。検索側へ関数配置を修正し再検証。ブラウザ試験初回は検索button複数、次は対比文献選択と保存後再描画待ち不足が原因で失敗。固有検索語/閉じたdetailsの再描画待ちで修正、製品側の承認不具合ではない。
 - まだPR23 Draft/未配布。これは管理Webの既存結果レビューであり、PatentBuddy内のレビュー認証導線、関係の新規提案/抽出UI、全分析履歴ページング（既存最新20件制限）、検索trace保存境界、性能I/O、配布更新、P2/PR-Gは未完。goal active。
 - 修正後全verify **191 tests成功67.311秒**（/tmp/pb-review-verify2.log）、JS構文・diff whitespace成功。変更diff確認済み。
+
+## 原文選択による関係登録UI（2026-11-11）
+
+- 前turn c6eab03は人手レビュー画面のprogress。今回、管理Web文献詳細へ事実関係の新規登録フォームを追加。本文のread-only textareaから根拠を選択、文献引用/ファミリー/優先権/出願人/分類/クレーム要件と関連先を指定し、既存admin専用graph APIへ保存。自動承認なし。推定関係のAI提案はこの手動フォームとは別の未実装工程。
+- Pythonの引用範囲と一致するようDOMのUTF-16 selectionをUnicode code pointへ変換。1〜4000文字、原文/改行がtextareaで変化していれば拒否。現在文献の版/引用/範囲/UTC取得時刻/manual_selectionを保存。文献ノードの既存ラベルをAPIから取得し、同じ文献への再登録時のラベル衝突を避ける。関連先に指定できる数値IDを文献詳細の「文献番号」として表示。
+- 同じフォーム内容を再試行するとedge ID・取得時刻を再利用。サーバーの既存冪等保存と合わせ、応答消失で同じ関係を重複登録しない。新規DB schema/認証権限変更なし。新規書込みは利用者が明示登録した関係/根拠/ノード/監査のみ。
+- 実Chrome1280/320pxで絵文字を含む合成本文「😀根拠確認…」の引用を保存し、Python範囲1〜5/quote根拠確認と一致。未確認/factualを保持、overflow/JS例外0（/tmp/pb-proposal-ui.log）。追加でPOSTをサーバー処理後にroute.abortして応答消失を発生させ、手動再試行が同じpayload/IDで成功（/tmp/pb-proposal-retry.log）。正本一時DBで計4件、再試行による重複0、全引用一致を確認。スクリーンショット .data/graph-proposal-*.png。
+- 一時fixture PID546705はSIGINT停止/cleaned確認。本番v0.5.10・原資料は不変。最後の「文献番号」表示追加はJS構文チェック済み、ブラウザfixtureは追加前のstatic cacheなので同表示自体のブラウザ受入は未実施。LLM処理は変更なし、30054f1でのControlDeck実LLM受入を維持。
+- PR23 Draft/未配布。次はHost local-onlyでの推定関係提案・根拠検証/限定保存/Jobs・UI接続、PatentBuddyからレビューへの認証導線、分析履歴ページング、trace保存境界、性能I/O、配布更新、P2/PR-G。全体goal active。
+- 全verify191 tests成功64.098秒（/tmp/pb-proposal-verify.log）、最終JS構文・diff whitespace成功。実差分レビュー済み。

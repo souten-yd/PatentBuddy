@@ -235,10 +235,64 @@ async function homeView(main) {
 }
 
 // ---------- search ----------
+// Selection offsets are converted from DOM UTF-16 to Python Unicode code points.
+function graphProposal(panel, d) {
+  const form = h("details", { id: "graph-proposal" }, h("summary", {}, "原文から事実関係を登録"));
+  const body = h("textarea", { readonly: true, rows: 8, "aria-label": "関係の根拠となる本文", value: d.body });
+  const quote = h("div", { class: "pre", "aria-live": "polite" }, "本文で根拠の範囲を選択してください。");
+  let evidence = null;
+  const selectQuote = h("button", { class: "btn", onclick: guard(async () => {
+    const start = body.selectionStart, end = body.selectionEnd;
+    const text = body.value.slice(start, end);
+    if (!text.trim() || Array.from(text).length > 4000) throw new Error("根拠は1〜4000文字で選択してください");
+    // Textareas normalize CRLF, so refuse changed text rather than save shifted ranges.
+    if (body.value !== d.body) throw new Error("改行形式が異なるため範囲を保存できません");
+    evidence = { start: Array.from(body.value.slice(0, start)).length, end: Array.from(body.value.slice(0, end)).length, quote: text };
+    quote.textContent = text;
+  }) }, "選択範囲を根拠にする");
+  const relation = sel([["citation","文献引用"],["family","特許ファミリー"],["priority","優先権"],["applicant","出願人"],["classification","分類"],["requirement","クレーム要件"]], "citation", {"aria-label":"関係の種類"});
+  const kind = sel([["document","文献"],["party","出願人"],["classification","分類"],["claim","クレーム要件"],["family","ファミリー"],["priority","優先権"]], "document", {"aria-label":"関連先の種類"});
+  const key = h("input", { maxlength: 200, "aria-label": "関連先の識別子" });
+  const label = h("input", { maxlength: 300, "aria-label": "関連先の表示名" });
+  let pending = null;
+  const save = h("button", { class: "btn" }, "未確認の関係として登録");
+  save.addEventListener("click", guard(async () => {
+    if (!evidence || !key.value.trim()) throw new Error("根拠の選択と関連先の識別子が必要です");
+    save.disabled = true;
+    try {
+      const sourceNodes = await api("GET", "/api/v1/graph/documents/" + d.id);
+      const source = {kind:"document",key:String(d.id),label:sourceNodes.nodes[0]?.label || (d.title || String(d.id)).slice(0,300)};
+      let target = {kind:kind.value,key:key.value,label:label.value};
+      if (kind.value === "document") {
+        if (!/^[1-9][0-9]{0,17}$/.test(key.value)) throw new Error("文献の数値IDを指定してください");
+        const other = await api("GET", "/api/v1/documents/" + key.value);
+        const nodes = await api("GET", "/api/v1/graph/documents/" + key.value);
+        target = {kind:"document",key:String(other.id),label:nodes.nodes[0]?.label || (other.title || String(other.id)).slice(0,300)};
+      } else if (!label.value.trim()) throw new Error("関連先の表示名が必要です");
+      const data = {source,target,relation:relation.value,basis:"factual",model:"",confidence:1,
+        evidence:{...evidence,doc_id:d.id,revision:d.revision,method:"manual_selection"}};
+      const signature = JSON.stringify(data);
+      // Retry a lost response with the same ID and timestamp, never duplicate the edge.
+      if (!pending || pending.signature !== signature) {
+        const bytes = crypto.getRandomValues(new Uint8Array(16));
+        pending = {signature, payload:{...data,id:"manual-"+Array.from(bytes,x=>x.toString(16).padStart(2,"0")).join(""),
+          evidence:{...data.evidence,retrieved_at:new Date().toISOString().replace(/\.\d{3}Z$/, "Z")}}};
+      }
+      await api("POST", "/api/v1/graph/edges", pending.payload);
+      toast("未確認の関係を登録しました"); await openDoc(d.id);
+    } finally { save.disabled = false; }
+  }));
+  form.append(h("p", {}, "現在の文献を起点に登録します。文献の関連先には管理画面の数値IDを指定してください。登録後に別途、原文と照合して確認します。"),
+    field("本文の根拠範囲", body), selectQuote, quote, field("関係",relation), field("関連先の種類",kind),
+    field("関連先の識別子",key), field("関連先の表示名（文献は自動取得）",label),save);
+  panel.append(form);
+}
+
 // Human approvals stay in the authenticated ResearchDataHub management UI.
 async function documentReviews(main, d) {
   const panel = h("section", { class: "card", id: "document-reviews" }, h("h2", {}, "分析と関係の確認"));
   main.append(panel);
+  graphProposal(panel, d);
   const statuses = { approved: "確認済み", rejected: "却下", unreviewed: "未確認" };
   function controls(item, path, box) {
     const select = sel(Object.entries(statuses), item.review_status);
@@ -324,7 +378,7 @@ async function openDoc(id) {
   const main = $app.querySelector("main"); clear(main);
   main.append(h("div", { class: "row" }, h("button", { class: "btn", onclick: () => { S.view = "search"; render(); } }, "← 戻る")),
     h("h1", {}, d.title || "(無題)"),
-    h("div", { class: "card" }, h("dl", { class: "dl" }, h("dt", {}, "ID"), h("dd", {}, d.ext_id || "-"), h("dt", {}, "日付"), h("dd", {}, d.date || "-"),
+    h("div", { class: "card" }, h("dl", { class: "dl" }, h("dt", {}, "文献番号"), h("dd", {}, String(d.id)), h("dt", {}, "ID"), h("dd", {}, d.ext_id || "-"), h("dt", {}, "日付"), h("dd", {}, d.date || "-"),
       h("dt", {}, "出典"), h("dd", {}, d.source || "-"), h("dt", {}, "URL"), h("dd", {}, d.url ? h("a", { href: d.url, target: "_blank", rel: "noopener noreferrer" }, d.url) : "-")),
       h("details", {}, h("summary", {}, "メタデータ"), h("div", { class: "pre" }, JSON.stringify(d.meta, null, 2)))),
     h("div", { class: "card" }, h("div", { class: "row" }, h("h2", {}, "本文"), h("span", { class: "spacer" }),
