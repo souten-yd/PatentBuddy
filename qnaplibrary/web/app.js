@@ -448,7 +448,27 @@ async function watchTab(body, pid) {
 // ---------- data ----------
 async function dataView(main) {
   await loadCollections();
-  main.append(h("h1", {}, "データ（コレクション）"));
+  main.append(h("h1", {}, "文献管理（コレクション）"));
+  const published = (await api("GET", "/api/v1/publications")).items;
+  const pubtable = h("table", {}, h("tr", {},
+    h("th", {}, "公開番号"), h("th", {}, "文献"), h("th", {}, "状態"), h("th", {}, "操作")));
+  for (const p of published) {
+    const revoke = h("button", { class: "btn danger", onclick: guard(async () => {
+      if (!confirm("この文献の公開抜粋を取り消しますか？")) return;
+      await api("DELETE", "/api/v1/publications/" + p.doc_id);
+      render();
+    }) }, "取り消す");
+    pubtable.append(h("tr", {},
+      h("td", {}, p.publication_number),
+      h("td", {}, p.title),
+      h("td", {}, p.active ? "承認済み" : "元文献変更により停止"),
+      h("td", {}, revoke)));
+  }
+  main.append(h("details", { class: "card" },
+    h("summary", {}, "外部AIアプリ向け公開抜粋（承認 " + published.filter(p => p.active).length + " 件）"),
+    h("p", { class: "small muted" }, "外部AIに共有するのは、各文献の詳細画面で明示承認した抜粋だけです。文献更新で承認は停止します。"),
+    published.length ? h("div", { class: "scrollx" }, pubtable) : h("p", { class: "small muted" }, "公開登録された文献はありません。")));
+
   const name = h("input", { placeholder: "名前（例: patents-jp）" }), kind = sel(S.kinds, "generic"), desc = h("input", { placeholder: "説明", class: "wide" });
   main.append(h("div", { class: "card" }, h("div", { class: "row" }, name, kind, desc, h("button", { class: "btn primary", onclick: guard(async () => { await api("POST", "/api/v1/collections", { name: name.value, kind: kind.value, description: desc.value }); render(); }) }, "作成"))));
   main.append(h("div", { class: "card" }, h("table", {}, h("tr", {}, h("th", {}, "名前"), h("th", {}, "種別"), h("th", {}, "文書"), h("th", {}, "チャンク"), h("th", {}, "ベクトル"), h("th", {}, "更新")),
