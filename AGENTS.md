@@ -1,6 +1,6 @@
 # AGENTS.md — AI エージェント／開発者向けガイド
 
-> **2026-11-10の開発方針（最優先）**: 汎用データ保存・収集・検索APIサーバーの新しい表示名は**ResearchDataHub**、ControlDeck特許専用アドオンは**PatentBuddy**。まずRyzen 7 9700XのLinux PCで両方を開発・結合し、完成後にResearchDataHubの唯一の正本DB/実行先をQNAPへ移行する。旧QPKG/SQLite/パスキーを維持し、未公開発明・請求項を外部LLMに渡さない（ローカルLLMへの入力、認証済みPC↔NASの転送は可）。正本は `docs/researchdatahub-plan.md`、**保存/低I/O受入契約は `docs/researchdatahub-performance.md`**、Codex指示は `docs/CODEX_NEXT.md`、進捗は `docs/HANDOFF.md`。**PR #16はdocs-only、Linux別名入口は未実装。**
+> **2026-11-10の開発方針（最優先）**: 汎用データ保存・収集・検索APIサーバーの新しい表示名は**ResearchDataHub**、ControlDeck特許専用アドオンは**PatentBuddy**。まずRyzen 7 9700XのLinux PCで両方を開発・結合し、完成後にResearchDataHubの唯一の正本DB/実行先をQNAPへ移行する。旧QPKG/SQLite/パスキーを維持し、未公開発明・請求項を外部LLMに渡さない（ローカルLLMへの入力、認証済みPC↔NASの転送は可）。正本は `docs/researchdatahub-plan.md`、**保存/低I/O受入契約は `docs/researchdatahub-performance.md`**、Codex指示は `docs/CODEX_NEXT.md`、進捗は `docs/HANDOFF.md`。**PR #16はdocs-onlyとしてマージ済み。Linux別名入口の実装/検証状況はHANDOFFのPR #17を参照。**
 
 ## 最初に読む順番
 

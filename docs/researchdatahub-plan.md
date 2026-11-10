@@ -70,3 +70,7 @@
 - PR #14: ControlDeck Add-on v2 A0基盤（Draft、未マージ）。この文書のResearchDataHub構成を参照し、古いPC正本案を採用しない
 - PR #15: 公開承認済み文献だけの検索APIと機械トークン（Draft、未マージ）。第三者LLMへの送信機能そのものは未実装
 - PR #16: **本チェックポイント（docs-only）**。コード実装なし、マージ後にCodexが実装PRを作成する
+
+
+### 2026-11-10 PR-A進捗
+PR #16の設計はmainへ統合済み。PR #17でLinux別名入口・doctor/serve/test・health/Web表示・配布同梱を実装し、61 tests、Linux配布/非rootインストール、QPKGのLinux上smoke、ControlDeckローカルLLMの合成案件assistを検証。リリース/更新は検証待ち、PR-B〜GとQNAP実機は未完了。詳細はHANDOFF。上記の「未実装」は設計チェックポイント時点の記録。

@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## v0.5.2
+
+管理Webとhealthの表示をResearchDataHubに変更し、Linux用の `python3 -m researchdatahub` と `rdh.sh doctor|serve|test` を追加しました。新入口ではデータ保存先を明示し、既存のサーバー・データ形式を利用します。旧起動入口、QPKG ID、パスキーRP ID、サービス名、配布資産名を維持します。配布物から一時データで起動・ログイン・新旧入口の互換性を検査できます。
+
 ## v0.5.1
 
 QnapPatentBuddy の未公開発明の機密保護を強化しました。QnapAssistantやOllama等は管理者がローカル専用と確認した場合のみ、発明内容・請求項・検索結果のAI処理を実行できます。OpenRouterなど外部AIへの未公開データ送信と自動埋め込み・リランクを遮断します。
