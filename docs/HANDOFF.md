@@ -1,10 +1,10 @@
 # HANDOFF — ResearchDataHub / PatentBuddy
 
-更新: 2026-11-10。`AGENTS.md` → `DEVELOPMENT_WORKFLOW.md` → 本書 → `docs/CODEX_NEXT.md` の順に確認する。計画の正本は `researchdatahub-plan.md`、性能受入は `researchdatahub-performance.md`。
+更新: 2026-11-11。`AGENTS.md` → `DEVELOPMENT_WORKFLOW.md` → 本書 → `docs/CODEX_NEXT.md` の順に確認する。計画の正本は `researchdatahub-plan.md`、性能受入は `researchdatahub-performance.md`。
 
 ## 現在地
 
-- Repo: `souten-yd/PatentBuddy`。最新公開 **v0.5.7**、main `11c500b`。
+- Repo: `souten-yd/PatentBuddy`。最新公開 **v0.5.10**、main `7fd0cda`。最新受入は末尾「v0.5.10実導入」を参照。
 - 作業ブランチ **feat/patentbuddy-host-ai-jobs**。PR #13 / PR-Dはマージ・公開・更新済み。PR-C #15はマージ・v0.5.4公開・自動更新確認済み。
 - ユーザー目標は計画全体の完了。**PR-E残作業・PR-F/G、QNAP実機は未完了**。勝手にPR-Cだけを全体完了としない。
 - 内部package `qnaplibrary`、QPKG ID `QnapLibrary`、port17871、Cookie/パスキーRP ID、Release資産名を維持する。ResearchDataHubは唯一の正本、PatentBuddyはPC上のControlDeck Add-on。SQLiteをSMB/NFSで共有・同時二重書込みしない。
@@ -197,3 +197,15 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - 最終verifyは143 tests成功39.690秒（/tmp/pb-pdf-0510-verify.log）。Linux・QPKG・Featureビルド成功。全diff/checkを確認。
 - 実Hostブラウザ1280/320pxで、指定PDF15ページ・画像13点の新規取込、PNG表示/保存、原本SHA一致、320pxで取消が成功。横溢れ・JS例外ゼロ（.data/pdf-ui-browser.json、スクリーンショット）。回路図の実表示を目視確認。今回は画像受入のためLLM再実行を省略し、前回の実HostローカルLLM受入を維持。
 - 一時fixtureを正常停止、一時addon/user/session/grantの除去を確認。本番の接続・文献DBはまだ変更していない。v0.5.10の公開・実更新・本番PDF取込は次の工程。
+
+## v0.5.10実導入（2026-11-11・最新）
+
+- PDF/OCR PR21をmain7fd0cdaへ統合、Release run42840942211成功。既存publisher鍵による署名Feature三資産も公開。マージ後のruntime/manifest差分なしを確認。
+- 公式v0.5.8から管理API check/apply経由でv0.5.10への自動更新成功。session/CSRF/collection/旧版保持・更新後分析保存を確認（/tmp/pb-autoupdate-0510.json）。
+- 本番Linux DBをオンラインbackup、quick_check成功。設定/秘密はpre-0.5.10へ保持。公式Linux archiveのSHAを検証し既存prefix/data/portを維持して0.5.8→0.5.10導入、秘密設定の一致を確認。
+- ControlDeck正規Feature CLIで0.5.9→0.5.10更新、installed/enabled/managed=true・healthy。正規enable APIでfiles.pick/resources.acquireを含む7権限を承認。3ユーザーサービスはactive。
+- 本番connection.jsonを作らず同一UID自動認証で、指定PDFを実Host Files pickerから正本DBへ保存。15ページ・13画像、PNG表示/保存・原本SHA一致、1280/320pxで横溢れ/JS例外ゼロ・320px取消が成功。ローカルLLM要約も保存成功（/tmp/pb-pdf-installed-browser.log）。未確認のOCR/分析結果を自動的に承認済みとはしない。
+- URL: PatentBuddy https://souten-linux.tailc8e858.ts.net/x/patent-buddy/workspace / ResearchDataHub http://192.168.68.200:17871/ 。NAS自体は未更新・未移行。
+- 請求項分析も保存成功。正本DBは文献1件・原本1件・画像参照13件・要約3775文字/請求項確認6510文字を保持、quick_check成功。15ページのうち直接抽出10、直接抽出+OCR5。OCR/AIの内容精度は人手未承認。請求項ブラウザ試験初回は既存要約の表示完了前の件数取得で誤判定したため、再生成せず「請求項の確認」の表示待ちに修正して成功（/tmp/pb-pdf-installed-claims-recheck.log）。
+- 一時ユーザー/session/grantと試験ジョブ履歴を正常除去（remaining_jobs=0）。原本・抽出結果・分析は本番正本に保持。利用者は文献検索で「JPA」などから開ける。connection.jsonなし、同一UID自動認証を維持。
+- docs-only追記の全verifyも143 tests成功39.361秒。古いガイド記載のtest_docs_rulesは存在せずimport失敗、実際のtest_updater_docs 7 testsと全verifyで検証した。PR-F/P2/PR-Gは未完了、全体goalはactive。
