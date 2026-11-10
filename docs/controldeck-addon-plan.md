@@ -1,14 +1,25 @@
 # PatentBuddy — ControlDeck Add-on 移行設計（規範）
 
-状態: 移行着手、NAS側既存データは変更しない。実機ホスト結合・データ移行は未実施。
+状態: **ハイブリッド案を採用（2026-11-10）**。NASが唯一の永続データ正本。PC Add-onは高機能な計算・UI層。実機ホスト結合・NAS公開データAPIの本番受入は未実施。
 
 ## 決定
 - PatentBuddy は ControlDeck Add-on Platform v2 の **独立プロセス**。ControlDeck本体へ特許専用コードを入れず、MediaForge/SonicForge と同じ外部サービス + manifest / sandbox embedded view を採用する。
-- R9700X PC が全文検索・分析・GraphRAG・ローカルLLMへの依頼を担当する。別PC/サーバー側へ特許固有の依存を共有しない。
-- NAS は公報の原本、検証済みデータベース・設定のスナップショット、世代管理、復元用メタデータの保管先。**稼働中のSQLite/WALをSMB/NFSで直接共有して配置しない**。ローカルSSDの稼働DB + SQLite Online Backup APIによる一貫したチェックポイントをNASへコピー（転送途中名 → ハッシュ検証 → 原子的な昇格）。失敗した時は旧世代を残す。SSDの完全故障時は最後の成功スナップショットまでがRPOとなる。
-- QPKG ID `QnapLibrary` と旧DBパス `QnapLibrary-data/library.sqlite3` を当面変更・削除しない。旧データからPCへ移す場合は、QPKG停止または既存手動スナップショットからコピーし、検証・dry-run・ロールバックを先行する。上書きしない。
+- QNAP NASはSQLite/FTS5の**唯一の永続正本**として文献、公報、案件、請求項、監査ログ、引用・関係の確定データを所有する。QNAP自身が公式API/RSSの公開情報を取り込み、認証付きRESTで全文検索・登録・検索・データ出力を提供する。既存QPKGを維持して改善する。
+- R9700X PC ControlDeck Add-onは暗号化されたNAS APIを通じてデータを参照し、ローカルLLM・埋め込み・RAG・クレーム/FTO等の計算と高度UIを担当。データの二重マスターは作らない。モデルやQdrant索引はPC SSDに**再構築可能なキャッシュ**として保持してよい。
+- NASのSQLite/WALは**NASローカルのファイルシステムでNASプロセスのみが開く**。PCはネットワーク共有越しにSQLiteを直接開かない。定期バックアップはNAS内部のSQLite Online Backup APIを使用し、別世代に整合性チェック付きで保管する。PC側はHost Job再開用の状態以外を正本としない。NAS障害時にPCキャッシュを勝手に正本へ昇格させない。
+- QPKG ID `QnapLibrary` と旧DBパス `QnapLibrary-data/library.sqlite3` を当面変更・削除しない。**NAS版を終了しない**。移行対象は高度UI/LLM処理であり、旧SQLiteデータをPCへ移行しない。設定・パスキー・既存NAS APIは保持する。
 - `souten-yd/QnapPatentBuddy` を既存コードの継続元とし、別の新規リポジトリへ複製しない。改名はブランド/配布の層から段階的に変更する。
-- 未公開発明/クレームを外部APIへ自動送信しない。ローカル専用AIをデフォルトとする。既存のPR #12の安全方針を優先。
+- 未公開発明/クレーム・個人メモを外部APIへ自動送信しない。ローカル専用AIをデフォルトとする。mainにマージ済みのPR #12の`privacy.fixed_public_request`の防壁を維持。一般的なOpenRouterへの自由入力・公報本文送信を勝手に解禁しない。外部AI用の限定データ経路は管理者が明示公開した文献のみに制約し、送信先・項目・目的・確認操作のポリシーを別途実装する。
+
+## データ公開・外部AI・APIの強制境界
+
+- すべての文献・案件は初期値**private**。公報の`kind=patent`、収集先、タイトルから公開可否を推定しない。
+- 管理者が元URLと文献ハッシュを確認して明示承認した文献だけ、`published_documents` registryで文書単位公開。更新/削除で公開承認を無効化。検索のSQL段階で公開登録と現行ハッシュ一致をJOINし、private行をレスポンスに出さない。
+- 専用`published`スコープの機械トークンは`/api/v1/published/*`のみ使用可能。元の`ro`トークンは**private文献も読めるため外部AIに渡さない**。既存ペアリングでpublished権限を発行できないようにし、管理者の明示発行だけを許可。
+- 公開APIのデータ最小化: 機密の`meta`、案件情報、チャット、パスキー、秘密設定、運用ログを返さず、本文・タイトル・公開番号・日付・公開URL等の承認済みフィールドのみ。検索はキーワード限定で外部LLMへの送信を一切行わない。
+- OpenRouterはあくまで**第三者へのデータ送信を伴うLLMサービス**。NAS公開検索API自体と同一視しない。第一段階ではPublic APIのレスポンスをローカルLLM/外部アプリが取得できるのみで、NASによるOpenRouterへの公報送信はしない。外部送信の第2段階はプレビュー・項目単位の承認、保存/再送/費用/ログを含め別PRで審査。
+- LANからNAS APIはTLS検証必須。プライベートなNAS URLやbearer tokenをOpenRouterへ中継しない。レート制限・監査・ページング・失効とバックアップを追加する。
+- リンクを開いただけで公開や外部送信が発生しない。管理UIでは`非公開`をデフォルト、明示確認後にのみ公開操作、公開中は復帰（非公開化）可能。
 
 ## 配布・ライフサイクル（MediaForge / SonicForge方式を踏襲）
 
@@ -25,13 +36,13 @@
 | 主体 | 責務 |
 | --- | --- |
 | ControlDeck Host | アドオンregistry/enable/disable、親ユーザー認証・権限・UIルート、限定Bearer認証、Jobs/AI/GPU Broker、ファイルgrant |
-| PatentBuddy Add-on | 文献・構成要件・出願/引用/特許ファミリーのストア、検索、可視化、特許ドメインAPI、生成物の根拠 |
-| QNAP NAS | 原文・完全性を検証したスナップショット・バックアップの保管。実行主体ではない |
+| PatentBuddy Add-on | 高度な調査/分析UI、ローカルLLM、GraphRAGの探索/再ランキング、Host Jobs・GPU制御、ローカル索引キャッシュ |
+| QNAP NAS | 唯一の文献・案件・請求項・公開承認・関係グラフの正本、全文検索/公式データ収集API、認証、差分取得、世代バックアップ |
 
-- Host内部Python moduleはimportしない。通信は scoped REST/Bridge のみ。
+- Host内部Python moduleはimportしない。通信は scoped REST/Bridge のみ。NAS APIは**TLS検証済みのHTTPS/Tailscale経由**、短期・用途別に限定したトークン、read-only service principal、失効・ローテーションを採用。NASへのHTTP平文・Host Cookieの転送は禁止。
 - 専用loopback: `http://127.0.0.1:9150` （自動起動・systemd設定は後続スライスで作成）。既存QNAPの 17871 は維持する。
 - フロントは Host のopaque iframe (no same-origin)。Cookie・localStorage・sessionStorageに依存せず、Hostから来る限定service tokenのintrospectionでリクエストごとに認証する。Host Cookieを転送せず、未検証Bearerを管理者に昇格させない。
-- 起動初期の今回のスライスは宣言的 manifest と Add-on health、および読み取り専用の初期導線。既存の管理画面全機能を未検証でHostへ公開しない。Hostに統合された文献検索・データ取り込み・AIは後続PRに分割。
+- A0は宣言的manifest・health・読み取り専用導線のみ。**PC上に2つ目のNAS文献DBを作らない**。現行`--addon`がローカルSQLiteを作る暫定構造は後続A1で取り除く必要があり、移行完成とは見なさない。Hostの認証済みprincipalがNASへの許可済みAPIだけを操作するまで旧管理APIを公開しない。
 - Hostへの `host_capabilities` は必要なものだけ要求。Jobs・AIなどは実装時に追加し、それ以前に権限があると主張しない。
 - ブラウザの埋め込みrouteとワークスペース状態は Hostのroute/theme Bridgeに追従。認証とCSPを満たすまで機能の公開をしない。
 
@@ -47,9 +58,9 @@ ControlDeck本体の汎用 `workflows/rag_graph.py` にはLLM三つ組抽出の�
 ## 実装順・受入ゲート
 - **A0（本PR）**: manifest契約/health、loopback Add-on 起動入口、host integration policy、ドキュメント・契約テスト。フルUI・AI・NAS同期は未実装を明記。
 - **A1**: Host token introspection・権限分離、Cookie不要なワークスペース、iPhone 320px〜、Host theme/route、安全なナビ。旧認証はstandalone用途のみ。
-- **A2**: ドキュメント/特許案件APIをHost principalに限定公開。既存の特許コネクタと全文検索機構を再利用。PR #13 のスケール改善を取り込む。
+- **A2**: NAS主データAPIを読み取り主体でHostへ接続する。差分同期(cursor/change feed)、検索結果の根拠ID、PR #13 のスケール改善を組み込み、ControlDeck側のローカルSSDを再構築可能な索引キャッシュに限定する。
 - **A3**: ローカルAI Gateway経由の特許作業とHost Jobs、明示実行・進捗・cancel。GPUを使用する場合Brokerリースを守る。
-- **A4**: NASバックアップ/移行ツール（dry-run/チェックサム/復元テスト）、旧QPKGからの移行受入後にQPKGリリースの凍結。
+- **A4**: QNAP上のSQLite一貫バックアップ・世代保持・復元テストとNAS障害時のread-only表示。旧QPKGの廃止/データ移動は行わず、必要ならNAS側に安全なAPI新機能を追加する。
 - **A5**: 正確な特許グラフ + 根拠付き意味拡張 + bounded GraphRAG。ベンチマークで効果が確認された関係のみ既定ON。
 
-競合PR #10（クレーム）、#11（認証）、#12（未公開発明）、#13（大量投入）は別PRとして維持し、必要な実装がmainに入った後に取り込む。**今回のPRはメインへの変更・自動リリースを伴わない**。実機検証はControlDeckを導入したUbuntu PCで行う。
+PR #10（クレーム）、#11（認証）、#13（大量投入）は別PR。PR #12（未公開発明保護）はmainへマージ済みであり制約として維持する。NAS限定公開データの独立した受入ゲートをA1より前に追加し、PR #15から実装する。**今回のPRはメインへの変更・自動リリースを伴わない**。実機検証はControlDeckを導入したUbuntu PCで行う。
