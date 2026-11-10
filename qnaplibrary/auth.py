@@ -90,7 +90,10 @@ class Sessions:
     """Bounded persistent admin sessions, with only hashed cookie IDs on disk."""
 
     def __init__(self, hours=720, store=None):
-        self.ttl = max(1, min(float(hours or 720), 720)) * 3600  # <=30 days
+        try:
+            self.ttl = max(3600, min(int(hours) * 3600, 30 * 86400))
+        except (ValueError, TypeError, OverflowError):
+            self.ttl = 30 * 86400
         self.store = store
         self._lock = threading.Lock()
         self._items = {}
