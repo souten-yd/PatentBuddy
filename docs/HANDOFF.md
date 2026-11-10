@@ -227,3 +227,13 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - 関連9 tests成功5.438秒、最終全verify152 tests成功44.949秒（/tmp/pb-chart-verify.log）。その後UIの確認状態文言と採用引用の明示だけを修正、Node構文チェックは追記後に実施。
 - 実Host一時addon pb-chart-ui-acceptance/一時RDHを使い、合成請求項と対比文献でControlDeckの実ローカルLLM生成・保存・1280/320pxの引用表示DOM検証が成功、横溢れ/JSエラーなし（/tmp/pb-chart-ui-browser.log）。スクリーンショットは上部でチャート本体が画角外のため、チャートの目視受入とは呼ばない。fixtureをSIGINTで正常終了、一時addon/user/session/grants/DB除去を確認（/tmp/pb-chart-ui-fixture.log）。本番v0.5.10は不変。
 - 次: vector/Host rerank接続、モデル版の保存、狭い提案/人手承認scopeとUI、関係管理UI/逆方向、実根拠の誤判定・取消/応答消失の復旧・性能I/O・配布受入を継続。PR10未マージ、PR23 Draft。P2汎用索引とPR-G NAS移行も未完。goal active。
+
+## PR23 検索AI契約の追加（2026-11-11・作業中）
+
+- 前turnはprogress（chart Host接続3c8c2ec push）。今回actual Host AI contractを確認するとtext/visionのみでembedding/rerankなし。Host所有権を維持するためControlDeck別worktree `/data1tb/ControlDeck-retrieval-ai` / `feat/addon-local-retrieval-ai` / Draft PR351 / 6e49086を追加した。現行live Hostファイルは変更していない。
+- Host側 /ai/retrieval/capabilities と /execute はai.inference認可、ローカル登録GGUF役割・loopback確認、既存gateway lease/ensure_ready/releaseを使用。32入力/64KiB/応答4MiB/8192次元、有限数・行/index完全被覆、proxy/redirect拒否、切断時task cancelを検証。モデル名/pathを返さずfile metadata指紋model_refを返す（内容hashではない）。
+- Host関連46 tests成功3.04秒。初回4failは既存disable HTTP409の誤期待・asyncテストplugin不存在。asyncio.runに修正、依存追加なし。frontend build19.08秒、初回全体1fail/1231passはbuild完了前に起動したSPA routeの404/405。build完了後の全1232 tests成功105.70秒/2skip。logs /tmp/pb-host-retrieval-tests2.log、*-build.log、*-full2.log。
+- PatentBuddy HostSession.retrievalと応答契約を実装。古いHostへ本文を送る前に能力/ローカル方針/model_refを確認。返答の指紋・次元/行数・重複/欠落/非有限数を拒否。取消時にsocketを閉じる実HTTP試験を追加。全verify156 tests成功47.169秒（/tmp/pb-retrieval-client-verify.log）。生成/検索パイプラインへまだ接続していない。
+- 実登録モデルはQwen3.8-27B LLMのみと確認。既存role-presets APIからBGE-M3（job04d5b26334e3）/Qwen3-Reranker-4B（job6a49ba113107）を通常導入中。前者は直近API succeeded、後者running。helperPID480692、exec26005、logs /tmp/pb-retrieval-model-install2.log/.err。初回helperがjob_id応答をidと誤読したが、作成済みjobをDBで特定して再投入せず監視を引継いだ。
+- 導入済みrootは /data1tb/LLM、二つのpreset directory。既存モデルは変更しない。ダウンロード中のHost再起動を避ける。helper終了時は一時ユーザー/sessionを除去（進行中ならinactiveとして保持）し監査/jobsは保持する設計。成功/cleanupは次turnで実確認が必要。
+- 次: 残りpreset導入の実handleを再確認→Host PR351最終review/mergeと既存dirty passkey変更を保持した限定反映→実retrieval APIと取消/モデル指紋確認→正本vector索引のscoped保存/版・モデル空間・再構築→keyword/vector/graph/rerank→人手review UI。文章生成のモデル版記録、性能/配布、P2/PR-Gも引き続き未完。本番PatentBuddy/RDHは0.5.10のまま、goal active。

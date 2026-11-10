@@ -68,6 +68,45 @@ class HostSession:
             raise AddonError(502, 'ローカルAIの応答を検証できません')
         return result['content']
 
+    def retrieval(self, capability, inputs, query=None):
+        from .retrieval_contract import validate_result
+        if capability not in ('text.embed', 'text.rerank'):
+            raise AddonError(400, '検索AIの処理方法が不正です')
+        caps = self.call('GET', '/ai/retrieval/capabilities').get(capability, {})
+        if (caps.get('available') is not True or caps.get('execution_policy') != 'local_only'
+                or caps.get('revision_kind') != 'host_file_metadata_v1'
+                or not re.fullmatch(r'[a-f0-9]{64}', str(caps.get('model_ref', '')))):
+            raise AddonError(503, 'Hostのローカル検索AIを利用できません')
+        body = {'capability': capability, 'inputs': inputs}
+        if query is not None:
+            body['query'] = query
+        url = urllib.parse.urlsplit(self.client.host_url)
+        cls = http.client.HTTPSConnection if url.scheme == 'https' else http.client.HTTPConnection
+        connection = cls(url.hostname, url.port, timeout=315)
+        try:
+            connection.connect()
+            with self.lock:
+                if self.aborted.is_set():
+                    raise AddonError(409, '分析はキャンセルされました')
+                self.transport = connection.sock
+                headers = dict(self.headers, **{'Content-Type': 'application/json'})
+            connection.request('POST', BASE + '/ai/retrieval/execute', body=json.dumps(body).encode(), headers=headers)
+            response = connection.getresponse()
+            if response.status != 200:
+                raise AddonError(503, 'Hostの検索AI要求が拒否されました')
+            raw = response.read(4 * 1024 * 1024 + 1)
+            if len(raw) > 4 * 1024 * 1024 or self.aborted.is_set():
+                raise AddonError(502, '検索AI応答が上限を超えたか処理が中断されました')
+            return validate_result(json.loads(raw), capability, len(inputs), caps['model_ref'])
+        except (OSError, ValueError, http.client.HTTPException) as error:
+            if isinstance(error, AddonError):
+                raise
+            raise AddonError(502, '検索AIとの通信または応答検証に失敗しました') from None
+        finally:
+            with self.lock:
+                self.transport = None
+            connection.close()
+
     def create_job(self, title="PatentBuddy 文献分析"):
         if self.job_id is not None:
             raise AddonError(409, 'ジョブは作成済みです')
