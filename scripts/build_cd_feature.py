@@ -9,6 +9,7 @@ manifest is signed with an approved publisher key.
 from __future__ import annotations
 
 import argparse
+import ast
 import gzip
 import hashlib
 import io
@@ -34,9 +35,11 @@ def files_to_bundle(root: Path):
 def build(destination: Path, root: Path = ROOT) -> dict:
     addon = json.loads((root / "addon.json").read_text(encoding="utf-8"))
     package = json.loads((root / "control-deck-feature.json").read_text(encoding="utf-8"))
-    namespace = {}
-    exec((root / "qnaplibrary/__init__.py").read_text(encoding="utf-8"), namespace)
-    version = namespace["VERSION"]
+    module = ast.parse((root / "qnaplibrary/__init__.py").read_text(encoding="utf-8"))
+    values = {target.id: ast.literal_eval(node.value)
+              for node in module.body if isinstance(node, ast.Assign)
+              for target in node.targets if isinstance(target, ast.Name) and target.id == "VERSION"}
+    version = values["VERSION"]
     if addon["version"] != version or package["version"] != version:
         raise ValueError("addon/package/Python versions disagree")
     if addon["id"] != package["feature_id"]:
