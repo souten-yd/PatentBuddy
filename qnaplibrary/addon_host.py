@@ -26,6 +26,7 @@ def owner_key(identity):
 
 class HostSession:
     required = REQUIRED
+    capability_message = "ControlDeckでAIとジョブの権限を有効にしてください"
 
     def __init__(self, client, headers):
         self.client = client
@@ -41,7 +42,7 @@ class HostSession:
 
     def require_capabilities(self):
         if not self.required.issubset(self.identity['granted_capabilities']):
-            raise AddonError(403, 'ControlDeckでAIとジョブの権限を有効にしてください')
+            raise AddonError(403, self.capability_message)
 
     def call(self, method, path, body=None, timeout=20):
         with self.lock:

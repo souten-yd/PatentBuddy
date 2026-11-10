@@ -168,3 +168,17 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - 次: LLM試験/一時grant metadata cleanup/最終verify結果を確認してpush。PDFJob managerの中断・再起動・Host終端再送・一時原本掃除、UIのFiles pickerとページ根拠/原本/図閲覧、署名配布/実更新/実画面受入が未完。既存AnalysisJobsと並行できるよう上限とowner境界を保持。PR-F/P2/PR-Gも継続。
 
 - 再試験完了: 指定PDFの取込後に実Host local-only LLMの要約生成/正本保存/Host終端同期成功64.59秒/3962文字。これは内容品質の人間承認ではない。temp addon/user/session削除、監査/Host履歴保持、一時grant metadata 2件も除去。最終134 tests成功37.560秒（/tmp/pb-pdf-storage-verify-final.log）。lease解放応答のID/状態/Job照合も追加し回帰検証済み。
+
+## PR21 PDF UI / Job管理（最新、未公開）
+
+- `PDFJobs`を実装。独立最大32件のmetadata履歴、PDF同時1件、所有者境界、CPU leaseと認証の5秒監視、キャンセル、原本SHAを確認する再選択実行、Host終端再送。原本/抽出本文/filename/tokenはmetadataへ保存しない。一時原本と中間画像は0700 scratchの中で処理し、終了時削除。再起動時は排他lock取得後に当該scratch残骸だけ削除する。
+- 保存API応答を失ったときは抽出版hashの読取receiptで照合。照合先まで落ちていればinterrupted/確認待ちとし、後で保存済み資料を回収する。原本/結果を保存済みなのに失敗と決めつけたり重複文献を作らない。新API GET `/api/v1/pdf-imports/{digest}` はread、published拒否は既存境界を維持。
+- UIにHost Files picker・OCRページ指定・進捗/取消・状態照合/再選択・原本download・ページ根拠/低信頼語数を追加。取り込み中は新規選択buttonを無効化。分析へそのまま進める。Host capabilitiesにfiles.pick/resources.acquire追加（配布後に正規enableで明示grantが必要）。
+- `tests.test_addon_pdf_jobs`は原本/秘密がmetadataに残らない、取消未保存/owner拒否、一時領域掃除、応答喪失receipt復旧、保存確認待ち、Host終端再送、排他lockを検証。既存AddonShell test teardownへPDFJobs.close追加。urllib HTTPError responseもcloseし、最終139 tests成功43.919秒、ResourceWarningなし（/tmp/pb-pdf-jobs-ui-verify-final.log）。前段139 testsは成功したが未close警告があり修正した。
+- 実Host Chromeの1280pxで選択→指定PDF15ページ取り込み→原本download/SHA一致→ローカルAI要約表示成功。320pxで頁根拠表示/原本SHA/取消成功。横溢れ/JSエラーなし。fixtureは候補Addon+temp ResearchDataHubで、導入済み製品の受入ではない。`.data/pdf-ui-first.json` / `/tmp/pb-pdf-ui-browser.log`。
+- テストscriptのフォルダbutton名は末尾「›」を含むため、最初の2回はexact locatorがtimeout。部分一致に修正。最初の320pxは前回成功資料を先に開いていたため、次回は新規成功カード数の増加を待つよう改善。busy button修正後の再試験で1280/320双方の新規取込と原本SHA/取消も成功（/tmp/pb-pdf-ui-browser2.log、LLM再実行は省略）。
+- fixtureの初回起動は実class名を誤りImportError。生成直後の一時user1件はJob/session未作成を確認し削除、classをAddonShellへ修正して再起動。その後のfixture停止ではtemporary addon/user/session/grantとtemp原本/DBを除去、監査/Hostjob履歴を保持する。
+- 未完の重要契約: Hostのlease解放済み/期限切れ状態を再起動後に照合するGET `/resources/leases/{id}` が現在ない。PDF clientに409時のGET照合を実装したが、Host側の最小read route追加/権限テスト/PRと実反映が必要。確認できない場合はhost_sync_pendingを残す。Hostを勝手に完了扱いしない。
+- 次はこのHost復旧契約、原本からの図/ページ画像の保存・閲覧、狭い永続PDF取込token（NAS接続でrwを要求しない）、リリース用docs/版整合・Linux/QPKG/署名Featureビルド、実更新・導入済み画面受入。その後PR-F/P2/PR-Gを続ける。現在本番はPatentBuddy v0.5.9 / RDH v0.5.8のまま。
+
+- 2回目の実Host UI fixtureも停止・一時addon/user/session/grant除去を確認。本番Addon healthはhealthyのまま。最後にPDF取込のJSON配列を400で拒否する型検査を追加し、保存/Jobs/client関連12 testsを再検証。全体139 tests以降の変更はこの入力検証とテストだけ。

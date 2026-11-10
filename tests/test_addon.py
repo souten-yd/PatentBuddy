@@ -20,7 +20,7 @@ class AddonManifestTest(unittest.TestCase):
         self.assertEqual(value["requires"]["addon_contract"], ">=2.0 <3.0")
         self.assertEqual(value["runtime"]["base_url"], "http://127.0.0.1:9150")
         self.assertEqual(value["runtime"]["health_path"], "/addon/v1/health")
-        self.assertEqual(value["host_capabilities"], ["context.read", "theme.read", "route.open", "ai.inference", "jobs.write"])
+        self.assertEqual(value["host_capabilities"], ["context.read", "theme.read", "route.open", "ai.inference", "jobs.write", "files.pick", "resources.acquire"])
         view = value["contributions"]["embedded_views"][0]
         self.assertEqual(view["path"], "/addon/workspace")
         self.assertEqual(view["mobile"], "embedded")

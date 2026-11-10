@@ -429,6 +429,26 @@ class Handler(BaseHTTPRequestHandler):
                         if method == "GET" and path == "/addon/v1/status":
                             result = client.status()
                             result["addon"]["version"] = VERSION
+                        elif path == "/addon/v1/pdf-jobs" and method == "GET":
+                            result = self.server.app.pdf_jobs.list(identity)
+                        elif path == "/addon/v1/pdf-jobs" and method == "POST":
+                            body = Request(self, method, path, {}, {}).json()
+                            if not isinstance(body, dict):
+                                raise AddonError(400, 'PDF取り込み条件を指定してください')
+                            result = self.server.app.pdf_jobs.start(self.headers, body.get('grant_id'), body.get('force_pages'), body.get('resume_id'))
+                        elif re.fullmatch(r"/addon/v1/pdf-jobs/[a-f0-9]{32}", path) and method == "DELETE":
+                            result = self.server.app.pdf_jobs.forget(path.rsplit('/', 1)[1], identity)
+                        elif re.fullmatch(r"/addon/v1/pdf-jobs/[a-f0-9]{32}/(cancel|reconcile)", path) and method == "POST":
+                            Request(self, method, path, {}, {}).json()
+                            identifier = path.split('/')[-2]
+                            result = (self.server.app.pdf_jobs.cancel(identifier, identity) if path.endswith('/cancel')
+                                      else self.server.app.pdf_jobs.reconcile(self.headers, identifier))
+                        elif method == "GET" and re.fullmatch(r"/addon/v1/documents/[1-9][0-9]{0,17}/pdf-extraction", path):
+                            result = client.data("GET", "/api/v1/documents/" + path.split('/')[-2] + "/pdf-extraction")
+                        elif method == "GET" and re.fullmatch(r"/addon/v1/documents/[1-9][0-9]{0,17}/original.pdf", path):
+                            raw = client.original_pdf(int(path.split('/')[-2]))
+                            status = self.send_bytes(200, raw, "application/pdf", {"Content-Disposition": 'attachment; filename="original.pdf"', "Cache-Control": "no-store"})
+                            return
                         elif method == "GET" and path == "/addon/v1/jobs":
                             result = self.server.app.jobs.list(identity)
                         elif method == "DELETE" and re.fullmatch(r"/addon/v1/jobs/[a-f0-9]{32}", path):
@@ -540,9 +560,12 @@ class AddonShell:
         self.client = AddonClient(self.data_dir)
         from .addon_jobs import AnalysisJobs
         self.jobs = AnalysisJobs(self.client, self.data_dir)
+        from .addon_pdf_jobs import PDFJobs
+        self.pdf_jobs = PDFJobs(self.client, self.data_dir)
 
     def request_shutdown(self, exit_code=0):
         self.jobs.close()
+        self.pdf_jobs.close()
         self.exit_code = exit_code
         if self.httpd:
             threading.Thread(target=self.httpd.shutdown, daemon=True).start()

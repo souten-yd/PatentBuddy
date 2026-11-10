@@ -109,7 +109,7 @@ def _ocr_words(tsv):
     }
 
 
-def extract_pdf(source, cancel=None, force_pages=(), progress=None):
+def extract_pdf(source, cancel=None, force_pages=(), progress=None, scratch_parent=None):
     """Return all pages or raise; no partial-success or silent truncation.
 
     force_pages uses 1-based page numbers. OCR confidence is an engine score,
@@ -121,7 +121,7 @@ def extract_pdf(source, cancel=None, force_pages=(), progress=None):
         raise PDFError('OCRページ番号は1以上の整数で指定してください')
     if os.name != 'posix':
         raise PDFError('PDF処理はLinux PCで実行してください')
-    with tempfile.TemporaryDirectory(prefix='patent-buddy-pdf-') as temporary:
+    with tempfile.TemporaryDirectory(prefix='patent-buddy-pdf-', dir=scratch_parent) as temporary:
         directory = Path(temporary)
         pdf = directory / 'source.pdf'
         digest, size = hashlib.sha256(), 0

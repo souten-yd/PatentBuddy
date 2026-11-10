@@ -14,6 +14,7 @@ HOST_BYTES = 2 * 1024 ** 3
 
 class PDFHostSession(HostSession):
     required = frozenset(('context.read', 'jobs.write', 'files.pick', 'resources.acquire'))
+    capability_message = 'ControlDeckでファイル選択・ジョブ・資源利用の権限を有効にしてください'
 
     def __init__(self, client, headers):
         super().__init__(client, headers)
@@ -97,8 +98,13 @@ class PDFHostSession(HostSession):
         # Release must happen before terminal Job reconciliation. Expiry remains
         # the Host fallback if credentials were revoked or the Host is offline.
         if self.lease_id:
-            value = self.call('POST', '/resources/leases/' + self.lease_id + '/release', {})
-            if value.get('lease_id') != self.lease_id or value.get('state') != 'released' or value.get('job_id') != self.job_id:
+            try:
+                value = self.call('POST', '/resources/leases/' + self.lease_id + '/release', {})
+            except AddonError as error:
+                if error.status != 409:
+                    raise
+                value = self.call('GET', '/resources/leases/' + self.lease_id)
+            if value.get('lease_id') != self.lease_id or value.get('state') not in ('released', 'expired', 'canceled') or value.get('job_id') != self.job_id:
                 raise AddonError(502, 'Host資源の解放を確認できません')
             self.lease_id = None
         if self.request_id:

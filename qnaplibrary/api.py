@@ -1059,6 +1059,8 @@ def pdf_import(req):
     import base64
     from . import pdf_store
     body = req.json(limit=88 * 1024 * 1024)
+    if not isinstance(body, dict):
+        raise _err(400, 'PDF取り込み条件を指定してください')
     encoded = body.get('pdf_base64')
     if not isinstance(encoded, str) or len(encoded) > ((pdf_store.MAX_PDF + 2) // 3) * 4:
         raise _err(400, 'PDFのサイズまたは形式が不正です')
@@ -1081,3 +1083,14 @@ def pdf_original(req):
     return req.h.send_bytes(200, pdf_store.original_for(req.app.store, int(req.params['did'])),
                             'application/pdf', {'Content-Disposition': 'attachment; filename="original.pdf"',
                                                 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff'})
+
+
+@route('GET', '/api/v1/pdf-imports/{digest}', 'read')
+def pdf_import_receipt(req):
+    digest = req.params['digest']
+    if not re.fullmatch(r'[a-f0-9]{64}', digest):
+        raise _err(400, '抽出版のIDが不正です')
+    row = req.app.store.one('SELECT doc_id,source_sha256,extraction_sha256 FROM document_pdfs WHERE extraction_sha256=?', (digest,))
+    if not row:
+        raise _err(404, '保存済みの抽出版がありません')
+    return dict(row)

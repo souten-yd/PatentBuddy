@@ -18,7 +18,9 @@
     "theme.read",
     "route.open",
     "ai.inference",
-    "jobs.write"
+    "jobs.write",
+    "files.pick",
+    "resources.acquire"
   ],
   "contributions": {
     "navigation": [

@@ -86,6 +86,7 @@ class PDFStoreTests(unittest.TestCase):
             body = {'title': 'fixture', 'pdf_base64': base64.b64encode(CONTENT).decode(), 'extraction': extraction()}
             for client, status in ((Client(server.base), 401), (readonly, 403), (analysis, 403), (public, 403)):
                 self.assertEqual(client.call('POST', '/api/v1/pdf-imports', body)[0], status)
+            self.assertEqual(importer.call('POST', '/api/v1/pdf-imports', [])[0], 400)
             code, result = importer.call('POST', '/api/v1/pdf-imports', body)
             self.assertEqual(code, 200, result)
             original = '/api/v1/documents/%d/original.pdf' % result['doc_id']

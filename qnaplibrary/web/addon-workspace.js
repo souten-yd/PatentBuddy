@@ -2,6 +2,8 @@
 let nonce = '';
 let currentDoc = null;
 let polling = false;
+let bridgePort = null;
+const bridgeCalls = new Map();
 const knownJobs = new Map();
 const root = location.pathname.startsWith('/addon-frame/') ? '/' + location.pathname.split('/').filter(Boolean).slice(0, 2).join('/') : '';
 const el = id => document.getElementById(id);
@@ -22,6 +24,7 @@ async function load() {
     el('message').textContent = ready ? 'ResearchDataHubに接続しました。文献を検索できます。' :
       s.setup_required ? 'ResearchDataHubの管理Webで初期設定を完了してください。' : 'ResearchDataHubの接続トークン設定が必要です。';
     el('submit').disabled = !ready;
+    el('import-pdf').disabled = !ready;
   } catch (error) { el('message').textContent = error.message; }
 }
 window.addEventListener('message', event => {
@@ -30,7 +33,13 @@ window.addEventListener('message', event => {
   if (event.source !== parent || event.origin !== expected || event.data?.type !== 'control-deck-host.connected' || !event.ports[0]) return;
   nonce = event.data.session_nonce;
   const port = event.ports[0];
+  bridgePort = port;
   port.onmessage = message => {
+    const reply = message.data;
+    if (reply?.type === 'response' && bridgeCalls.has(reply.id)) {
+      const call = bridgeCalls.get(reply.id); bridgeCalls.delete(reply.id); clearTimeout(call.timer);
+      if (reply.ok) call.resolve(reply.result); else call.reject(new Error(reply.error?.message || 'ファイル選択を中断しました'));
+    }
     if (message.data?.type === 'event' && message.data.event === 'session.updated') nonce = message.data.data.session_nonce;
     if (message.data?.event === 'theme.changed') document.documentElement.style.colorScheme = message.data.data?.mode || 'light dark';
   };
@@ -49,8 +58,7 @@ el('search').addEventListener('submit', async event => {
       button.textContent = `${row.ext_id || ''} ${row.title || '無題'}\n${row.snippet || ''}`;
       button.onclick = async () => {
         try {
-          const doc = await api('documents/' + row.doc_id);
-          el('title').textContent = doc.title || '文献'; el('body').textContent = doc.body || ''; el('detail').hidden = false; currentDoc = row.doc_id; await loadAnalyses(currentDoc);
+          await openDocument(row.doc_id);
         } catch (error) { el('message').textContent = error.message; }
       };
       el('results').append(button);
@@ -90,7 +98,7 @@ async function loadJobs() {
     el('jobs').replaceChildren();
     if (!data.items.length) el('jobs').textContent = '実行中の分析はありません。';
     for (const job of data.items) {
-      const row = document.createElement('div'); row.className = 'job';
+      const row = document.createElement('div'); row.className = 'job'; row.dataset.status = job.status;
       const label = document.createElement('p'); label.textContent = `${job.kind === 'claims' ? '請求項の確認' : '要約'} · 文献 ${job.doc_id} — ${job.message}`;
       row.append(label);
       if (['queued', 'running'].includes(job.status)) {
@@ -137,7 +145,91 @@ async function loadJobs() {
       if (job.status === 'succeeded' && knownJobs.get(job.id) !== 'succeeded' && currentDoc === job.doc_id) await loadAnalyses(currentDoc);
       knownJobs.set(job.id, job.status);
     }
+    await loadPDFJobs();
   } catch (error) { el('jobs').textContent = error.message; }
   finally { polling = false; }
 }
 setInterval(loadJobs, 2500);
+
+
+function hostCall(method, params) {
+  return new Promise((resolve, reject) => {
+    if (!bridgePort) { reject(new Error('ControlDeckへの接続を待ってください')); return; }
+    const id = crypto.randomUUID();
+    const timer = setTimeout(() => { bridgeCalls.delete(id); reject(new Error('ファイル選択の待ち時間を超えました')); }, 300000);
+    bridgeCalls.set(id, {resolve, reject, timer});
+    bridgePort.postMessage({type: 'request', id, method, params, session_nonce: nonce});
+  });
+}
+async function startPDF(resumeId) {
+  const text = el('ocr-pages').value.trim();
+  if (text && !/^\d+(\s*,\s*\d+)*$/.test(text)) throw new Error('ページ番号をカンマで区切って指定してください');
+  const pages = text ? text.split(',').map(x => Number(x.trim())) : [];
+  if (pages.some(x => x < 1 || x > 200) || pages.length > 200) throw new Error('ページは1〜200で指定してください');
+  const selected = await hostCall('host.file.pick', {mode: 'file', title: '取り込むPDFを選択'});
+  await api('pdf-jobs', {grant_id: selected.grant_id, force_pages: pages, resume_id: resumeId || null});
+  el('message').textContent = 'PDFの取り込みを開始しました。';
+  await loadPDFJobs();
+}
+el('import-pdf').onclick = async () => {
+  el('import-pdf').disabled = true;
+  try { await startPDF(); } catch (error) { el('message').textContent = error.message; }
+  finally { el('import-pdf').disabled = false; try { await loadPDFJobs(); } catch (_) {} }
+};
+async function openDocument(id) {
+  const doc = await api('documents/' + id);
+  currentDoc = id;
+  el('title').textContent = doc.title || '文献'; el('body').textContent = doc.body || ''; el('detail').hidden = false;
+  el('pdf-evidence').hidden = true; el('pdf-evidence').replaceChildren();
+  await loadAnalyses(id);
+  if (doc.meta?.source_type !== 'pdf' || currentDoc !== id) return;
+  const evidence = await api('documents/' + id + '/pdf-extraction');
+  if (currentDoc !== id) return;
+  const box = el('pdf-evidence'); box.hidden = false;
+  const heading = document.createElement('h3'); heading.textContent = 'PDFの原本とページ根拠';
+  const download = document.createElement('button'); download.textContent = '原本PDFを保存';
+  download.onclick = async () => {
+    download.disabled = true;
+    try {
+      const response = await fetch(root + '/addon/v1/documents/' + id + '/original.pdf', {credentials: 'include', headers: {'X-Control-Deck-Bridge-Session': nonce}});
+      if (!response.ok) throw new Error('原本PDFを取得できません');
+      const url = URL.createObjectURL(await response.blob());
+      const a = document.createElement('a'); a.href = url; a.download = 'original.pdf'; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (error) { el('message').textContent = error.message; }
+    finally { download.disabled = false; }
+  };
+  const source = document.createElement('p'); source.className = 'hint';
+  source.textContent = `原本 SHA-256: ${evidence.sha256} · ${evidence.page_count}ページ · OCR結果は未確認です`;
+  box.append(heading, download, source);
+  for (const page of evidence.pages) {
+    const details = document.createElement('details'); const label = document.createElement('summary');
+    const method = page.method === 'pdf_text' ? '文字を直接抽出' : page.method === 'pdf_text_and_ocr' ? '直接抽出＋OCR' : 'OCR';
+    label.textContent = `ページ ${page.page} — ${method}` + (page.low_confidence_words ? ` · 要確認 ${page.low_confidence_words}語` : '');
+    const body = document.createElement('pre'); body.textContent = page.text || '読み取れる文字がありません。原本の図を確認してください。';
+    details.append(label, body); box.append(details);
+  }
+}
+async function loadPDFJobs() {
+  const data = await api('pdf-jobs'); const box = el('pdf-jobs'); box.replaceChildren();
+  el('import-pdf').disabled = data.items.some(job => ['queued', 'running'].includes(job.status));
+  for (const job of data.items) {
+    const row = document.createElement('div'); row.className = 'job'; row.dataset.status = job.status;
+    const label = document.createElement('p'); label.textContent = job.message; row.append(label);
+    function button(title, action) {
+      const b = document.createElement('button'); b.textContent = title;
+      b.onclick = async () => { b.disabled = true; try { await action(); } catch (error) { el('message').textContent = error.message; } finally { await loadPDFJobs(); } };
+      row.append(b);
+    }
+    if (['queued', 'running'].includes(job.status)) button('PDF取り込みをキャンセル', () => api('pdf-jobs/' + job.id + '/cancel', {}));
+    else {
+      if (job.doc_id) button('取り込んだ文献を開く', () => openDocument(job.doc_id));
+      if (job.host_sync_pending || job.status === 'interrupted') button('保存・Host状態を確認', () => api('pdf-jobs/' + job.id + '/reconcile', {}));
+      else {
+        if (['failed', 'canceled'].includes(job.status)) button('PDFを再選択して実行', () => startPDF(job.id));
+        button('履歴から除外（資料は保持）', () => api('pdf-jobs/' + job.id, undefined, 'DELETE'));
+      }
+    }
+    box.append(row);
+  }
+}
