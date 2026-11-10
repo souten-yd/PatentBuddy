@@ -21,6 +21,17 @@
 - 遅い処理（OCR/埋め込み/GraphRAG/大規模RAG）はControlDeck PCへ寄せ、サーバーはデータ保存/収集/検索APIを保持する。確定した引用・特許family・文献改版などの関係データはResearchDataHubが保存する。
 - 既存 `qnaplibrary` Pythonパッケージ、`QPKG_NAME=QnapLibrary`、データディレクトリ `QnapLibrary-data`、port 17871 は互換性のため維持。表示ブランド・Linux入口だけを段階的に移す。名称の変更で既存データ・パスキーを初期化しない。
 
+## 最優先の非機能要件：保存効率・低ディスクI/O・大量処理性能
+
+[ResearchDataHubストレージ性能仕様](researchdatahub-performance.md) を**Codex向けの受入契約**とする。特許だけでなく、規格・論文・汎用コレクションすべてに適用する。
+
+- **PC開発中もQNAP本番でも、正本DBは各時点で1台のローカルストレージ上のみ**に置く。SQLite/WALをNAS共有から複数PCが同時に開かない。
+- 取り込みは冪等キー、バッチ、差分判定、無変更再送の書き込み削減を優先する。追加索引が検索を速くする一方で書込みを増やすトレードオフは実測して判断する。
+- 検索APIは必要な列・スニペット・cursorだけ返す。大容量本文・ベクトル・GraphRAG全件を毎回読み出さない。
+- アイドル/大量投入/検索/チェックポイントそれぞれで**物理read/write bytes・DB/WALサイズ・P50/P95/P99・RSS・CPU**を計測する。ベンチで改善が再現できない最適化は採用しない。
+- 既存のWAL・同期・監査・認証を無効化して見かけの高速化をしない。圧縮・blob分離・並列読取・外部インデックスは実測後のオプションであり、最初から追加依存を増やさない。
+- **PR #13はDraftで未マージ**。実装案のレビュー・回帰テストを行ってから現在のmain（機密保護PR #12を含む）へ取り込むこと。
+
 ## 本PRは設計・引き継ぎのみ（2026-11-10 checkpoint）
 
 このPR #16 は **documentation-only**。ResearchDataHub のLinux実行入口、サービス起動、QPKG表示変更、データ移行、ControlDeck Host接続、公開データAPIは**実装しない**。以下の列挙は **Codex が次の実装PRで実行する仕様**であり、既に動く機能を示していない。READMEは現在の実装だけを示し、旧製品名の互換エイリアスは将来のLinux PRにて追加する。設計上の正本はこの文書、日々の進捗正本は `docs/HANDOFF.md`、Codex向け受入手順は `docs/CODEX_NEXT.md`。
