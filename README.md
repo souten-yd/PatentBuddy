@@ -1,8 +1,6 @@
-# QnapPatentBuddy
+# ResearchDataHub
 
-> **移行中:** ControlDeck PCで動くPatentBuddy Add-onへ段階移行します。NASは公報原本・検証済みDBスナップショットを保存し、稼働SQLiteはPC SSDを利用します。QPKG版の旧データは保全します。A0は登録/状態表示だけで、Host認証と特許データ操作はまだ未対応です。詳細: [移行設計](docs/controldeck-addon-plan.md)。
-
-QNAP NAS と Linux で動く**特許創出・先行技術調査・請求項・権利化支援ツール**です。公報・規格・公開審査基準を根拠に、日本語全文検索や任意のベクトル検索を利用できます。未公開発明は、管理者が確認したローカル専用LLMから出さない設計です。
+QNAP NAS と Linux で動く**研究資料の保存・収集・検索APIサーバー**です。特許創出・先行技術調査・請求項・権利化の支援機能を備えています。公報・規格・公開審査基準を根拠に、日本語全文検索や任意のベクトル検索を利用できます。未公開発明は、管理者が確認したローカル専用LLMから出さない設計です。
 別の PC や AI アシスタントは API / MCP からデータの取り込み・検索ができます。
 
 ## 主な機能
@@ -15,6 +13,7 @@ QNAP NAS と Linux で動く**特許創出・先行技術調査・請求項・�
 - **収集**: GDELT（公開世界ニュース）、RSS、EPO OPS、JPO 特許情報取得API、USPTO Open Data Portal。外部へ検索式を送る場合は公開情報のみと明示確認。
 - **接続**: LAN で事前パスコードによるペアリング → 以後トークンで無制限に利用。MCP（`/mcp`）対応
 - **ログイン**: パスワード、パスキー（Face ID / Windows Hello などの顔認証。HTTPS 接続時）
+- **公開資料API**: 管理者がタイトル・公開番号・抜粋を確認して承認した資料だけを専用トークンで検索・取得。原文更新で承認を停止します。自動クラウド送信はありません。詳しくは [公開資料API](docs/public-catalog.md)。
 - **AI 向けデバッグ出力**: 状態・直近エラー・検索トレースを JSON で取得（秘密は除去）
 - **自動更新**: [QnapPatentBuddy Releases](https://github.com/souten-yd/QnapPatentBuddy/releases) から SHA-256 を検証して更新
 - **バックアップ**: 管理 Web からSQLiteの一貫したスナップショットを手動作成（設定・秘密情報は別途保全が必要）
@@ -80,3 +79,24 @@ tailscale serve --bg --https=8443 http://127.0.0.1:17871
 
 - [アーキテクチャ](docs/architecture.md) / [API と接続](docs/api.md) / [特許支援の設計](docs/patent-workflow.md)
 - [RAG 向け DB ランキング](docs/rag-db-ranking.md) / [実現性評価](docs/feasibility.md) / [提案](docs/proposals.md) / [ロードマップ](docs/roadmap.md)
+
+
+## Linux の ResearchDataHub 入口
+
+既存の `qnaplibrary` サーバーと同じ実装・データ形式を使います。
+新入口では保存先を明示してください（`QNAPLIBRARY_DATA` 環境変数も利用可能）。
+旧入口のデフォルト保存先、サービス名、Cookie、パスキーRP ID、QPKG IDは維持します。
+同じ保存先で新旧サーバーを同時起動しないでください。
+
+```sh
+python3 -m researchdatahub --data /path/to/pc-data --bind 127.0.0.1 --port 17871
+./rdh.sh doctor
+./rdh.sh serve --data /path/to/pc-data --bind 127.0.0.1
+./rdh.sh test
+```
+
+`doctor` はメモリ上でPython/SQLite/FTS5の可用性のみを確認し、秘密や設定を読みません。
+`test` は一時データとloopback上の実サーバーで起動・ログイン・保存先互換を確認する
+配布smokeです。全開発検査は `bash scripts/verify.sh` を使用します。
+Linux tar.gzに同梱し、インストール後は `<prefix>/current/rdh.sh` から使用できます。
+既存の `<prefix>/bin/qnaplibrary-run` とsystemdサービスは引き続き利用できます。

@@ -1,75 +1,52 @@
-# HANDOFF — 現在地と次の一手
+# HANDOFF — ResearchDataHub / PatentBuddy
 
-> 作業の区切りごとに更新すること（DEVELOPMENT_WORKFLOW.md §5）。中断した AI はここから再開する。
+更新: 2026-11-10。`AGENTS.md` → `DEVELOPMENT_WORKFLOW.md` → 本書 → `docs/CODEX_NEXT.md` の順に確認する。計画の正本は `researchdatahub-plan.md`、性能受入は `researchdatahub-performance.md`。
 
-## 優先: ControlDeck PC Add-onへの転換（2026-11-10）
+## 現在地
 
-- リポジトリは `souten-yd/QnapPatentBuddy`、mainは機密データ保護強化を含むv0.5.1。新規機能はControlDeck PC上の独立Add-onへ移行する。
-- **PR #14 Draft・未マージ**: contract v2 manifest、A0のloopbackモード、setup_required health、静的案内。旧ログイン/管理/文献APIをA0で遮断。`control-deck-feature.json` と `scripts/build_cd_feature.py` で再現可能な**未署名**のPC向け配布バンドル作成を定義。`pb.sh doctor/serve/test`、manifest・バンドル回帰テストを追加。署名/公開/Host登録・認証・本格UI・NASバックアップ同期は未実装。
-- PR #10、#11、#13 は別スコープ。PR #12 の未公開発明の外部送信ブロックはmainにマージ済みで、移行後も維持する。
-- Ubuntu/ControlDeck実機・全テスト・Feature bundleスクリプトのローカル実行は未実施。マージ前に `bash scripts/verify.sh`、`python3 scripts/build_cd_feature.py`、ControlDeck Host manifest検証・A0拒否・再起動・サービス継続テストが必要。**未署名バンドルは本番インストール不可。**
-- NASネットワーク共有で稼働SQLiteを直接開かず、PC SSD稼働DBとNASの整合した復元可能バックアップを分離。GraphRAG特許関係をA5で段階導入。
+- Repo: `souten-yd/PatentBuddy`。最新公開 **v0.5.3**、main `b14ed77`。
+- 作業ブランチ **feat/nas-public-patent-catalog**、Draft **PR #15 / PR-C**。v0.5.4候補。mainにはまだ公開資料APIはない。
+- ユーザー目標は計画全体の完了。**PR-D〜G、QNAP実機は未完了**。勝手にPR-Cだけを全体完了としない。
+- 内部package `qnaplibrary`、QPKG ID `QnapLibrary`、port17871、Cookie/パスキーRP ID、Release資産名を維持する。ResearchDataHubは唯一の正本、PatentBuddyはPC上のControlDeck Add-on。SQLiteをSMB/NFSで共有・同時二重書込みしない。
+- 未公開情報は検証済みローカルLLMのみ。既存privacy gateを弱めない。NAS↔PCの認証/TLS通信とクラウドLLM送信は区別する。
 
-## 現在のバージョン
+## 完了した実装単位
 
-- **v0.5.1（最新公開済み・NAS版）**: https://github.com/souten-yd/QnapPatentBuddy/releases/tag/v0.5.1 — 未公開発明の外部送信制限 PR #12 を反映。Add-on A0はまだリリースされていない。
-- v0.5.0（直前）: https://github.com/souten-yd/QnapPatentBuddy/releases/tag/v0.5.0
-- 履歴: v0.1.1（HTTPS 8443・OpenRouter 埋め込み）→ v0.2.0（ウォッチ・通知・分類・審査基準）→ v0.3.0（Qdrant・リランカー・分析・PC クライアント）→ v0.4.0（調査ジョブ・市場データ・規格）
-- ロードマップ v0.1〜v0.5 は完了。次の候補は `docs/roadmap.md` 末尾と `docs/proposals.md`（定期バックアップ・調査の自動化など）
+| 計画 | 状態・証拠 |
+|---|---|
+| 設計 #16 | main統合済み `24cb084`、docs-only |
+| PR-A #17 | v0.5.2公開、main `4170acd`、release run42809839947成功。薄いLinux入口・doctor/serve/test・Web/health表示・配布互換。61 tests、非root Linux導入、QPKGのLinux展開start/status/health/stop。QTS実機ではない |
+| PR-B #11 | v0.5.3公開、main `b14ed77`、run42810849292成功。ハッシュのみセッション永続化/最大128件、通常GETと期限切れ参照はRAMのみ。再起動Cookie/CSRF/パスキー登録・RP ID・ログアウト/パスワード変更失効を検証。67 testsと配布/更新確認 |
 
-## 状態（2026-11-10）
+旧公開v0.5.1の更新確認は改名前Repo名によるURL不一致で失敗することを再現。初回は手動更新が必要。公開v0.5.3をSHA-256照合し非rootで手動更新、管理者/コレクション保持、配布4 smoke tests成功。**修正済みv0.5.3から次版への自動更新をv0.5.4公開後に検証する。**
 
-- [x] 開発ルール（AGENTS.md / DEVELOPMENT_WORKFLOW.md）、実現性評価、RAG DB ランキング、特許ワークフロー設計、提案、ロードマップ
-- [x] サーバー本体（REST・MCP・認証・パスキー・LAN ペアリング・検索・特許・AI チャット・コネクタ・デバッグ・自動更新）
-- [x] 管理 Web（Playwright で PC 幅 1280px / スマホ幅 390px を確認、コンソールエラー 0）
-- [x] Linux パッケージ: 非 root ユーザーで install.sh → 起動 → /api/health 確認
-- [x] QPKG: ローカルで QDK ビルド（rsync 代替シム使用）→ 展開 → qnaplibrary.sh start/status/stop を QTS 外で確認
-- [ ] QNAP 実機（TS-253Be）でのインストール・Python3 QPKG 連携・HTTPS/パスキー（**未実施**、所有者の確認待ち）
-- [ ] 実 LLM（QnapAssistant / OpenRouter）・EPO OPS・JPO API との疎通（キー未設定のため未実施。単体は mock で検証）
+PR-Bでは未読POST本文が次のHTTP/1.1要求に混ざり501になることを実HTTPで再現・修正。一般リトライなし。iPhoneの実パスキー署名やQTS独自の別原因は未検証。rdh.shのcwd別checkout誤読も修正。
 
-## 検証コマンドと結果
+## PR-C — 公開資料API（現在の作業）
 
-- **v0.5.0** の GitHub Actions release workflow（run 42749131155）で Python unit/API **52 tests OK**、Linux tar.gz・QPKG ビルド成功、QPKG payload 検査成功、Release 公開完了。
-- このチャットの実行環境では clone/DNS 制限のため `scripts/verify.sh` 全体のローカル実行は未実施。GitHub Actions 上で実行されたのは `unittest` テスト部分であり、verify.sh の Python/JS/shell 静的検査全体と同一ではない。
-- `bash scripts/build-linux.sh dist` / `bash scripts/build-qpkg.sh dist`（rsync 必須。無いと QDK が空の data を作るため inspect-qpkg.py で検出して失敗させる）
+- 既存Draft #15をmain v0.5.3へ統合し実diffをレビュー。
+- 管理者専用の送信プレビューにタイトル/公開番号/抜粋を全表示。10分有効の署名tokenが文献版・全表示項目に結び付く。変更/期限切れ/再起動なら再確認。抜粋の無断切詰め/正規化なし。プレビューは永続書込みなし。
+- 原文更新で承認を無効化。本文を元へ戻しても再承認まで停止。原文削除時は公開snapshotとFTS索引を削除。
+- `published` tokenは専用検索/取得route以外を全件403。private資料/MCP/debug/export/settings不可。管理Cookie併用でも昇格しない。LAN pairingで発行不可。loopback以外はTLS必須、遠隔からのX-Forwarded-Proto偽装を拒否。
+- 公開API **14 tests合格**。プレビュー競合/期限/再起動、失効、TLS条件、CSRF/Origin、全private route遮断、FTS代替経路、原文削除、型不正、通常検索のDB更新0を確認。
+- 実TLS: 一時証明書を検証するHTTPSクライアントで承認→専用token取得→公開本文のみ取得、MCP403。`/tmp/pb-public-tls.py`。
+- 実Chrome: 1280/390pxでプレビュー全項目→入力変更で無効化→同意/承認→公開用tokenで抜粋だけ取得・private403。横溢れ/JSエラー/外部リクエスト0。証拠 `.data/acceptance/pr-c/browser.json` / `preview-*.png`（合成データのみ）。`/tmp/pb-public-ui.cjs`。一時サーバーは停止済み。
+- 最終verify **81 tests合格**（20.088秒、`/tmp/pb-verify-054.log`）。Linux/QPKGビルド・payload検査合格（`/tmp/pb-build-*-054.log`）。PR全diffを確認。マージ、v0.5.4公開、自動更新はこれから。
+- 書込み追加理由: 承認snapshot/FTS/監査、原文改変時の不可逆な承認停止、削除時の索引清掃が必要。検索の常駐書込みは増やさない。認証last_seenは既存ポリシー。
 
-## 自己更新の実地確認（2026-11-10）
+## ユーザー指定PDF / ControlDeck LLM検証
 
-- Linux 版 v0.1.0（非 root ユーザー、`install.sh --no-service`、`qnaplibrary-run`）→ 管理 API「更新を確認」で v0.1.1 を検出 →「適用」→
-  GitHub Release から tar.gz を取得し SHA-256 一致 → `versions/0.1.1` 展開・`current` 切替 → 終了コード 75 で再起動 → `/api/health` が 0.1.1、
-  更新前に登録した文書が検索で見つかる（データ保持）。旧版 `versions/0.1.0` は残りロールバック可能。
-- release.yml（main マージでバージョン変更時）: v0.1.1 で成功（テスト→Linux→QPKG（payload 検査込み）→リリース作成）。
-- 見つけた不具合: ランチャーを `qnaplibrary/` フォルダのあるディレクトリから起動すると `python -m` がそちらを読み込む。
-  `fix/launcher-cwd` で修正（Linux ランチャーと QPKG ランナーが自分のインストール先へ cd）。v0.2.0 以降に含まれる（既存 Linux インストールでは更新後の install.sh を再実行しないと旧ランチャーが残る可能性あり）。
+- ダウンロード済みPDFを実解析。成果物 `/home/souten/ダウンロード/JPA-2026116114-analysis/report.html` と同名zip。元PDFを変更せずSHA-256再照合。本文15頁、請求項14（独立1/14）、段落64、図11。表紙だけOCR+目視。原文・図・回答はGitに入れていない。
+- ControlDeck管理llama.cpp（loopback8097、Qwen3.8-27BローカルGGUF、mmproj）で全文要約/請求項整理70.60秒、整合性60.80秒、図6画像11.55秒。従属関係14/14一致。回答の逆表現・自己参照接続などは原文で検証して訂正/除外、原回答を保存。実行品質を法的品質や全自動正確性と混同しない。
+- 実資料の一時API取込: 本文往復一致、70チャンク、3検索語ヒット、請求項14件。実資料は本番/公開APIへ自動登録していない。HTMLはChrome1280/390pxで図11/請求項14、横溢れ/画像欠損/JSエラー0。
+- 合成案件の再現スクリプト: `PYTHONPATH=. python3 scripts/test-local-llm.py --verified-local`。既存モデルを利用しロード/アンロードしない。初回合格42.58秒/1137文字、案件変更なし。
 
-## 複数版をまたぐ自己更新の確認（2026-11-10）
+## 次の一手 / 未完了
 
-- Linux 版 v0.1.1 → v0.4.0 を管理 API から一度で更新。新しいテーブル（watches / watch_hits / notify_log）は起動時に自動作成され、既存データは保持。`versions/` に 0.1.0・0.1.1・0.4.0 が残り（直近3版）、`current` は 0.4.0。
+1. PR-C最終検証→v0.5.4公開→旧v0.5.3から管理API自己更新・再起動/セッション・データ保持を確認。
+2. PR-D #13: 実diffと性能仕様に沿ってP0計測から着手。1千/1万/10万、P50/P95/P99、CPU/RSS、物理I/O/DB/WAL、15分idle、再起動/復元を変更前後比較。無変更書込み0、一覧本文なし、カーソルを検証。100万件対応は未実測。
+3. PR-E #14: ControlDeck/MediaForge/SonicForge最新mainの実契約を再読しHost権限/Jobs/Broker/Feature/署名/UIを結合。PC側に別正本文献DBを作らない。まだ未着手。
+4. PR-F #10等: 確定/推測エッジ分離、根拠・版・人手承認、bounded GraphRAG、ローカルLLMのみ。まだ未着手。
+5. PR-G: **最後**にPC→QNAPのdry-run/backup/hash/quick_check/件数/秘密・認証確認/停止・単一書込み切替/ロールバック。QNAP既存領域の上書き・削除禁止。未着手。
 
-## v0.5.0 引き継ぎ内容（PR #8）
-
-- SQLite 管理者専用の手動スナップショット（VACUUM INTO + quick_check、権限 0600、容量確認、Web 画面、API テスト）。
-- iOS ホーム画面向け 180×180 不透明 PNG アイコンとメタデータ、既存 SVG/QPKG アイコンの共通デザイン。
-- ホーム画面の KPI をモバイル 2 列表示へ整理。処理状況（埋め込み・調査・Qdrant 同期・更新）を既存 API の読み取りのみで表示し、20 秒間隔の状態更新はホーム表示中のみ実施。技術詳細は折りたたみ。
-- PR #8 は `main` にマージ済み（squash SHA `bcdc7e5f82eacb0805133f85fb16f2d0836e7933`）。2026-11-10 の GitHub Actions で 52 tests OK、Linux/QPKG 両パッケージ作成・公開を確認。QNAP/iPhone 実機確認は **未実施**。
-
-## 機密保護改修（PR #12 / v0.5.1、進行中）
-- [x] OpenRouter/クラウドAIへ未公開発明・チャット・埋め込み・リランクが流れないように送信直前で fail-closed 制限。ローカルのモデル中継の危険もチェック方式で対処。
-- [x] 公開制度の固定一般ガイド、外部コネクタの明示承認、既存ウォッチ自動収集の承認ゲート、通知の本文秘匿、Qdrant loopback 限定。
-- [x] [特許専用の段階的機能計画](patent-feature-plan.md) と [機密境界](privacy-boundary.md) を追加。
-- [ ] PR #12 の差分/全テスト/バイナリ検査、GitHub Actions、QNAP実機での実通信の確認。**未検証のまま完成・流出ゼロと断言しない**。
-- [ ] v0.5.0以前の自己更新コードは旧GitHubリポジトリ名をURL一致判定に使う。改名後のリリースを自動選択できない可能性があるため、初回のみQPKG手動更新を案内。旧QPKG_NAME/QnapLibrary-data は保持。
-- [ ] PR #11（管理ログイン永続化・パスキー/501修正）、PR #10（機密対照付きAIクレームチャート）は継続保留。#10 は #12 安全対策に依存。PR #11 の v0.5.1 競合は次のマージ前に調整が必要。
-- [ ] NAS上のローカルLLM自体が外部クラウドへ中継しないことは実機で別途検証する必要がある。アプリ単体ではOSや他プロセスの通信までは保証できない。
-
-## 次の一手
-
-1. TS-253Be 実機で v0.5.0 を更新/導入し、アプリ画面と iPhone のホームアイコン、SQLite スナップショット、設定・秘密ファイルの外部保全を確認する。
-2. 必要なら開発環境で `bash scripts/verify.sh` 全体（Python/JS/shell 静的検査を含む）を別途実行する。
-3. 週次バックアップ、保存世代管理、設定・秘密を含めた完全バックアップ、定期調査とレポート差分を検討する。
-
-## 既知の問題 / 未決事項
-
-- 所有者の決定事項は `docs/feasibility.md` 末尾（パスキー採用、Tailscale 8443、埋め込み既定 OpenRouter、JPO 未登録）
-- JPO API・USPTO ODP のエンドポイントは公開仕様に基づく実験実装。キー取得後に実地調整が必要
-- QTS の Python3 QPKG の SQLite に FTS5 が無い場合は LIKE 検索に自動フォールバック（遅い）。実機で `/api/v1/stats` の `fts5` を確認すること
+QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/publisher登録、NAS HDD性能、実案件の法的品質・審査状態は未検証。過去詳細はgit履歴と各Release/PR参照。goalはactive。

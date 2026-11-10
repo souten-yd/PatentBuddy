@@ -1,7 +1,8 @@
-"""Authentication: admin password, RAM sessions, LAN pairing passcode and device tokens.
+"""Authentication: admin password, persistent sessions, LAN pairing passcode and device tokens.
 
 * Admin (management web): password (PBKDF2-SHA256) or passkey (WebAuthn: Face ID / Windows Hello).
-  Sessions live in RAM only (restart = log in again), cookie HttpOnly + SameSite=Strict, CSRF token.
+  Sessions keep only SHA-256 digests in persistent SQLite (survive restarts),
+  and a bounded RAM cache; cookies are HttpOnly + SameSite=Strict, CSRF protected.
 * Devices (other PCs, AI assistants, ControlDeck): the admin sets a pairing passcode; a client on
   the LAN posts it once to /api/v1/pair and receives a long-lived bearer token. Tokens are stored
   as SHA-256 hashes; they work without rate limits from LAN / Tailscale addresses.
@@ -86,37 +87,88 @@ class RateLimiter:
 
 
 class Sessions:
-    def __init__(self, hours=12):
-        self.ttl = hours * 3600
-        self._items = {}
+    """Bounded persistent admin sessions, with only hashed cookie IDs on disk."""
+
+    MAX_SESSIONS = 128
+
+    def __init__(self, hours=720, store=None):
+        try:
+            self.ttl = max(3600, min(int(hours) * 3600, 30 * 86400))
+        except (ValueError, TypeError, OverflowError):
+            self.ttl = 30 * 86400
+        self.store = store
         self._lock = threading.Lock()
+        self._items = {}
+        if store is not None:
+            # In-memory lookups avoid disk reads/writes per request.
+            for row in store.q("SELECT sid_hash, csrf, exp, via, created FROM admin_sessions WHERE exp>? ORDER BY created DESC, sid_hash DESC LIMIT ?",
+                               (time.time(), self.MAX_SESSIONS)):
+                self._items[row["sid_hash"]] = {
+                    "exp": row["exp"], "csrf": row["csrf"], "via": row["via"],
+                    "hash": row["sid_hash"], "created": row["created"],
+                }
+
+    @staticmethod
+    def _digest(sid):
+        return hashlib.sha256(sid.encode("utf-8")).hexdigest()
 
     def create(self, via):
         sid = secrets.token_urlsafe(32)
+        digest, t = self._digest(sid), time.time()
+        session = {"exp": t + self.ttl, "csrf": secrets.token_urlsafe(24), "via": via,
+                   "hash": digest, "created": t}
         with self._lock:
-            t = time.time()
-            for k in [k for k, v in self._items.items() if v["exp"] < t]:
-                del self._items[k]
-            self._items[sid] = {"exp": t + self.ttl, "csrf": secrets.token_urlsafe(24), "via": via,
-                                "hash": hashlib.sha256(sid.encode()).hexdigest(), "created": t}
-        return sid, self._items[sid]
+            active = {k: v for k, v in self._items.items() if v["exp"] > t}
+            active[digest] = session
+            kept = sorted(active, key=lambda k: (active[k]["created"], k), reverse=True)[:self.MAX_SESSIONS]
+            if self.store is not None:
+                with self.store.lock:
+                    self.store.db.execute("BEGIN IMMEDIATE")
+                    try:
+                        self.store.db.execute("DELETE FROM admin_sessions WHERE exp<=?", (t,))
+                        self.store.db.execute(
+                            "INSERT INTO admin_sessions(sid_hash,csrf,exp,via,created) VALUES(?,?,?,?,?)",
+                            (digest, session["csrf"], session["exp"], via, t))
+                        self.store.db.execute(
+                            "DELETE FROM admin_sessions WHERE sid_hash NOT IN "
+                            "(SELECT sid_hash FROM admin_sessions ORDER BY created DESC, sid_hash DESC LIMIT ?)",
+                            (self.MAX_SESSIONS,))
+                        self.store.db.execute("COMMIT")
+                    except Exception:
+                        self.store.db.execute("ROLLBACK")
+                        raise
+            self._items = {k: active[k] for k in kept}
+        return sid, session
 
     def get(self, sid):
-        if not sid:
+        if not sid or not isinstance(sid, str):
             return None
+        digest = self._digest(sid)
         with self._lock:
-            s = self._items.get(sid)
-            if not s or s["exp"] < time.time():
-                self._items.pop(sid, None)
+            session = self._items.get(digest)
+            if not session:
                 return None
-            return s
+            if session["exp"] <= time.time():
+                self._items.pop(digest, None)
+                # Expiry reads stay RAM-only; prune disk rows on the next login.
+                return None
+            return session
 
     def drop(self, sid):
+        if not sid:
+            return
+        digest = self._digest(sid)
         with self._lock:
-            self._items.pop(sid, None)
+            if self.store is not None:
+                with self.store.lock:
+                    self.store.db.execute("DELETE FROM admin_sessions WHERE sid_hash=?", (digest,))
+            self._items.pop(digest, None)
 
     def clear(self):
         with self._lock:
+            if self.store is not None:
+                with self.store.lock:
+                    self.store.db.execute("DELETE FROM admin_sessions")
             self._items.clear()
 
 
@@ -124,7 +176,7 @@ class Auth:
     def __init__(self, config, store):
         self.config = config
         self.store = store
-        self.sessions = Sessions(config.get("auth", "session_hours", default=12))
+        self.sessions = Sessions(config.get("auth", "session_hours", default=720), store)
         self.limiter = RateLimiter()
         self._device_seen = {}
 
@@ -135,7 +187,9 @@ class Auth:
     def set_admin_password(self, password):
         if not isinstance(password, str) or len(password) < 10:
             raise ValueError("パスワードは10文字以上にしてください")
-        self.config.set_secret("admin_password", hash_password(password))
+        password_hash = hash_password(password)
+        self.sessions.clear()
+        self.config.set_secret("admin_password", password_hash)
 
     def check_admin_password(self, password):
         stored = self.config.secret("admin_password")
@@ -160,8 +214,8 @@ class Auth:
     def create_device(self, name, scopes="rw"):
         token = "qlt_" + secrets.token_urlsafe(32)
         name = (name or "device").strip()[:80] or "device"
-        if scopes not in ("rw", "ro"):
-            scopes = "rw"
+        if scopes not in ("rw", "ro", "published"):
+            raise ValueError("unsupported device token scope")
         with self.store.lock:
             cur = self.store.db.execute("INSERT INTO devices(name,token_hash,scopes,created) VALUES(?,?,?,?)",
                                         (name, token_hash(token), scopes, time.time()))

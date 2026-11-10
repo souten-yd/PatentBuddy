@@ -81,7 +81,7 @@ function render() {
   if (!S.me) return $app.append(loginView());
   const views = [["home", "ホーム"], ["search", "検索"], ["patents", "特許"], ["data", "データ"], ["analytics", "分析"], ["chat", "AIチャット"], ["collect", "収集"], ["settings", "設定"]];
   const main = h("main", {});
-  const nav = h("nav", { class: "side" }, h("div", { class: "brand" }, h("img", { src: "icon.svg", alt: "" }), "QnapLibrary"),
+  const nav = h("nav", { class: "side" }, h("div", { class: "brand" }, h("img", { src: "icon.svg", alt: "" }), "ResearchDataHub"),
     views.map(([id, label]) => h("button", { class: S.view === id ? "active" : "", onclick: () => { S.view = id; render(); } }, label)),
     h("div", { class: "ver" }, "v" + S.health.version));
   $app.append(h("div", { class: "layout" }, nav, main));
@@ -97,7 +97,7 @@ function loginView() {
   });
   pw.addEventListener("keydown", e => { if (e.key === "Enter") go(); });
   const box = h("div", { class: "login" }, h("div", { class: "card" },
-    h("h1", {}, setup ? "QnapLibrary 初期設定" : "QnapLibrary ログイン"),
+    h("h1", {}, setup ? "ResearchDataHub 初期設定" : "ResearchDataHub ログイン"),
     setup ? h("p", { class: "muted small" }, "管理者パスワードを設定します（LANからのみ）。後で設定からパスキー（Face ID 等）を登録できます。") : null,
     field(setup ? "新しい管理者パスワード" : "パスワード", pw),
     h("div", { class: "row" }, h("button", { class: "btn primary", onclick: go }, setup ? "設定して開始" : "ログイン"),
@@ -172,7 +172,7 @@ async function homeView(main) {
     h("dt", {}, "検索用ベクトル索引"), h("dd", {}, st.vectors.vectors + " 件 / RAM " + st.vectors.ram_mb + " MB"));
   main.append(h("details", { class: "card home-technical" },
     h("summary", {}, "技術情報を表示"), info));
-  main.append(h("p", { class: "small muted home-version" }, "QnapLibrary v" + S.health.version));
+  main.append(h("p", { class: "small muted home-version" }, "ResearchDataHub v" + S.health.version));
 
   const live = () => main.isConnected && S.view === "home";
   let lastActivity = null;
@@ -270,6 +270,47 @@ async function openDoc(id) {
     h("div", { class: "card" }, h("div", { class: "row" }, h("h2", {}, "本文"), h("span", { class: "spacer" }),
       h("button", { class: "btn", onclick: guard(() => addRefDialog(d)) }, "特許案件の先行文献に追加")), h("div", { class: "pre" }, d.body || "(本文なし)")),
     h("div", { class: "card" }, h("h2", {}, "チャンク（索引単位） " + d.chunks.length), d.chunks.map(c => h("details", {}, h("summary", {}, "#" + c.ord + " " + c.section), h("div", { class: "pre" }, c.text)))));
+  const excerpt = h("textarea", { maxlength: 12000, placeholder: "公開本文から共有してよい箇所だけを選択（最大12000文字）" });
+  const approvalCheck = h("input", { type: "checkbox" });
+  const previewBox = h("div", {});
+  let preview = null;
+  const approveButton = h("button", { class: "btn primary", disabled: true, onclick: guard(async () => {
+    if (!preview || !approvalCheck.checked) throw new Error("プレビュー全項目と公開・利用許諾を確認してください");
+    const reviewed = preview;
+    approveButton.disabled = true;
+    try {
+      await api("POST", "/api/v1/publications", { doc_id: d.id, excerpt: reviewed.publication.text,
+        preview_token: reviewed.preview_token, confirm_public: true });
+      toast("公開資料として登録しました");
+    } finally { preview = null; approvalCheck.checked = false; clear(previewBox); }
+  }) }, "確認した内容を承認");
+  const previewButton = h("button", { class: "btn", disabled: !d.ext_id, onclick: guard(async () => {
+    const text = excerpt.value;
+    preview = null; approveButton.disabled = true; approvalCheck.checked = false; clear(previewBox);
+    const result = await api("POST", "/api/v1/publications/preview", { doc_id: d.id, excerpt: text });
+    if (excerpt.value !== text) return;
+    preview = result;
+    previewBox.append(h("h3", {}, "共有される全項目"),
+      h("dl", { class: "dl" }, h("dt", {}, "タイトル"), h("dd", {}, result.publication.title),
+        h("dt", {}, "公開番号"), h("dd", {}, result.publication.publication_number)),
+      h("div", { class: "pre" }, result.publication.text),
+      h("p", { class: "small muted" }, "この内容だけが専用APIに公開されます。外部LLMへの送信は行いません。"));
+    approveButton.disabled = false;
+  }) }, "送信プレビュー");
+  excerpt.addEventListener("input", () => {
+    preview = null; approveButton.disabled = true; approvalCheck.checked = false; clear(previewBox);
+  });
+  const revokeButton = h("button", { class: "btn danger", onclick: guard(async () => {
+    if (!confirm("この文献の公開登録を取り消しますか？")) return;
+    await api("DELETE", "/api/v1/publications/" + d.id);
+    toast("公開登録を取り消しました");
+  }) }, "公開を取り消す");
+  main.append(h("div", { class: "card" },
+    h("h2", {}, "外部AIアプリ用の公開資料"),
+    h("p", { class: "small muted" }, "この操作はNAS・ControlDeck間の共有とは別です。未公開発明・社内メモや未公開の請求項案は登録しないでください。外部AIアプリに共有するのは、手動で確認・選択した抜粋だけです。"),
+    excerpt, previewButton, previewBox,
+    h("label", {}, approvalCheck, " タイトル・公開番号・抜粋すべてが公開済みで、共有する利用許諾があることを確認"),
+    h("div", { class: "row end" }, approveButton, revokeButton)));
 }
 async function addRefDialog(d) {
   const pats = (await api("GET", "/api/v1/patents")).projects;
@@ -427,7 +468,27 @@ async function watchTab(body, pid) {
 // ---------- data ----------
 async function dataView(main) {
   await loadCollections();
-  main.append(h("h1", {}, "データ（コレクション）"));
+  main.append(h("h1", {}, "文献管理（コレクション）"));
+  const published = (await api("GET", "/api/v1/publications")).items;
+  const pubtable = h("table", {}, h("tr", {},
+    h("th", {}, "公開番号"), h("th", {}, "文献"), h("th", {}, "状態"), h("th", {}, "操作")));
+  for (const p of published) {
+    const revoke = h("button", { class: "btn danger", onclick: guard(async () => {
+      if (!confirm("この文献の公開抜粋を取り消しますか？")) return;
+      await api("DELETE", "/api/v1/publications/" + p.doc_id);
+      render();
+    }) }, "取り消す");
+    pubtable.append(h("tr", {},
+      h("td", {}, p.publication_number),
+      h("td", {}, p.title),
+      h("td", {}, p.active ? "承認済み" : "元文献変更により停止"),
+      h("td", {}, revoke)));
+  }
+  main.append(h("details", { class: "card" },
+    h("summary", {}, "外部AIアプリ向け公開抜粋（承認 " + published.filter(p => p.active).length + " 件）"),
+    h("p", { class: "small muted" }, "外部AIに共有するのは、各文献の詳細画面で明示承認した抜粋だけです。文献更新で承認は停止します。"),
+    published.length ? h("div", { class: "scrollx" }, pubtable) : h("p", { class: "small muted" }, "公開登録された文献はありません。")));
+
   const name = h("input", { placeholder: "名前（例: patents-jp）" }), kind = sel(S.kinds, "generic"), desc = h("input", { placeholder: "説明", class: "wide" });
   main.append(h("div", { class: "card" }, h("div", { class: "row" }, name, kind, desc, h("button", { class: "btn primary", onclick: guard(async () => { await api("POST", "/api/v1/collections", { name: name.value, kind: kind.value, description: desc.value }); render(); }) }, "作成"))));
   main.append(h("div", { class: "card" }, h("table", {}, h("tr", {}, h("th", {}, "名前"), h("th", {}, "種別"), h("th", {}, "文書"), h("th", {}, "チャンク"), h("th", {}, "ベクトル"), h("th", {}, "更新")),
@@ -599,7 +660,7 @@ async function settingsView(main) {
         h("button", { class: "btn", onclick: guard(async () => { await api("POST", "/api/auth/logout", {}); S.me = null; render(); }) }, "ログアウト")));
   } else if (tab === "devices") {
     const d = await api("GET", "/api/devices");
-    const pc = h("input", { type: "password", placeholder: "8文字以上" }), dn = h("input", { placeholder: "デバイス名" }), out = h("div", {});
+    const pc = h("input", { type: "password", placeholder: "8文字以上" }), dn = h("input", { placeholder: "デバイス名" }), out = h("div", {}), scope = sel([["published", "外部AI用・公開資料のみ"], ["ro", "全データの読み取り"], ["rw", "全データの読み書き"]], "published");
     body.append(h("div", { class: "card" }, h("h2", {}, "LAN ペアリング用パスコード"), h("p", { class: "small muted" }, "別PC・AI アシスタント・ControlDeck が POST /api/v1/pair {\"passcode\":\"…\",\"name\":\"…\"} で長期トークンを取得します（LAN / Tailscale からのみ、取得後は無制限に利用可）。"),
       h("p", {}, "状態: ", h("span", { class: "tag " + (d.pairing_enabled ? "ok" : "warn") }, d.pairing_enabled ? "有効" : "未設定")),
       h("div", { class: "row" }, pc, h("button", { class: "btn primary", onclick: guard(async () => { await api("PUT", "/api/devices/pairing", { passcode: pc.value }); toast("設定しました"); render(); }) }, "設定"),
@@ -607,7 +668,11 @@ async function settingsView(main) {
       h("details", {}, h("summary", {}, "接続例"), h("div", { class: "pre" }, 'curl -X POST http://<NAS>:' + location.port + '/api/v1/pair -H "Content-Type: application/json" -d \'{"passcode":"…","name":"my-pc"}\'\n\n# 以降\ncurl -H "Authorization: Bearer qlt_…" http://<NAS>:' + location.port + '/api/v1/collections\n# MCP: POST http://<NAS>:' + location.port + '/mcp （同じトークン）'))),
       h("div", { class: "card" }, h("h2", {}, "接続済みデバイス"), h("table", {}, d.devices.map(x => h("tr", {}, h("td", {}, x.name), h("td", {}, h("span", { class: "tag" }, x.scopes)), h("td", { class: "small muted" }, "最終 " + fmtDate(x.last_seen) + " " + (x.last_ip || "")),
         h("td", {}, h("button", { class: "btn danger", onclick: guard(async () => { await api("DELETE", "/api/devices/" + x.id); render(); }) }, "失効"))))),
-        h("div", { class: "row" }, dn, h("button", { class: "btn", onclick: guard(async () => { const r = await api("POST", "/api/devices", { name: dn.value }); clear(out).append(h("p", {}, "トークン（一度だけ表示）: ", h("code", {}, r.token))); }) }, "トークンを直接発行")), out));
+        h("p", { class: "small muted" }, "公開資料専用トークンは明示承認した抜粋だけを検索できます。外部LLMへトークン自体を送らず、HTTPSで中継するアプリ側で保管してください。"),
+        h("div", { class: "row" }, dn, scope, h("button", { class: "btn", onclick: guard(async () => {
+          const r = await api("POST", "/api/devices", { name: dn.value, scopes: scope.value });
+          clear(out).append(h("p", {}, "トークン（一度だけ表示）: ", h("code", {}, r.token)));
+        }) }, "トークンを直接発行")), out));
   } else if (tab === "ai") {
     await aiSettings(body);
   } else if (tab === "keys") {
@@ -665,11 +730,17 @@ async function settingsView(main) {
     body.append(h("div", { class: "card" }, h("dl", { class: "dl" }, h("dt", {}, "現在"), h("dd", {}, "v" + u.current + "（" + u.mode + "）"), h("dt", {}, "状態"), h("dd", {}, u.phase + " " + (u.message || "")),
       h("dt", {}, "最新"), h("dd", {}, u.latest ? "v" + u.latest.version + "（" + (u.latest.published_at || "") + "）" : "-"), h("dt", {}, "確認日時"), h("dd", {}, fmtDate(u.checked_at)), u.error ? [h("dt", {}, "エラー"), h("dd", {}, u.error)] : null),
       u.latest && u.latest.notes ? h("details", {}, h("summary", {}, "リリースノート"), md(u.latest.notes)) : null,
-      h("div", { class: "row" }, h("button", { class: "btn", onclick: guard(async () => { await api("POST", "/api/update/check", {}); render(); }) }, "更新を確認"),
+      h("div", { class: "row" }, h("button", { class: "btn", onclick: guard(async (event) => {
+          const button = event.currentTarget;
+          button.disabled = true;
+          button.textContent = "更新を確認中…";
+          try { await api("POST", "/api/update/check", {}); await render(); }
+          finally { button.disabled = false; button.textContent = "更新を確認"; }
+        }) }, "更新を確認"),
         h("button", { class: "btn primary", disabled: !u.latest || u.mode === "dev", onclick: guard(async () => { if (!confirm("v" + u.latest.version + " に更新します。再起動します。")) return; await api("POST", "/api/update/apply", {}); toast("更新を開始しました"); waitRestart(u.current); }) }, "今すぐ更新")),
       h("label", {}, check, " 毎日自動で確認"), " ", h("label", {}, auto, " 新しい版を自動で適用"),
       h("button", { class: "btn", onclick: guard(async () => { await api("PUT", "/api/settings", { update: { auto_check: check.checked, auto_apply: auto.checked } }); toast("保存しました"); }) }, "保存"),
-      h("p", { class: "small muted" }, "GitHub Releases（souten-yd/QnapLibrary）の資産を SHA-256 で検証してから適用します。")));
+      h("p", { class: "small muted" }, "GitHub Releases（souten-yd/PatentBuddy）の資産を SHA-256 で検証してから適用します。")));
   } else if (tab === "debug") {
     const pre = h("div", { class: "pre" }, "…");
     body.append(h("div", { class: "card" }, h("p", { class: "small muted" }, "AI に不具合調査を依頼するときは、このバンドルを渡してください（秘密情報は除去済み）。デバイストークンがあれば GET /api/debug/bundle や MCP の debug_bundle でも取得できます。"),

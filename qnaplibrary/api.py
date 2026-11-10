@@ -10,7 +10,7 @@ import re
 import time
 import urllib.parse
 
-from . import VERSION, connectors, debuglog, mcp, patents as patents_mod, store as store_mod, webauthn
+from . import APP_NAME, VERSION, connectors, debuglog, mcp, patents as patents_mod, store as store_mod, webauthn
 from .auth import is_local_network
 from .backup import BackupError
 from .llm import LLMError
@@ -49,7 +49,7 @@ def _err(status, message):
 @route("GET", "/api/health", "public")
 def health(req):
     a = req.app
-    return {"app": "QnapPatentBuddy", "version": VERSION, "ok": True, "setup_required": not a.auth.admin_configured(),
+    return {"app": APP_NAME, "version": VERSION, "ok": True, "setup_required": not a.auth.admin_configured(),
             "pairing": a.auth.pairing_enabled(), "https": req.is_https(), "https_url": a.config.get("server", "https_url", default=""), "uptime_s": round(time.time() - a.started)}
 
 
@@ -236,7 +236,10 @@ def pair(req):
         a.limiter.fail(key)
         raise _err(401, "パスコードが違います")
     a.limiter.reset(key)
-    dev = a.create_device(body.get("name") or ("device@" + req.ip), body.get("scopes", "rw"))
+    scopes = body.get("scopes", "rw")
+    if scopes not in ("rw", "ro"):
+        raise _err(403, "公開資料専用トークンは管理者画面からのみ作成できます")
+    dev = a.create_device(body.get("name") or ("device@" + req.ip), scopes)
     req.app.store.audit("pair", "device.create", "%s %s" % (dev["name"], req.ip))
     return dict(dev, usage="Authorization: Bearer <token> を付けて /api/v1/* と /mcp を呼び出してください")
 
@@ -293,6 +296,56 @@ def secret_put(req):
     req.app.store.audit("admin", "secret.set", name)
     req.app.embedder.kick()
     return req.app.config.secret_status(name)
+
+
+# ---------------------------------------------------------------------------
+# Published patent excerpts (explicit admin approval; NO external LLM calls)
+@route("GET", "/api/v1/publications", "admin")
+def publications_admin(req):
+    return req.app.public_catalog.admin_list()
+
+
+@route("POST", "/api/v1/publications/preview", "admin")
+def publications_preview(req):
+    b = req.json()
+    if not isinstance(b, dict):
+        raise _err(400, "JSON object required")
+    return req.app.public_catalog.preview(b.get("doc_id"), b.get("excerpt"))
+
+
+@route("POST", "/api/v1/publications", "admin")
+def publications_approve(req):
+    b = req.json()
+    if not isinstance(b, dict):
+        raise _err(400, "JSON object required")
+    result = req.app.public_catalog.approve(b.get("doc_id"), b.get("excerpt"),
+                                             acknowledged=b.get("confirm_public") is True,
+                                             preview_token=b.get("preview_token"))
+    req.app.store.audit("admin", "publication.approve", "approved excerpt")
+    return result
+
+
+@route("DELETE", "/api/v1/publications/{doc_id}", "admin")
+def publications_revoke(req):
+    result = req.app.public_catalog.revoke(req.params["doc_id"])
+    req.app.store.audit("admin", "publication.revoke", "revoked excerpt")
+    return result
+
+
+@route("POST", "/api/v1/public-catalog/search", "published")
+def publications_search(req):
+    b = req.json()
+    if not isinstance(b, dict):
+        raise _err(400, "JSON object required")
+    return req.app.public_catalog.search(b.get("q"), b.get("limit", 20))
+
+
+@route("GET", "/api/v1/public-catalog/{public_id}", "published")
+def publications_get(req):
+    document = req.app.public_catalog.get(req.params["public_id"])
+    if document is None:
+        raise _err(404, "公開資料がありません")
+    return document
 
 
 # ---------------------------------------------------------------------------
