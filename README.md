@@ -29,7 +29,7 @@ QNAP NAS と Linux で動く**研究資料の保存・収集・検索APIサー�
 ## インストール
 
 ### QNAP
-1. [Releases](https://github.com/souten-yd/PatentBuddy/releases) から `QnapLibrary_<版>_x86_64.qpkg` を取得。**リポジトリ改名前のv0.5.0等の自己更新機能は旧URLを前提としているため、v0.5.1への初回更新はQPKGの手動インストールが必要になる場合があります。**
+1. [Releases](https://github.com/souten-yd/PatentBuddy/releases) から `QnapLibrary_<版>_x86_64.qpkg` を取得。旧版で更新URLエラーが出る場合は[手動上書き更新の手順](docs/upgrade.md)に従ってください。
 2. App Center → 手動インストール で選択
 3. `http://<NAS>:17871/` を開き、管理者パスワードを設定（LAN から）
 

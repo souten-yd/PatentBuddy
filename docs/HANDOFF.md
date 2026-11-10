@@ -101,3 +101,5 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - v0.5.7候補へ版を統一。P0/P1最終比較と生JSONをdocsへ保存（合成データのみ）、P2一般識別子/版/日付/出典/ライセンス設計を追加。追加索引2,469,888 bytes、登録write増約13.17MBを深いcursorアクセスの費用として明記。PR-Dはコード/配布最終検証中、まだ公開しない。ControlDeck GatewayローカルLLMの再テストも進行中。
 
 - v0.5.7最終全verify108 tests成功25.034秒（/tmp/pb-scale-057-verify.log）、Linux/QPKG build/payload成功。10万件のStore実装は計測候補eb6354dと同一。ControlDeckローカルLLMテストPID143325稼働を確認、結果待ち。
+
+- ControlDeck Host Gateway経由のローカルQwen3.8-27Bテスト成功、50.02秒/1206文字、案件不変（/tmp/pb-scale-host-llm.json）。既存Host認証キーは出力せず、ローカルGGUF/runtime確認後にHost admission経由で使用。AI品質やAddon principal AI結合の完了とはしない。
