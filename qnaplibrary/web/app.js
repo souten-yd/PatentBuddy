@@ -1,4 +1,4 @@
-/* QnapLibrary management web — dependency-free, CSP-safe (no inline handlers, no innerHTML with data). */
+/* QnapPatentBuddy management web — dependency-free, CSP-safe (no inline handlers, no innerHTML with data). */
 "use strict";
 (() => {
 const S = { me: null, csrf: null, view: "home", health: null, collections: [], meta: null };
@@ -384,7 +384,7 @@ async function patentDetail(main, id) {
   } else if (tab === "ai") {
     const providers = await api("GET", "/api/llm/providers");
     const task = sel(Object.entries(S.meta.tasks), S.aiTask || "novelty");
-    const prov = sel(providers.providers.map(x => [x.id, x.label || x.id]), providers.default_provider);
+    const prov = sel(providers.providers.filter(x => x.type !== "openrouter" && x.local_only_verified === true).map(x => [x.id, x.label || x.id]), providers.default_provider);
     const picker = collectionPicker(S.collections.map(c => c.name));
     const extra = h("textarea", { placeholder: "追加指示（拒絶理由通知の本文、対象製品の説明など）" });
     const out = h("div", {});
@@ -394,7 +394,7 @@ async function patentDetail(main, id) {
         clear(out).append(h("div", { class: "card" }, h("div", { class: "row small muted" }, r.model || "", h("span", { class: "spacer" }), h("button", { class: "btn", onclick: () => navigator.clipboard.writeText(r.answer) }, "コピー")), md(r.answer),
           r.evidence.length ? h("div", { class: "small muted" }, "参照: ", r.evidence.map((e, i) => h("a", { href: "#", onclick: ev => { ev.preventDefault(); openDoc(e.doc_id); } }, "[" + (i + 1) + "] " + (e.ext_id || e.title) + " "))) : null));
       } finally { btn.disabled = false; } }) }, "実行");
-    body.append(h("div", { class: "card" }, field("タスク", task), field("AI プロバイダ", prov), field("根拠を探すコレクション", picker), field("追加指示", extra), h("div", { class: "row end" }, btn)), out);
+    body.append(h("div", { class: "card" }, field("タスク", task), field("AI プロバイダ（ローカル専用）", prov), field("根拠を探すコレクション", picker), field("追加指示", extra), h("div", { class: "row end" }, btn)), out);
   }
 }
 
@@ -408,11 +408,14 @@ async function watchTab(body, pid) {
         h("td", {}, h("button", { class: "btn", onclick: guard(async (e) => { e.target.disabled = true; try { const r = await api("POST", "/api/v1/watches/" + w.id + "/run", {}); toast(r.last_status); render(); } finally { e.target.disabled = false; } }) }, "今すぐ実行"),
           h("button", { class: "btn danger", onclick: guard(async () => { await api("DELETE", "/api/v1/watches/" + w.id); render(); }) }, "削除"))))) : h("p", { class: "muted" }, "ウォッチはまだありません。")));
   const conn = sel(cs.connectors.map(c => [c.id, c.label + (c.key && !c.configured ? "（未登録）" : "")]), "epo_ops");
-  const q = h("input", { class: "wide", placeholder: "EPO: CQL（例: ta=\"solid electrolyte\" and pd>=2024）／GDELT: 検索語／RSS: URL" });
+  const q = h("input", { class: "wide", placeholder: "公開特許に関する検索語（未公開の発明は含めないでください）" });
+  const publicWatch = h("input", { type: "checkbox" });
   const name = h("input", { placeholder: "名前" }), coll = h("input", { placeholder: "保存先（空なら自動）" }), days = h("input", { type: "number", value: 7, min: 1 });
   body.append(h("div", { class: "card" }, h("h2", {}, "ウォッチを追加"), h("div", { class: "row" }, name, conn, days, h("span", { class: "small" }, "日ごと")), field("条件", q), field("保存先コレクション", coll),
-    h("button", { class: "btn primary", onclick: guard(async () => { const c = conn.value; const key = c === "rss" ? "url" : c === "jpo" ? "application_number" : "query";
-      await api("POST", "/api/v1/watches", { name: name.value || q.value.slice(0, 40), connector: c, params: { [key]: q.value }, collection: coll.value, patent_id: pid, interval_hours: Math.max(6, +days.value * 24) }); render(); }) }, "追加")));
+    h("label", { class: "small" }, publicWatch, " 検索語が公開情報のみで、外部APIへ送信してよいことを確認"), h("button", { class: "btn primary", onclick: guard(async () => {
+      if (!publicWatch.checked) return toast("機密保護：外部検索の承認が必要です");
+      const c = conn.value; const key = c === "rss" ? "url" : c === "jpo" ? "application_number" : "query";
+      await api("POST", "/api/v1/watches", { name: name.value || q.value.slice(0, 40), connector: c, params: { [key]: q.value, public_only_confirmed: publicWatch.checked }, collection: coll.value, patent_id: pid, interval_hours: Math.max(6, +days.value * 24) }); render(); }) }, "追加")));
   body.append(h("div", { class: "card" }, h("h2", {}, "候補（新しい順・スコア順）"), hits.hits.length ? h("table", {}, hits.hits.map(x => h("tr", {},
     h("td", {}, h("span", { class: "tag " + (x.status === "new" ? "bad" : x.status === "relevant" ? "ok" : "") }, { new: "新規", relevant: "関連", dismissed: "対象外" }[x.status])),
     h("td", {}, h("a", { href: "#", onclick: e => { e.preventDefault(); openDoc(x.doc_id); } }, (x.ext_id || "") + " " + x.title), h("div", { class: "small muted" }, x.watch_name + " / " + (x.doc_date || "") + " / スコア " + x.score)),
@@ -505,7 +508,7 @@ async function chatView(main) {
     if (m.meta && (m.meta.model || m.meta.error)) el.append(h("div", { class: "src" }, (m.meta.model || "") + (m.meta.error ? " エラー: " + m.meta.error : "")));
     msgs.append(el); msgs.scrollTop = msgs.scrollHeight; return el; };
   th.messages.forEach(addMsg);
-  const prov = sel(providers.providers.map(x => [x.id, x.label || x.id]), S.chatProvider || providers.default_provider);
+  const prov = sel(providers.providers.filter(x => x.type !== "openrouter" && x.local_only_verified === true).map(x => [x.id, x.label || x.id]), S.chatProvider || providers.default_provider);
   const rag = h("input", { type: "checkbox", checked: S.chatRag !== false });
   const picker = collectionPicker(S.chatColls || []);
   const ta = h("textarea", { placeholder: "質問（Ctrl/⌘+Enter で送信）" });
@@ -544,7 +547,9 @@ async function collectView(main) {
       c.params.map(p => field(p.label, inputs[p.name] = h("input", { class: "wide", value: p.default ?? "" }))), field("保存先", coll),
       c.key && !c.configured ? h("p", { class: "small" }, h("span", { class: "tag warn" }, "未登録のため使いません"), " 設定 > 外部キー で登録すると利用できます。") : null,
       h("div", { class: "row end" }, out, h("button", { class: "btn primary", disabled: !!(c.key && !c.configured), onclick: guard(async (e) => { e.target.disabled = true;
-        try { const params = {}; for (const k in inputs) params[k] = inputs[k].value; const r = await api("POST", "/api/v1/connectors/" + c.id + "/run", { params, collection: coll.value });
+        try {
+          if (!confirm("入力した検索語・URLは外部の公的APIへ送信されます。未公開発明を含まず、公開情報のみですか？")) return;
+          const params = {}; for (const k in inputs) params[k] = inputs[k].value; const r = await api("POST", "/api/v1/connectors/" + c.id + "/run", { params, collection: coll.value, public_query_confirmed: true });
           out.textContent = r.collection + ": 取得 " + r.fetched + " / 追加 " + r.added + " / 更新 " + r.updated + "（" + r.ms + "ms）"; } finally { e.target.disabled = false; } }) }, "実行"))));
   });
   main.append(h("datalist", { id: "colls" }, S.collections.map(c => h("option", { value: c.name }))));
@@ -553,7 +558,7 @@ async function collectView(main) {
 async function researchCard(main) {
   const [jobs, providers] = await Promise.all([api("GET", "/api/v1/research"), api("GET", "/api/llm/providers")]);
   const q = h("textarea", { placeholder: "調査したいこと（例: 全固体電池の硫化物系電解質について、主要出願人と最近の技術課題・規格動向を整理して）" });
-  const prov = sel(providers.providers.map(x => [x.id, x.label || x.id]), providers.default_provider), news = h("input", { type: "checkbox", disabled: true }), picker = collectionPicker([]);
+  const prov = sel(providers.providers.filter(x => x.type !== "openrouter" && x.local_only_verified === true).map(x => [x.id, x.label || x.id]), providers.default_provider), news = h("input", { type: "checkbox", disabled: true }), picker = collectionPicker([]);
   const out = h("div", {});
   const show = guard(async (id) => { const j = await api("GET", "/api/v1/research/" + id); const r = j.result;
     clear(out).append(h("div", { class: "card" }, h("div", { class: "row" }, h("strong", {}, j.params.question), h("span", { class: "tag " + (j.status === "done" ? "ok" : j.status === "failed" ? "bad" : "warn") }, r.step || j.status)),
@@ -561,7 +566,7 @@ async function researchCard(main) {
       r.error ? h("p", { class: "tag bad" }, r.error) : null, r.report ? md(r.report) : null,
       r.sources ? h("div", { class: "small muted" }, "根拠: ", r.sources.map(x => h("a", { href: "#", onclick: e => { e.preventDefault(); openDoc(x.doc_id); } }, "[" + x.n + "] " + (x.ext_id || x.title) + " "))) : null));
     if (j.status === "running") setTimeout(() => S.view === "collect" && show(id), 4000); });
-  main.append(h("h1", {}, "調査ジョブ"), h("div", { class: "card" }, h("p", { class: "small muted" }, "質問をサブ質問に分け、ライブラリ（と任意で世界ニュース）を検索して根拠付きレポートを作り、reports コレクションに保存します。1 件ずつ実行します。"),
+  main.append(h("h1", {}, "調査ジョブ"), h("div", { class: "card" }, h("p", { class: "small muted" }, "未公開情報を含む可能性があるため、ローカルと確認したAIのみ利用します。外部ニュース検索は機密保護のため無効です。"),
     q, h("div", { class: "row" }, prov, h("label", {}, news, " 世界ニュース外部検索（機密保護のため無効）"), h("span", { class: "spacer" }),
       h("button", { class: "btn primary", onclick: guard(async () => { const j = await api("POST", "/api/v1/research", { question: q.value, provider: prov.value, use_news: news.checked, collections: picker.values() }); show(j.id); }) }, "調査開始")), picker,
     jobs.jobs.length ? h("table", {}, jobs.jobs.slice(0, 10).map(j => h("tr", { class: "click", onclick: () => show(j.id) }, h("td", {}, j.question), h("td", {}, h("span", { class: "tag" }, j.status)), h("td", { class: "small muted" }, fmtDate(j.created))))) : null), out);
