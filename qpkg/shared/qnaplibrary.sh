@@ -47,6 +47,7 @@ case "${1:-}" in
         (
             exec /bin/sh -c '
                 root="$1"; python="$2"; data="$3"
+                cd "$root" || exit 1   # python -m imports from the working directory first
                 while :; do
                     QNAPLIBRARY_INSTALL_MODE=qpkg QNAPLIBRARY_INSTALL_ROOT="$root" PYTHONPATH="$root" \
                         "$python" -B -m qnaplibrary --data "$data"

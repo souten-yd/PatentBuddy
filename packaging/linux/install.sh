@@ -62,6 +62,9 @@ cat > "$PREFIX/bin/qnaplibrary" <<EOF
 #!/bin/sh
 export QNAPLIBRARY_INSTALL_MODE=linux QNAPLIBRARY_INSTALL_ROOT="$PREFIX" PYTHONPATH="$PREFIX/current"
 ${PORT:+export QNAPLIBRARY_PORT=$PORT}
+# python -m puts the working directory first on sys.path: run from the install root so a
+# qnaplibrary/ folder in the caller's directory can never shadow the installed version.
+cd "$PREFIX" || exit 1
 exec "$PY" -B -m qnaplibrary "\$@"
 EOF
 cat > "$PREFIX/bin/qnaplibrary-run" <<EOF

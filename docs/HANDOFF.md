@@ -4,8 +4,8 @@
 
 ## 現在のバージョン
 
-- v0.1.0: PR #1 をマージ済み（リリースは未作成。開発環境からのタグ push・API でのタグ作成・workflow_dispatch がプロキシで禁止されているため）
-- v0.1.1: PR #2（release.yml を「main マージでバージョンファイルが変わったら自動リリース」に変更、Tailscale Serve HTTPS、OpenRouter 既定の自動ベクトル化、未登録キーの収集元を無効表示）
+- **v0.1.1（リリース済み・最新）**: https://github.com/souten-yd/QnapLibrary/releases/tag/v0.1.1
+- v0.1.0 は PR #1 でマージしたがリリースなし（開発環境からはタグ push / API でのタグ作成 / workflow_dispatch がプロキシで禁止。リリースは main マージ時の release.yml が作る）
 
 ## 状態（2026-11-10）
 
@@ -22,9 +22,17 @@
 - `bash scripts/verify.sh` → 32 tests OK
 - `bash scripts/build-linux.sh dist` / `bash scripts/build-qpkg.sh dist`（rsync 必須。無いと QDK が空の data を作るため inspect-qpkg.py で検出して失敗させる）
 
+## 自己更新の実地確認（2026-11-10）
+
+- Linux 版 v0.1.0（非 root ユーザー、`install.sh --no-service`、`qnaplibrary-run`）→ 管理 API「更新を確認」で v0.1.1 を検出 →「適用」→
+  GitHub Release から tar.gz を取得し SHA-256 一致 → `versions/0.1.1` 展開・`current` 切替 → 終了コード 75 で再起動 → `/api/health` が 0.1.1、
+  更新前に登録した文書が検索で見つかる（データ保持）。旧版 `versions/0.1.0` は残りロールバック可能。
+- release.yml（main マージでバージョン変更時）: v0.1.1 で成功（テスト→Linux→QPKG（payload 検査込み）→リリース作成）。
+- 見つけた不具合: ランチャーを `qnaplibrary/` フォルダのあるディレクトリから起動すると `python -m` がそちらを読み込む。
+  `fix/launcher-cwd` で修正（Linux ランチャーと QPKG ランナーが自分のインストール先へ cd）。**次の版に含まれる**（既存の Linux 導入はランチャーが install.sh で作られるため、次版の install.sh を再実行するまで旧ランチャーのまま。systemd 経由なら cwd は / なので実害なし）。
+
 ## 次の一手
 
-1. PR #2 マージ → v0.1.1 の自動リリース確認 → ローカルの Linux 版 v0.1.0 から v0.1.1 への自己更新を実地確認（結果をここに記録）
 2. `docs/proposals.md` の 1（特許ウォッチ）→ 2（IPC/FI 辞書）→ 3（審査基準）→ 5（期限通知）
 
 ## 既知の問題 / 未決事項
