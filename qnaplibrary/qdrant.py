@@ -10,6 +10,9 @@ import logging
 import urllib.error
 import urllib.request
 
+from .llm import _DIRECT_OPENER
+from .privacy import local_endpoint
+
 LOG = logging.getLogger("qnaplibrary.qdrant")
 
 
@@ -26,13 +29,17 @@ class Qdrant:
         self._ready_dim = None
 
     def _call(self, method, path, body=None):
+        if not local_endpoint(self.url):
+            # Remote mirrors must be individually approved at the App boundary,
+            # but never permit redirects or environment-configured proxies.
+            raise QdrantError("機密保護: 信頼できないQdrant送信先です")
         headers = {"Content-Type": "application/json"}
         if self.api_key:
             headers["api-key"] = self.api_key
         req = urllib.request.Request(self.url + path, data=json.dumps(body).encode() if body is not None else None,
                                      headers=headers, method=method)
         try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+            with _DIRECT_OPENER.open(req, timeout=self.timeout) as resp:
                 return json.loads(resp.read() or b"{}")
         except urllib.error.HTTPError as error:
             if error.code == 404 and method == "GET":
