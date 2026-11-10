@@ -1,5 +1,14 @@
 # AGENTS.md — AI エージェント／開発者向けガイド
 
+## 2026-11-10 方針更新: ControlDeck Add-on への段階的移行
+
+- 新製品名は **PatentBuddy**。旧 `qnaplibrary` / QPKG ID / SQLite保存パスは互換性のため直ちに改名しない。
+- 新規開発は `docs/controldeck-addon-plan.md` のA0〜A5を優先。ControlDeckへ特許固有コードを直接組み込まず、MediaForge/SonicForge同様に独立サービスとして実装。
+- NAS版は移行検証完了まで保持。旧DB、パスキー、設定を削除しない。
+- ControlDeck内部モジュールのimportを禁止し、Hostの権限付きHTTP/Bridgeを使用。未検証Host bearerを管理者に昇格しない。
+- A0は旧管理・文献APIをすべて遮断する。NAS共有上で稼働中SQLite WALを使わない。
+- 標準ライブラリ/QPKG互換は保留したまま、依存変更・配布方式変更は別PRで判断する。
+
 ## 最初に読む順番
 
 1. 本ファイル（概要と絶対ルール）

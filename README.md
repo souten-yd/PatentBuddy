@@ -1,5 +1,7 @@
 # QnapPatentBuddy
 
+> **移行中:** ControlDeck PCで動くPatentBuddy Add-onへ段階移行します。NASは公報原本・検証済みDBスナップショットを保存し、稼働SQLiteはPC SSDを利用します。QPKG版の旧データは保全します。A0は登録/状態表示だけで、Host認証と特許データ操作はまだ未対応です。詳細: [移行設計](docs/controldeck-addon-plan.md)。
+
 QNAP NAS と Linux で動く**特許創出・先行技術調査・請求項・権利化支援ツール**です。公報・規格・公開審査基準を根拠に、日本語全文検索や任意のベクトル検索を利用できます。未公開発明は、管理者が確認したローカル専用LLMから出さない設計です。
 別の PC や AI アシスタントは API / MCP からデータの取り込み・検索ができます。
 

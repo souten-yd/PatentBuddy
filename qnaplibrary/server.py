@@ -46,7 +46,8 @@ class HTTPError(Exception):
 
 
 class App:
-    def __init__(self, data_dir):
+    def __init__(self, data_dir, addon_mode=False):
+        self.addon_mode = bool(addon_mode)
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.config = Config(self.data_dir)
@@ -375,6 +376,24 @@ class Handler(BaseHTTPRequestHandler):
         path = parts.path
         req = None
         try:
+            if self.server.app.addon_mode:
+                if method == "GET" and path == "/addon/v1/health":
+                    from .addon import health_report
+                    status = self.send_json(200, health_report())
+                    return
+                if method == "GET" and path in ("/addon/workspace", "/addon/style.css", "/addon/icon.svg"):
+                    entry = {
+                        "/addon/workspace": "/addon-workspace.html",
+                        "/addon/style.css": "/style.css",
+                        "/addon/icon.svg": "/icon.svg",
+                    }[path]
+                    status = self._static(entry)
+                    return
+                # The existing REST/MCP/auth endpoints are deliberately NOT
+                # mapped to Host proxy principals in the A0 bootstrap slice.
+                raise HTTPError(404, "addon endpoint not available")
+            if path.startswith("/addon/"):
+                raise HTTPError(404, "not found")
             if method == "GET" and not path.startswith(("/api/", "/mcp")):
                 status = self._static(path)
                 return
@@ -439,7 +458,8 @@ class Server(ThreadingHTTPServer):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(prog="qnaplibrary", description="QnapLibrary server")
-    parser.add_argument("--data", default=os.environ.get("QNAPLIBRARY_DATA", "./.data"), help="persistent data directory")
+    parser.add_argument("--data", default=None, help="persistent data directory")
+    parser.add_argument("--addon", action="store_true", help="ControlDeck A0 loopback setup mode")
     parser.add_argument("--bind", default=None)
     parser.add_argument("--port", type=int, default=None)
     parser.add_argument("--tls-cert", default=None)
@@ -450,13 +470,28 @@ def main(argv=None):
     if args.version:
         print(VERSION)
         return 0
+    if args.addon:
+        data_dir = args.data or os.environ.get("PATENT_BUDDY_DATA_DIR")
+        if not data_dir:
+            parser.error("--addon requires --data or PATENT_BUDDY_DATA_DIR")
+        bind = args.bind or "127.0.0.1"
+        if bind not in ("127.0.0.1", "::1"):
+            parser.error("--addon requires a loopback --bind")
+        if args.tls_cert or args.tls_key:
+            parser.error("--addon is loopback HTTP behind the ControlDeck TLS endpoint")
+        port = args.port if args.port is not None else 9150
+    else:
+        data_dir = args.data or os.environ.get("QNAPLIBRARY_DATA", "./.data")
     debuglog.setup(args.log_level)
-    app = App(args.data)
-    cfg = app.config.get("server")
-    bind = args.bind or os.environ.get("QNAPLIBRARY_BIND") or cfg.get("bind") or "0.0.0.0"
-    port = args.port or int(os.environ.get("QNAPLIBRARY_PORT") or 0) or int(cfg.get("port") or DEFAULT_PORT)
-    cert, key = args.tls_cert or cfg.get("tls_cert"), args.tls_key or cfg.get("tls_key")
-    tls = (cert, key) if cert and key else None
+    app = App(data_dir, addon_mode=args.addon)
+    if not args.addon:
+        cfg = app.config.get("server")
+        bind = args.bind or os.environ.get("QNAPLIBRARY_BIND") or cfg.get("bind") or "0.0.0.0"
+        port = args.port or int(os.environ.get("QNAPLIBRARY_PORT") or 0) or int(cfg.get("port") or DEFAULT_PORT)
+        cert, key = args.tls_cert or cfg.get("tls_cert"), args.tls_key or cfg.get("tls_key")
+        tls = (cert, key) if cert and key else None
+    else:
+        tls = None
     httpd = Server((bind, port), app, tls)
     app.httpd = httpd
 
@@ -464,17 +499,19 @@ def main(argv=None):
         app.request_shutdown(0)
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
-    app.updater.start_background()
-    app.embedder.start()
-    app.embedder.kick()
-    app.scheduler.start()
-    LOG.warning("%s %s listening on %s://%s:%d (data: %s)", APP_NAME, VERSION, "https" if tls else "http", bind, port, args.data)
+    if not args.addon:
+        app.updater.start_background()
+        app.embedder.start()
+        app.embedder.kick()
+        app.scheduler.start()
+    LOG.warning("%s %s listening on %s://%s:%d (data: %s)", APP_NAME, VERSION, "https" if tls else "http", bind, port, data_dir)
     try:
         httpd.serve_forever(poll_interval=1.0)
     finally:
         httpd.server_close()
-        app.embedder.stop()
-        app.scheduler.stop()
+        if not args.addon:
+            app.embedder.stop()
+            app.scheduler.stop()
         app.store.close()
     return app.exit_code
 

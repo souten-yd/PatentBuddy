@@ -29,3 +29,14 @@
 ## 特許専用ロードマップ（v0.6以降）
 
 詳細は [patent-feature-plan.md](patent-feature-plan.md) を参照。機密保護をゲートに、発明創出・ブレスト・請求項→先行技術/新規性・進歩性→競合/回避設計・FTO→出願文書へ段階的に進める。AIの外部送信は公開一般論に限定し、未公開発明・案件資料はローカル専用。
+
+## ControlDeck Add-on 移行計画（PR #14を基盤とする）
+
+- A0: Add-on v2 manifest、loopback専用起動、health/初期状態画面、旧管理APIの隔離
+- A1: Host principal認証、sandboxのworkspace・テーマ・iPhone対応
+- A2: 特許/検索/大量文献API移行、PR #13の高速化統合
+- A3: 未公開情報を保護したHost AI/Jobs/Broker連携
+- A4: PC SSD稼働DBからNASへの整合性検証済バックアップ、移行/復旧受入
+- A5: 特許引用/ファミリー/請求項グラフと根拠付き意味拡張
+
+[設計原本](controldeck-addon-plan.md)。

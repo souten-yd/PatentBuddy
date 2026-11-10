@@ -1,3 +1,5 @@
+
+> 次の開発の正本: [ControlDeck Add-on移行設計](controldeck-addon-plan.md)。以下は従来のNAS/Linux standalone構造であり、移行完了までは残す。
 # アーキテクチャ
 
 ```
