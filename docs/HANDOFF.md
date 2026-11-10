@@ -21,7 +21,7 @@
 
 ## 検証コマンドと結果
 
-- `bash scripts/verify.sh` → 32 tests OK
+- v0.4.0 の最終確認は `bash scripts/verify.sh` → 45 tests OK（PR #6 記録）。v0.5.0 追加テストは未実行
 - `bash scripts/build-linux.sh dist` / `bash scripts/build-qpkg.sh dist`（rsync 必須。無いと QDK が空の data を作るため inspect-qpkg.py で検出して失敗させる）
 
 ## 自己更新の実地確認（2026-11-10）
@@ -31,7 +31,7 @@
   更新前に登録した文書が検索で見つかる（データ保持）。旧版 `versions/0.1.0` は残りロールバック可能。
 - release.yml（main マージでバージョン変更時）: v0.1.1 で成功（テスト→Linux→QPKG（payload 検査込み）→リリース作成）。
 - 見つけた不具合: ランチャーを `qnaplibrary/` フォルダのあるディレクトリから起動すると `python -m` がそちらを読み込む。
-  `fix/launcher-cwd` で修正（Linux ランチャーと QPKG ランナーが自分のインストール先へ cd）。**次の版に含まれる**（既存の Linux 導入はランチャーが install.sh で作られるため、次版の install.sh を再実行するまで旧ランチャーのまま。systemd 経由なら cwd は / なので実害なし）。
+  `fix/launcher-cwd` で修正（Linux ランチャーと QPKG ランナーが自分のインストール先へ cd）。v0.2.0 以降に含まれる（既存 Linux インストールでは更新後の install.sh を再実行しないと旧ランチャーが残る可能性あり）。
 
 ## 複数版をまたぐ自己更新の確認（2026-11-10）
 
