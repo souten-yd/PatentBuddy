@@ -1,16 +1,9 @@
-"""Fail-closed ControlDeck Add-on v2 A0 status.
-
-No Host credentials, proprietary document content, or execution endpoints are
-exposed here. The complete Host browser bridge / identity integration is A1.
-"""
-
-from . import VERSION
+"""ControlDeck Add-on v2 health: only fields accepted by the Host contract."""
 
 
-def health_report(local_connected=False):
+def health_report(connection_configured=False):
     """Host Add-on v2 status: do not advertise an unimplemented workspace as ready."""
     report = {
-        "app": "PatentBuddy", "version": VERSION, "service_role": "patent-addon",
         "status": "setup_required",
         "contract_version": "2.0",
         "reason_code": "setup_incomplete",
@@ -28,7 +21,8 @@ def health_report(local_connected=False):
         }],
     }
 
-    if local_connected:
-        report.update(status="healthy", reason_code="ready", message="ResearchDataHubへローカル自動認証で接続済みです。", setup=[])
+    if connection_configured:
+        report.update(status="healthy", message="ResearchDataHubの接続設定があります。接続状況は画面で確認してください。", setup=[])
         report.pop("action", None)
+        report.pop("reason_code", None)
     return report

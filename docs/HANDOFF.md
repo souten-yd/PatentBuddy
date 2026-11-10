@@ -133,3 +133,7 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - PR19はmain725e3ecへ統合、Release42827637382成功。公式Linuxと署名Featureを実更新し双方v0.5.8。旧0.5.7の管理APIから公式自己更新も成功（/tmp/pb-autoupdate-058.json）。121 tests成功。
 - 実Hostブラウザ受入で停止中表示を再現。Hostの厳格AddonHealthReportがapp/version/service_roleという余剰fieldを拒否している。合成Host試験では検出できなかった契約不一致。さらに更新後の新規ai.inference/jobs.write権限は既存grantに自動追加されない。画面で使える状態に直してからPDF/OCRに進む。
 - 本修正PRはhealth契約整合と実Host画面受入に限定。PDF/OCRは次の作業で、現在アプリには未統合。
+
+- v0.5.9候補: health余剰fieldを除去。手動token設定時もsetup済みとし、接続検証は認証済みstatus/UIで行う。新規AI/Jobs権限をHost正規enable APIで明示付与する。
+
+- Host実スキーマはhealthy時のreason_code=readyも拒否するため省略へ修正。setup_required/healthy双方を実Host AddonHealthReportで検証成功。最終122 tests成功30.752秒、Linux/Feature build成功。/tmp/pb-health-059-verify-final.log。追加ディスク書込みなし。
