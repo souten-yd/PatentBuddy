@@ -12,6 +12,7 @@ import urllib.parse
 
 from . import VERSION, connectors, debuglog, mcp, patents as patents_mod, store as store_mod, webauthn
 from .auth import is_local_network
+from .backup import BackupError
 from .llm import LLMError
 
 ROUTES = []
@@ -292,6 +293,28 @@ def secret_put(req):
     req.app.store.audit("admin", "secret.set", name)
     req.app.embedder.kick()
     return req.app.config.secret_status(name)
+
+
+# ---------------------------------------------------------------------------
+# backups (admin only, no web download or automated restore)
+@route("GET", "/api/backups", "admin")
+def backups_list(req):
+    """List on-demand SQLite snapshots."""
+    try:
+        return {"snapshots": req.app.backups.list()}
+    except BackupError as exc:
+        raise _err(503, str(exc))
+
+
+@route("POST", "/api/backups", "admin")
+def backups_create(req):
+    """Create and validate a consistent SQLite snapshot."""
+    try:
+        item = req.app.backups.create()
+    except BackupError as exc:
+        raise _err(503, str(exc))
+    req.app.store.audit("admin", "backup.create", item["name"])
+    return {"snapshot": item}
 
 
 # ---------------------------------------------------------------------------
