@@ -47,6 +47,9 @@ class PublicCatalog:
                 self.store.db.execute(
                     "CREATE VIRTUAL TABLE IF NOT EXISTS published_patents_fts "
                     "USING fts5(title,tok,tokenize='unicode61 remove_diacritics 0')")
+                self.store.db.execute(
+                    "CREATE TRIGGER IF NOT EXISTS published_fts_delete AFTER DELETE ON published_patents "
+                    "BEGIN DELETE FROM published_patents_fts WHERE rowid=OLD.doc_id; END")
                 self.fts = True
                 # A database initially created without FTS5 may later gain it.
                 if not existed:
@@ -65,7 +68,7 @@ class PublicCatalog:
 
     @staticmethod
     def _source(db, doc_id, excerpt):
-        if isinstance(doc_id, bool) or not isinstance(doc_id, int) or doc_id < 1:
+        if isinstance(doc_id, bool) or not isinstance(doc_id, int) or not 1 <= doc_id <= 9223372036854775807:
             raise ValueError("文献IDが不正です")
         if not isinstance(excerpt, str) or not excerpt.strip() or len(excerpt) > MAX_EXCERPT:
             raise ValueError("抜粋は1〜12000文字にしてください")
@@ -163,7 +166,9 @@ class PublicCatalog:
     def search(self, query, limit=20):
         if not isinstance(query, str) or not 1 <= len(query.strip()) <= 180:
             raise ValueError("検索語は1〜180文字にしてください")
-        limit = max(1, min(int(limit), 50))
+        if isinstance(limit, bool) or not isinstance(limit, int):
+            raise ValueError("件数は整数で指定してください")
+        limit = max(1, min(limit, 50))
         q = query.strip()
         if self.fts:
             expression = textproc.parse_query(q)
@@ -179,7 +184,7 @@ class PublicCatalog:
                 raise ValueError("公開カタログの検索式が不正です")
         else:
             # FTS5-free QNAP Python remains usable; performance is reported separately.
-            term = "%" + textproc.normalize(q).replace("%", r"\%").replace("_", r"\_") + "%"
+            term = "%" + textproc.normalize(q).replace("\\", "\\\\").replace("%", r"\%").replace("_", r"\_") + "%"
             rows = self.store.q(
                 "SELECT p.public_id,p.title,p.ext_id,p.excerpt FROM published_patents p "
                 "JOIN documents d ON d.id=p.doc_id AND d.hash=p.source_hash "

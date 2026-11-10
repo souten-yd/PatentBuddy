@@ -71,3 +71,10 @@ while True:
 未公開の発明/要約/請求項/検索語/論点/引用の組み合わせはデフォルト機密。バックエンドがクラウドLLM・クラウド埋め込み・リランカへの送信を拒否します。ローカルAIはモデルの実体と中継設定を管理者が確認済みである必要があります（`local_only_verified:true`）。管理用APIに機密プロンプトを付与しただけで公開送信の例外指定はできません。
 
 **ウォッチ:** `params.public_only_confirmed:true` がない旧ウォッチは自動外部収集停止。公開検索語のみと承認したものだけ再開できます。外部検索APIの実行は管理者専用。通知には案件名/本文を含めません。詳しくは [privacy-boundary.md](privacy-boundary.md)。
+
+
+## 公開承認済み資料（v0.5.4）
+
+管理セッションで `POST /api/v1/publications/preview`（doc_id, excerpt）を呼び、返されたpublicationのtitle/publication_number/textを全件確認する。同じdoc_id/excerptとpreview_token、confirm_public:trueで `POST /api/v1/publications` を呼ぶ。10分期限・文献変更・再起動後はプレビューを取り直す。取消は `DELETE /api/v1/publications/{doc_id}`。
+
+管理者発行のscopes=published tokenは `POST /api/v1/public-catalog/search`（q, limit:最大50）と `GET /api/v1/public-catalog/{public_id}` のみ。元文献、案件、MCP、debug/export、設定APIへのアクセス不可。通常rw/ro tokenとは権限が異なる。loopback以外はHTTPS必須。公開APIは外部LLMを呼ばない。詳しくはpublic-catalog.md。

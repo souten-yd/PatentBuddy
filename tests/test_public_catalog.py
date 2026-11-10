@@ -181,6 +181,73 @@ class PublicCatalogApiTest(unittest.TestCase):
                     self.assertEqual(status, 403)
             outgoing.assert_not_called()
 
+    def test_preview_expiry_restart_and_read_only_operations(self):
+        catalog = self.server.app.public_catalog
+        store = self.server.app.store
+        payload = {"doc_id": self.doc_id, "excerpt": "正極と固体電解質層を備える。", "confirm_public": True}
+        before = store.db.total_changes
+        with mock.patch("qnaplibrary.public_catalog.time.time", return_value=1000):
+            preview = catalog.preview(self.doc_id, payload["excerpt"])
+        self.assertEqual(before, store.db.total_changes)
+        with mock.patch("qnaplibrary.public_catalog.time.time", return_value=1600):
+            with self.assertRaises(ValueError):
+                catalog.approve(self.doc_id, payload["excerpt"], acknowledged=True,
+                                preview_token=preview["preview_token"])
+        preview = catalog.preview(self.doc_id, payload["excerpt"])
+        fresh = PublicCatalog(store)
+        with self.assertRaises(ValueError):
+            fresh.approve(self.doc_id, payload["excerpt"], acknowledged=True,
+                          preview_token=preview["preview_token"])
+        _, approved = self.approve(payload)
+        self.assertEqual(fresh.get(approved["id"])["text"], payload["excerpt"])
+        before = store.db.total_changes
+        for _ in range(5):
+            catalog.search("固体電解質")
+            catalog.get(approved["id"])
+        self.assertEqual(before, store.db.total_changes)
+
+    def test_remote_tls_guard_and_untrusted_forwarding(self):
+        from qnaplibrary.server import Request
+        original = Request.__init__
+        def remote(req, *args, **kwargs):
+            original(req, *args, **kwargs)
+            req.ip = "192.168.1.99"
+        with mock.patch.object(Request, "__init__", remote):
+            for headers in ({}, {"X-Forwarded-Proto": "https", "Host": "example.ts.net"}):
+                self.assertEqual(self.public.call("POST", "/api/v1/public-catalog/search",
+                    {"q": "電池"}, headers=headers)[0], 403)
+            # Model only the server-side verified TLS flag, not a client header.
+            with mock.patch.object(self.server.httpd, "tls", True):
+                self.assertEqual(self.public.call("POST", "/api/v1/public-catalog/search", {"q": "電池"})[0], 200)
+
+    def test_csrf_origin_and_token_revocation(self):
+        payload = {"doc_id": self.doc_id, "excerpt": "正極と固体電解質層を備える。"}
+        csrf = self.admin.csrf
+        self.admin.csrf = None
+        self.assertEqual(self.admin.call("POST", "/api/v1/publications/preview", payload)[0], 403)
+        self.admin.csrf = csrf
+        self.assertEqual(self.admin.call("POST", "/api/v1/publications/preview", payload,
+            headers={"Origin": "https://attacker.invalid"})[0], 403)
+        # A valid admin cookie must not elevate a public-only bearer token.
+        self.admin.token = self.public.token
+        self.assertEqual(self.admin.call("GET", "/api/debug/bundle")[0], 403)
+        self.admin.token = None
+        devices = self.admin.call("GET", "/api/devices")[1]["devices"]
+        token_id = next(d["id"] for d in devices if d["scopes"] == "published")
+        self.assertEqual(self.admin.call("DELETE", "/api/devices/%d" % token_id)[0], 200)
+        self.assertEqual(self.public.call("POST", "/api/v1/public-catalog/search", {"q": "電池"})[0], 403)
+
+    def test_source_delete_cleans_index_and_rejects_malformed_input(self):
+        _, approved = self.approve({"doc_id": self.doc_id, "excerpt": "正極と固体電解質層を備える。", "confirm_public": True})
+        self.assertEqual(self.admin.call("DELETE", "/api/v1/documents/%d" % self.doc_id)[0], 200)
+        self.assertEqual(self.public.call("GET", "/api/v1/public-catalog/" + approved["id"])[0], 404)
+        if self.server.app.public_catalog.fts:
+            self.assertEqual(self.server.app.store.one("SELECT COUNT(*) FROM published_patents_fts")[0], 0)
+        for limit in (None, True, [], {}, "NaN"):
+            self.assertEqual(self.public.call("POST", "/api/v1/public-catalog/search", {"q": "電池", "limit": limit})[0], 400)
+        self.assertEqual(self.admin.call("POST", "/api/v1/publications/preview",
+            {"doc_id": 10**40, "excerpt": "text"})[0], 400)
+
 
 if __name__ == "__main__":
     unittest.main()
