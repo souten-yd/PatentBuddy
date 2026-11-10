@@ -208,6 +208,7 @@ class Request:
             if length > limit:
                 raise HTTPError(413, "リクエストが大きすぎます")
             raw = self.h.rfile.read(length) if length else b""
+            self.h._body_consumed = True
             if not raw:
                 self._body = {}
             else:
@@ -265,10 +266,23 @@ class Handler(BaseHTTPRequestHandler):
         self._dispatch("DELETE")
 
     def do_OPTIONS(self):
+        self._body_consumed = False
         self.send_response(204)
         self.send_header("Allow", "GET, POST, PUT, PATCH, DELETE")
         self.send_header("Content-Length", "0")
         self.end_headers()
+
+    def end_headers(self):
+        # Unread bodies (including rejected requests) must never become the
+        # next request line on an HTTP/1.1 connection. Do not drain untrusted
+        # bodies: close explicitly so clients reconnect without a retry.
+        headers = getattr(self, "headers", {})
+        if (self.close_connection or headers.get("Transfer-Encoding") or
+                (headers.get("Content-Length", "0") != "0" and
+                 not getattr(self, "_body_consumed", False))):
+            self.send_header("Connection", "close")
+            self.close_connection = True
+        super().end_headers()
 
     # -----------------------------------------------------------------------
     def _security_headers(self):
@@ -371,12 +385,19 @@ class Handler(BaseHTTPRequestHandler):
             req.session, req.session_id, req.actor = session, sid, "admin"
 
     def _dispatch(self, method):
+        self._body_consumed = False
         t0 = time.time()
         status = 500
         parts = urlsplit(self.path)
         path = parts.path
         req = None
         try:
+            if self.headers.get("Transfer-Encoding"):
+                raise HTTPError(400, "Transfer-Encoding is not supported")
+            lengths = self.headers.get_all("Content-Length", [])
+            if len(lengths) > 1 or (lengths and (not lengths[0].isascii() or not lengths[0].isdigit())):
+                self.close_connection = True
+                raise HTTPError(400, "Invalid Content-Length")
             if method == "GET" and not path.startswith(("/api/", "/mcp")):
                 status = self._static(path)
                 return
@@ -451,7 +472,7 @@ class Server(ThreadingHTTPServer):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(prog="qnaplibrary", description="QnapLibrary server")
+    parser = argparse.ArgumentParser(prog="qnaplibrary", description="ResearchDataHub server (qnaplibrary compatible)")
     parser.add_argument("--data", default=os.environ.get("QNAPLIBRARY_DATA", "./.data"), help="persistent data directory")
     parser.add_argument("--bind", default=None)
     parser.add_argument("--port", type=int, default=None)

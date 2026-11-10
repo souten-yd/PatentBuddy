@@ -81,7 +81,7 @@ function render() {
   if (!S.me) return $app.append(loginView());
   const views = [["home", "ホーム"], ["search", "検索"], ["patents", "特許"], ["data", "データ"], ["analytics", "分析"], ["chat", "AIチャット"], ["collect", "収集"], ["settings", "設定"]];
   const main = h("main", {});
-  const nav = h("nav", { class: "side" }, h("div", { class: "brand" }, h("img", { src: "icon.svg", alt: "" }), "QnapLibrary"),
+  const nav = h("nav", { class: "side" }, h("div", { class: "brand" }, h("img", { src: "icon.svg", alt: "" }), "ResearchDataHub"),
     views.map(([id, label]) => h("button", { class: S.view === id ? "active" : "", onclick: () => { S.view = id; render(); } }, label)),
     h("div", { class: "ver" }, "v" + S.health.version));
   $app.append(h("div", { class: "layout" }, nav, main));
@@ -97,7 +97,7 @@ function loginView() {
   });
   pw.addEventListener("keydown", e => { if (e.key === "Enter") go(); });
   const box = h("div", { class: "login" }, h("div", { class: "card" },
-    h("h1", {}, setup ? "QnapLibrary 初期設定" : "QnapLibrary ログイン"),
+    h("h1", {}, setup ? "ResearchDataHub 初期設定" : "ResearchDataHub ログイン"),
     setup ? h("p", { class: "muted small" }, "管理者パスワードを設定します（LANからのみ）。後で設定からパスキー（Face ID 等）を登録できます。") : null,
     field(setup ? "新しい管理者パスワード" : "パスワード", pw),
     h("div", { class: "row" }, h("button", { class: "btn primary", onclick: go }, setup ? "設定して開始" : "ログイン"),
@@ -172,7 +172,7 @@ async function homeView(main) {
     h("dt", {}, "検索用ベクトル索引"), h("dd", {}, st.vectors.vectors + " 件 / RAM " + st.vectors.ram_mb + " MB"));
   main.append(h("details", { class: "card home-technical" },
     h("summary", {}, "技術情報を表示"), info));
-  main.append(h("p", { class: "small muted home-version" }, "QnapLibrary v" + S.health.version));
+  main.append(h("p", { class: "small muted home-version" }, "ResearchDataHub v" + S.health.version));
 
   const live = () => main.isConnected && S.view === "home";
   let lastActivity = null;
@@ -710,11 +710,17 @@ async function settingsView(main) {
     body.append(h("div", { class: "card" }, h("dl", { class: "dl" }, h("dt", {}, "現在"), h("dd", {}, "v" + u.current + "（" + u.mode + "）"), h("dt", {}, "状態"), h("dd", {}, u.phase + " " + (u.message || "")),
       h("dt", {}, "最新"), h("dd", {}, u.latest ? "v" + u.latest.version + "（" + (u.latest.published_at || "") + "）" : "-"), h("dt", {}, "確認日時"), h("dd", {}, fmtDate(u.checked_at)), u.error ? [h("dt", {}, "エラー"), h("dd", {}, u.error)] : null),
       u.latest && u.latest.notes ? h("details", {}, h("summary", {}, "リリースノート"), md(u.latest.notes)) : null,
-      h("div", { class: "row" }, h("button", { class: "btn", onclick: guard(async () => { await api("POST", "/api/update/check", {}); render(); }) }, "更新を確認"),
+      h("div", { class: "row" }, h("button", { class: "btn", onclick: guard(async (event) => {
+          const button = event.currentTarget;
+          button.disabled = true;
+          button.textContent = "更新を確認中…";
+          try { await api("POST", "/api/update/check", {}); await render(); }
+          finally { button.disabled = false; button.textContent = "更新を確認"; }
+        }) }, "更新を確認"),
         h("button", { class: "btn primary", disabled: !u.latest || u.mode === "dev", onclick: guard(async () => { if (!confirm("v" + u.latest.version + " に更新します。再起動します。")) return; await api("POST", "/api/update/apply", {}); toast("更新を開始しました"); waitRestart(u.current); }) }, "今すぐ更新")),
       h("label", {}, check, " 毎日自動で確認"), " ", h("label", {}, auto, " 新しい版を自動で適用"),
       h("button", { class: "btn", onclick: guard(async () => { await api("PUT", "/api/settings", { update: { auto_check: check.checked, auto_apply: auto.checked } }); toast("保存しました"); }) }, "保存"),
-      h("p", { class: "small muted" }, "GitHub Releases（souten-yd/QnapLibrary）の資産を SHA-256 で検証してから適用します。")));
+      h("p", { class: "small muted" }, "GitHub Releases（souten-yd/PatentBuddy）の資産を SHA-256 で検証してから適用します。")));
   } else if (tab === "debug") {
     const pre = h("div", { class: "pre" }, "…");
     body.append(h("div", { class: "card" }, h("p", { class: "small muted" }, "AI に不具合調査を依頼するときは、このバンドルを渡してください（秘密情報は除去済み）。デバイストークンがあれば GET /api/debug/bundle や MCP の debug_bundle でも取得できます。"),

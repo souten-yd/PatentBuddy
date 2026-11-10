@@ -10,7 +10,7 @@ import re
 import time
 import urllib.parse
 
-from . import VERSION, connectors, debuglog, mcp, patents as patents_mod, store as store_mod, webauthn
+from . import APP_NAME, VERSION, connectors, debuglog, mcp, patents as patents_mod, store as store_mod, webauthn
 from .auth import is_local_network
 from .backup import BackupError
 from .llm import LLMError
@@ -49,7 +49,7 @@ def _err(status, message):
 @route("GET", "/api/health", "public")
 def health(req):
     a = req.app
-    return {"app": "QnapPatentBuddy", "version": VERSION, "ok": True, "setup_required": not a.auth.admin_configured(),
+    return {"app": APP_NAME, "version": VERSION, "ok": True, "setup_required": not a.auth.admin_configured(),
             "pairing": a.auth.pairing_enabled(), "https": req.is_https(), "https_url": a.config.get("server", "https_url", default=""), "uptime_s": round(time.time() - a.started)}
 
 
