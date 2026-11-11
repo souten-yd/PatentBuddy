@@ -222,3 +222,13 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - `docs/research-queue-design.md`と正本planに反映。QNAP正本/キュー/書誌・公式収集、PC Host OCR/embed/rerank/LLMのpull worker。CPUが弱いことを理由にOpenRouterへ切り替えない。公開検索語自体の外部送信、ファミリーと公報の違い、色の件数/未分類、上限打切りと真の総件数、入力snapshotの版、DL実ファイル数/bytes上限、leaseとHost資源所有権を区別。
 - PR24 /data1tb/PatentBuddy-sources は公式番号指定PDF取得のコード実装途中（未コミット qnaplibrary/patent_download.py、api.py、web/app.js）。EPO公式RESTから仕様例EP1004359B1.pdfを302833bytes取得成功、SHA256 070f17fdac403ceed8808e376644250242a899656d79899576749bc8f84a49ee（/tmp/pb-epo-live.log）。これはパワエレ10件の取得ではなくAPI疎通。UI/権限/リダイレクト/上限テスト、verify、配布は未完。次はこれらを完了し、調査プレビュー/キューを段階実装する。
 - PR23 graphはcc1ea97までpush済み。全体PR-F/性能/P2/PR-G、10件原本抽出、キーワード横断検索/マスク/収集キューとも未完。目標active。本番v0.5.10は不変。
+
+## 改善方式の評価と公式PDF取得の検証（2026-11-11）
+
+- ユーザーはより良い方法の調査・評価・採用を指示。一次資料（WIPO/USPTO/IP Australia/EPO、Sentence Transformers公式）を調査し、上位N切詰め・ヒートマップ単独・全件LLM・段階検索の設計比較を docs/research-selection-evaluation.md に記録。目的別検索、基準文献pin、除外再確認、偏り表示、候補限定rerank、差分取得を採用方針へ反映。MMR等の具体的方式/重みと実資料精度は未評価で、性能向上を主張しない。
+- EPO公式PDF取得を実装。固定HTTPS REST origin/公報番号のみ・redirect拒否・proxy不使用・16MiB/時間上限/1並列/100000 bytes/sec。GETや検索で自動取得せずadmin POST+CSRF+strict同意、PDF magic/Content-Length検査。応答をブラウザ保存し、正本への登録は既存PatentBuddy PDF取込で行う。追加常駐DB書込みなし。PATENTSCOPEは公式ブラウザへの導線だけで自動robot禁止を維持。
+- 関連4 tests成功0.602秒（/tmp/pb-download-tests.log）。URL/不正公報拒否、PDF以外/未完/サイズ上限、排他/redirect拒否、匿名401/readonly403/CSRF403/不正同意400、拒否時外部呼出0を確認。全verify147 tests成功41.789秒（/tmp/pb-download-verify.log）、JS構文/diff whitespace成功。
+- 実EPO RESTからEP1004359B1.pdf取得、302833 bytes/SHA256 070f17fdac403ceed8808e376644250242a899656d79899576749bc8f84a49ee。既存extract_pdfで14ページ抽出成功（/tmp/pb-epo-extraction.log）。これはAPI仕様例の疎通資料でパワエレ10件ではない。
+- 実Chrome1280pxで管理Web収集→EPO PDF取得→ダウンロード内容SHA一致、320pxで表示受入。両幅overflow/JS例外0（/tmp/pb-download-ui.log）。320pxは同じPDFを再取得せず表示のみ。一時管理Web fixture PID606660をSIGINT停止。本番データ/サービス不変。
+- PR24 Draft/未配布。次は調査snapshot・候補統合/重複/マスク/件数予算・キュー、API登録必須取得元、パワエレ10件の原本/比較評価。PR23/性能/P2/PR-Gも未完。goal active。
+- ControlDeck実Host Job/CPU lease/local-only LLMで取得PDFの先頭ページのみを入力し、157文字の説明生成とmodel/runtime証明を確認（/tmp/pb-epo-llm-live.log）。全文分析やパワエレ精度評価ではない。一時addon/user/session削除、Host job/audit保持、正常資源解放。管理Web fixtureもcleaned確認。

@@ -1120,3 +1120,21 @@ def pdf_image(req):
     from . import pdf_store
     return req.h.send_bytes(200, pdf_store.image_for(req.app.store, int(req.params['did']), int(req.params['iid'])),
                             'image/png', {'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff'})
+
+
+@route('POST', '/api/v1/patent-downloads/epo', 'admin')
+def download_epo_publication(req):
+    from . import patent_download, connectors
+    body = req.json(limit=1024)
+    if not isinstance(body, dict) or set(body) != {'publication', 'confirm_public'} or body['confirm_public'] is not True:
+        raise _err(400, '外部に送信する公開公報番号を確認してください')
+    try:
+        patent_download.publication(body['publication'])
+    except connectors.ConnectorError as error:
+        raise _err(400, str(error)) from None
+    try:
+        name, raw = patent_download.download(body['publication'])
+    except connectors.ConnectorError as error:
+        raise _err(502, str(error)) from None
+    return req.h.send_bytes(200, raw, 'application/pdf', {
+        'Content-Disposition':'attachment; filename="'+name+'"', 'Cache-Control':'no-store', 'X-Content-Type-Options':'nosniff'})

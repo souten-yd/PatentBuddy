@@ -599,6 +599,31 @@ async function collectView(main) {
   await researchCard(main);
   main.append(h("h1", {}, "収集（外部データ源）"),
     h("p", { class: "muted small" }, "公式 API・フィードのみ利用します。キーが必要なものは 設定 > 外部キー で登録してください。別PCからは REST API / MCP で直接投入できます。"));
+  const number = h("input", {placeholder:"EP1004359B1", maxlength:40, "aria-label":"EPO公報番号"});
+  const consent = h("input", {type:"checkbox"});
+  const status = h("p", {"aria-live":"polite"});
+  const getPDF = h("button", {class:"btn",disabled:true}, "EPO公式PDFをダウンロード");
+  consent.addEventListener("change", () => {getPDF.disabled = !consent.checked;});
+  getPDF.addEventListener("click", guard(async () => {
+    getPDF.disabled = true; consent.disabled = true; number.disabled = true;
+    status.textContent = "EPOの公式APIから取得しています…";
+    try {
+      const response = await api("POST", "/api/v1/patent-downloads/epo", {publication:number.value,confirm_public:true}, {raw:true});
+      if (!response.ok) {const error=await response.json();throw new Error(error.error || "取得に失敗しました");}
+      const blob = await response.blob();
+      const name = /filename="([A-Z0-9]+\.pdf)"/.exec(response.headers.get("Content-Disposition") || "")?.[1] || "publication.pdf";
+      const url = URL.createObjectURL(blob), link=h("a", {href:url,download:name});document.body.append(link);link.click();link.remove();
+      setTimeout(() => URL.revokeObjectURL(url),60000);
+      status.textContent = "PDFを保存しました。PatentBuddyの「PDFを選択して取り込む」で読み込めます。";
+    } catch(error) {status.textContent=error.message;}
+    finally {consent.disabled=false;number.disabled=false;getPDF.disabled=!consent.checked;}
+  }));
+  main.append(h("section", {class:"card",id:"patent-downloads"}, h("h2", {}, "特許の検索と原本PDF"),
+    h("p", {}, h("a", {href:"https://patentscope.wipo.int/search/ja/search.jsf",target:"_blank",rel:"noopener noreferrer"}, "PATENTSCOPEで検索・手動ダウンロード")),
+    h("p", {}, "PATENTSCOPEの無料画面は手動で利用します。自動ロボットは禁止、機械連携Webサービスは有料です。ダウンロードしたPDFはPatentBuddyで取り込めます。"),
+    h("h3", {}, "EPO European Publication Server（登録不要）"),
+    h("p", {}, "欧州A/B公報の番号指定取得です。日本公報やキーワード検索には対応しません。1件16MiBまで、転送量を制限して取得します。"),
+    field("公開公報番号",number),field("この公報番号をEPOへ送信する",consent),getPDF,status));
   cs.forEach(c => {
     const inputs = {};
     const coll = h("input", { placeholder: "保存先コレクション（空なら " + c.kind + "-" + c.id + "）", list: "colls" });
