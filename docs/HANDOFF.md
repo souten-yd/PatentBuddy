@@ -215,3 +215,12 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - ユーザー画像でv0.5.10 PatentBuddy workspaceのLoad failed/操作disabled。評価成果を普段の画面で試せる状態を要求。main193f53aから /data1tb/PatentBuddy-loading / fix/addon-cookie-independent-loading を分離し、まず読込障害と既存分析結果への導線を修正する。
 - 実サービス3個active、RDH health正常。opaque sandboxからcredentials=includeのfetchを使用。Hostはbridge nonceでcookieなし認証にも対応しており比較候補。ただしiPhone原因は未確定。隔離Host addonでWebKit/Chrome比較中。
 - PR24の公式OPS候補検索追加は /data1tb/PatentBuddy-sources に未コミットで保持（research_discovery.py/api.py/connectors.py/research_store.py/store.py）。API/transport/parser変更は未テスト、未配布。既存662d685までのUIはpush済み。
+
+## v0.5.11候補: 保存済み結果への導線と読込再確認
+
+- PR25にCookieなしfetch（bridge nonce認証）、接続を再確認ボタン、接続失敗時の日本語案内を追加。保存先選択→最新20文献→原文/既存要約・請求項表示を接続。限定POST libraryはcollection_id整数だけ受け付け、本文なし一覧を正本から取得。新規永続書込みなし。
+- Linux WebKit/Chromeの390pxで旧版も読込成功したためiPhone実機エラー原因は未確定。修正版も両browserで読込・一覧・原文成功。Chromeは実ControlDeck LLMの要約生成/画面表示まで成功（/tmp/pb-loading-browser-llm.log）。WebKitの記録には親画面遷移時のHost API中断/CORSログが残り、アプリ全体無エラーとは主張しない。iPhone実機は未検証。
+- WebKitの不足shared libraryはapt downloadを/tmp/pb-webkit-libsへ展開し一時launcherで使用、root/system package変更なし。既存Playwright cacheへWebKit追加。
+- 関連addon_client4 tests成功1.148秒、追加API型/余剰field拒否・本文非取得確認。全143 testsの初回はHANDOFFに0.5.11未記載の文書テストだけ失敗し追記。Linux/Feature build成功。最終verify再実行と公開/本番更新はこの時点で未実施。
+- 隔離fixture /tmp/pb-loading-fixture.pyは実Host temporary addon/userと合成RDHで稼働。正本ユーザーPDFを変更していない。PR23/24は未統合、全体goal active。
+- 最終全verify143 tests成功38.538秒（/tmp/pb-loading-final2-verify.log）。隔離fixture639378停止、一時addon/user/session/grants除去確認。署名Feature buildも既存publisher鍵で検証済み。

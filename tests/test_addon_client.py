@@ -71,6 +71,14 @@ class AddonClientTests(unittest.TestCase):
                         status, doc = browser.call('GET', '/addon/v1/documents/%d' % doc_id)
                         self.assertEqual(status, 200)
                         self.assertEqual(doc['body'], '電池の構造を説明する。')
+                        status, library = browser.call('POST', '/addon/v1/library', {'collection_id': doc['collection_id']})
+                        self.assertEqual(status, 200)
+                        self.assertEqual(library['items'][0]['id'], doc_id)
+                        self.assertNotIn('body', library['items'][0])
+                        for value in (True, 0, '1', '../debug', 10**18):
+                            self.assertEqual(browser.call('POST', '/addon/v1/library', {'collection_id': value})[0], 400)
+                        self.assertEqual(browser.call('POST', '/addon/v1/library', {'collection_id': 1, 'url': 'https://example.com'})[0], 400)
+
                         self.assertEqual(browser.call('GET', '/api/debug/bundle')[0], 404)
                         self.assertEqual(browser.call('POST', '/addon/v1/search', {'q': []})[0], 400)
                     self.assertFalse((Path(tmp) / 'library.sqlite3').exists())
