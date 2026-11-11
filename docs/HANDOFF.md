@@ -276,3 +276,35 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - research専用device/同一UID Unix認証を追加、調査API以外のcollections/settings/debugへアクセス不可。ro/rw/公開専用と混同しない。PatentBuddyから限定request/snapshot APIだけを中継する。
 - PatentBuddyへキーワード/CQL・送信式preview・確認・候補上限・調査要求・履歴・cancel/retry・結果候補表示を追加中。まだ画面受入/本番更新未実施。選定操作と取得キューは未接続。
 - queue3 tests成功0.658秒、関連15 tests成功3.596秒。HTTP auth/CSRF/readonly、キー待ち→再開→snapshot、重複再送無書込み、cancel/期限切れ旧結果拒否、原子的失敗rollback、backup復元/quick_checkを確認。scope初回変更で匿名403になったテスト失敗は認証優先順を修正し401へ復帰。全verifyはmain最新の通信修正を統合後に実施する。
+## iPhone Load failedと画面反映の優先対応（2026-11-11）
+
+- ユーザー画像でv0.5.10 PatentBuddy workspaceのLoad failed/操作disabled。評価成果を普段の画面で試せる状態を要求。main193f53aから /data1tb/PatentBuddy-loading / fix/addon-cookie-independent-loading を分離し、まず読込障害と既存分析結果への導線を修正する。
+- 実サービス3個active、RDH health正常。opaque sandboxからcredentials=includeのfetchを使用。Hostはbridge nonceでcookieなし認証にも対応しており比較候補。ただしiPhone原因は未確定。隔離Host addonでWebKit/Chrome比較中。
+- PR24の公式OPS候補検索追加は /data1tb/PatentBuddy-sources に未コミットで保持（research_discovery.py/api.py/connectors.py/research_store.py/store.py）。API/transport/parser変更は未テスト、未配布。既存662d685までのUIはpush済み。
+
+## v0.5.11候補: 保存済み結果への導線と読込再確認
+
+- PR25にCookieなしfetch（bridge nonce認証）、接続を再確認ボタン、接続失敗時の日本語案内を追加。保存先選択→最新20文献→原文/既存要約・請求項表示を接続。限定POST libraryはcollection_id整数だけ受け付け、本文なし一覧を正本から取得。新規永続書込みなし。
+- Linux WebKit/Chromeの390pxで旧版も読込成功したためiPhone実機エラー原因は未確定。修正版も両browserで読込・一覧・原文成功。Chromeは実ControlDeck LLMの要約生成/画面表示まで成功（/tmp/pb-loading-browser-llm.log）。WebKitの記録には親画面遷移時のHost API中断/CORSログが残り、アプリ全体無エラーとは主張しない。iPhone実機は未検証。
+- WebKitの不足shared libraryはapt downloadを/tmp/pb-webkit-libsへ展開し一時launcherで使用、root/system package変更なし。既存Playwright cacheへWebKit追加。
+- 関連addon_client4 tests成功1.148秒、追加API型/余剰field拒否・本文非取得確認。全143 testsの初回はHANDOFFに0.5.11未記載の文書テストだけ失敗し追記。Linux/Feature build成功。最終verify再実行と公開/本番更新はこの時点で未実施。
+- 隔離fixture /tmp/pb-loading-fixture.pyは実Host temporary addon/userと合成RDHで稼働。正本ユーザーPDFを変更していない。PR23/24は未統合、全体goal active。
+- 最終全verify143 tests成功38.538秒（/tmp/pb-loading-final2-verify.log）。隔離fixture639378停止、一時addon/user/session/grants除去確認。署名Feature buildも既存publisher鍵で検証済み。
+
+## v0.5.11実導入（2026-11-11）
+
+- PR25 main8cf5d17へmerge、Release42990308386成功。Linux/QPKG公開、署名Featureを追加公開してHost正規feature updateで0.5.10→0.5.11 healthy/enabledを確認（/tmp/pb-loading-installed-update.json）。Feature SHA256 2c5113546d74798cee6278233f7b6b55e18f938620680ae6c6d0c9f8d0ce5083。
+- 実Host HTTPSのPatentBuddy画面でLinux WebKit/Chrome 390pxとも保存済み資料一覧→ユーザーPDF原文→既存分析2件を表示、版0.5.11確認。/tmp/pb-loading-installed-browser.log。Chrome例外0、WebKitは親画面遷移時Host API中断/CORSログあり。iPhone実機の元のLoad failedは未再現で、改善完了とは主張しない。今回Cookie非依存通信と再確認ボタンを提供。
+- 本番PDF/分析は読み取りのみ、一時ユーザー/session削除確認。サーバーRDHは0.5.10のまま互換接続。アドオンのみ更新。隔離合成資料では実ControlDeck local-only LLM要約生成/保存/表示も成功済み。
+- 旧Linux0.5.8→公開0.5.11の管理API自己更新、認証cookie/CSRF・文献保持を確認（/tmp/pb-autoupdate-0511.json）。初回試験はversion dir期待値に0.5.10が残る試験script誤りで失敗、期待値修正して再実行成功。
+- PR23/24の調査/graphは未公開。公式OPS候補検索の未コミット作業はsources worktreeに保持。次はこの途中作業のテスト/統合と、評価済み機能を普段のPatentBuddy UIへ段階配布する。全体PR-F/P2/PR-GとQNAP性能/10件原本評価も未完、goal active。
+
+## HTTP経由の起動失敗を再現（2026-11-11）
+
+- ユーザーはv0.5.11でもTailscale/ローカル双方失敗と報告。HTTPSホスト名の実HostはLinux WebKit/Chrome iPhone13設定とも成功。一方 http://192.168.68.200:8765 は両方で接続待ち、JS/CSS/iconの子リクエストが拒否/ORBとなることを再現（/tmp/pb-loading-lan.log）。ユーザーのTailscale URL scheme/IPかhostnameかは確認中で、同一原因とはまだ断定しない。
+- Hostはopaque iframe内の静的資産にもcookie認証を要求するが、HTTP LANではSameSite=None;Secure cookieが利用できない。Bridgeが起動する前のJS取得で詰まる。アドオンの初回HTMLへ固定JS/CSSをhash付きCSPで同梱し、認証済みAPIだけBridgeで取得する修正を進める。unsafe-inlineや匿名の資料APIは導入しない。
+- 実応答にはHost sandboxとアドオンCSPの2本があることも確認したが、現在のHTTPS試験では両方成功しておりこれだけを原因としない。このHostに登録済みの独立addonはPatentBuddyのみ、他アプリとの比較は埋め込み方式の違いを含む。
+
+- v0.5.12候補: 起動固定JS/CSSを初回HTMLに同梱、SHA256 CSP hashで許可、iconはdata URI。API認証維持、unsafe-inlineなし。起動時1回読込/RAM保持、追加永続書込みなし。addon_client4 tests/CSP hash検証成功、全143 tests39.288秒成功（/tmp/pb-bootstrap-verify.log）。
+- その後WebKit HTTPでstatusのconnect-src self拒否を実再現（/tmp/pb-http-bootstrap-debug.log）。ControlDeck PR354で上流CSPのselfにブラウザ側exact originを追加、none/hash/sandbox維持。live proxy.pyだけ変更しdeck.sh再起動、既存dirty/untracked23files hash不変。修正後同じWebKit HTTPでstatus/文献表示成功（/tmp/pb-http-bootstrap-fixed.log）。他の親画面の遷移時中断ログは別件。Host全体テスト/mergeとPB公開更新は進行中。
+- v0.5.12最終verify143 tests成功39.753秒、Linux/署名Feature build成功。署名Feature SHA256 cea9a906cc343178ce677ef8b3d74e4f2c46377c949fe097efcf9e6810232351。公開/更新は次工程。
