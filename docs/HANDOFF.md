@@ -241,3 +241,12 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - 関連3 tests成功（重複統合・順序不変・family矛盾・多重分類・マスク解除・pin競合・公報数予算・snapshot不一致）。実パワエレ候補metadata10件へ重複2件を加え12→10を確認、上限5で10件をブロック、手動分類currentをマスクして5件preview成功。未検証familyは全件None。`.data/selection-power-electronics.json`。自動分類/関連性精度の評価ではなく、まだ原本抽出も未完。
 - 次はこのsnapshotの正本保存/版付き選定・ヒートマップUI・承認済み上限内取得キューを接続する。API鍵がない取得元は未設定表示し、候補不足を網羅と主張しない。本番0.5.10不変、PR24 Draft、PR23/性能/P2/PR-G含めgoal active。今回LLM処理変更なし、前turnの実Host疎通を維持。
 - 最終検証: 全verify150 tests成功40.176秒（/tmp/pb-selection-verify.log）。family既知/未知キーの衝突防止調整後も関連3 testsとdiff whitespace確認成功。新規previewは純粋計算で永続書込みなし。PR24の途中成果としてpushし、リリース/本番更新は未実施。
+
+## 調査候補の正本保存API（2026-11-11）
+
+- PR24へresearch_store.py、research_snapshots/research_selectionsテーブルを追加。候補内容hashのimmutable snapshotと選定revisionを同じ正本SQLiteへ保存。POST /api/v1/research/snapshots、GET /api/v1/research/snapshots/{sid}、POST .../{sid}/selection はadmin限定。候補最大2000件/JSON 8MiB、任意URL取得や自動DLなし。調査履歴をro/rw deviceへ開放しない。
+- 同一候補は入力順/重複入力数に依存せず同じ保存内容。選定はexpected_revision比較とtransactionで古い更新を拒否。同一結果の再送はaudit含め無変更。マスク/pin/明示選択を別々に保持し解除可能。download_readyは未接続のためfalse。
+- 新規snapshot/変更選定の永続書込みは再開/復元/競合防止に必要。auditにはsnapshot IDとrevisionのみ。小規模Linux測定で同一候補再投入とGET相当を20回実行しprocess write_bytes増分0、SQLite total_changes増分0。大量/NASの性能契約を満たしたという意味ではない。
+- 関連5 tests成功、HTTP管理者保存/読出し・匿名/ro/rw/CSRF拒否、再送無変更、競合拒否、SQLite backup復元/quick_checkを確認。全verify152 tests成功（/tmp/pb-research-store-verify.log）。最終の明示選択保持/HTTP選定成功assert追加後も関連tests成功。
+- ControlDeck実Host Job/CPU lease/local-only LLMでEPO PDF先頭ページ説明157文字、model/runtime証明、lease解放、一時addon/user/session除去を再確認（/tmp/pb-research-store-llm.log）。これはLLM疎通であり候補の関連性精度評価ではない。
+- 未完: snapshot一覧/削除管理、ヒートマップUI、PatentBuddy用の限定scope、公式検索結果接続、容量/取得元/承認付き収集キュー。実装はPR24 Draftのみで本番v0.5.10不変。PR23/性能/P2/PR-G含めgoal active。

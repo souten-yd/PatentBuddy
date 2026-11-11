@@ -1138,3 +1138,24 @@ def download_epo_publication(req):
         raise _err(502, str(error)) from None
     return req.h.send_bytes(200, raw, 'application/pdf', {
         'Content-Disposition':'attachment; filename="'+name+'"', 'Cache-Control':'no-store', 'X-Content-Type-Options':'nosniff'})
+
+
+@route('POST', '/api/v1/research/snapshots', 'admin')
+def research_snapshot_create(req):
+    from . import research_store
+    body = req.json(limit=8 * 1024 * 1024)
+    if not isinstance(body, dict) or set(body) != {'records'}:
+        raise _err(400, 'records required')
+    return research_store.create(req.app.store, body['records'], req.actor)
+
+
+@route('GET', '/api/v1/research/snapshots/{sid}', 'admin')
+def research_snapshot_get(req):
+    from . import research_store
+    return research_store.get(req.app.store, req.params['sid'])
+
+
+@route('POST', '/api/v1/research/snapshots/{sid}/selection', 'admin')
+def research_selection_save(req):
+    from . import research_store
+    return research_store.save_selection(req.app.store, req.params['sid'], req.json(), req.actor)
