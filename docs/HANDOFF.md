@@ -215,3 +215,10 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - ユーザー追加要求: パワエレ異常検知の約10件調査と、PATENTSCOPE/無料APIの特許ダウンロード機能。候補一覧は /home/souten/ダウンロード/power-electronics-anomaly-patents/ 。本文/図未取得。公開ミラー利用可否への明示回答はまだないため、まず公式API経路を実装。
 - main193f53aから独立worktree /data1tb/PatentBuddy-sources、feat/patent-download-sources。PR23 graphとは分離。公式条件と実装計画は docs/patent-download-sources.md。PATENTSCOPE自動robotは禁止、SOAPは有料。登録不要のEPO Publication Server REST v1.2を先行実装する。API鍵は既存設定に未登録、値は出力していない。
 - 本番0.5.10不変。全体計画PR-F/P2/PR-Gと10件原本抽出は未完。
+
+## ヒートマップ・調査キュー・QNAP保存継続の要望（2026-11-11）
+
+- ユーザーはキーワード→各種公式取得元の候補統合→重複排除→ヒートマップで一時マスク/絞り込み提案→規定件数以内のDLを要求。さらにPatentBuddyからResearchDataHubへ調査キューを投入、NAS低CPUで可能な収集/保存を行い、重い処理はPCへ分担し、容量の大きいNASを保存先として維持したいと指定。
+- `docs/research-queue-design.md`と正本planに反映。QNAP正本/キュー/書誌・公式収集、PC Host OCR/embed/rerank/LLMのpull worker。CPUが弱いことを理由にOpenRouterへ切り替えない。公開検索語自体の外部送信、ファミリーと公報の違い、色の件数/未分類、上限打切りと真の総件数、入力snapshotの版、DL実ファイル数/bytes上限、leaseとHost資源所有権を区別。
+- PR24 /data1tb/PatentBuddy-sources は公式番号指定PDF取得のコード実装途中（未コミット qnaplibrary/patent_download.py、api.py、web/app.js）。EPO公式RESTから仕様例EP1004359B1.pdfを302833bytes取得成功、SHA256 070f17fdac403ceed8808e376644250242a899656d79899576749bc8f84a49ee（/tmp/pb-epo-live.log）。これはパワエレ10件の取得ではなくAPI疎通。UI/権限/リダイレクト/上限テスト、verify、配布は未完。次はこれらを完了し、調査プレビュー/キューを段階実装する。
+- PR23 graphはcc1ea97までpush済み。全体PR-F/性能/P2/PR-G、10件原本抽出、キーワード横断検索/マスク/収集キューとも未完。目標active。本番v0.5.10は不変。
