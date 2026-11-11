@@ -232,3 +232,9 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - 本番PDF/分析は読み取りのみ、一時ユーザー/session削除確認。サーバーRDHは0.5.10のまま互換接続。アドオンのみ更新。隔離合成資料では実ControlDeck local-only LLM要約生成/保存/表示も成功済み。
 - 旧Linux0.5.8→公開0.5.11の管理API自己更新、認証cookie/CSRF・文献保持を確認（/tmp/pb-autoupdate-0511.json）。初回試験はversion dir期待値に0.5.10が残る試験script誤りで失敗、期待値修正して再実行成功。
 - PR23/24の調査/graphは未公開。公式OPS候補検索の未コミット作業はsources worktreeに保持。次はこの途中作業のテスト/統合と、評価済み機能を普段のPatentBuddy UIへ段階配布する。全体PR-F/P2/PR-GとQNAP性能/10件原本評価も未完、goal active。
+
+## HTTP経由の起動失敗を再現（2026-11-11）
+
+- ユーザーはv0.5.11でもTailscale/ローカル双方失敗と報告。HTTPSホスト名の実HostはLinux WebKit/Chrome iPhone13設定とも成功。一方 http://192.168.68.200:8765 は両方で接続待ち、JS/CSS/iconの子リクエストが拒否/ORBとなることを再現（/tmp/pb-loading-lan.log）。ユーザーのTailscale URL scheme/IPかhostnameかは確認中で、同一原因とはまだ断定しない。
+- Hostはopaque iframe内の静的資産にもcookie認証を要求するが、HTTP LANではSameSite=None;Secure cookieが利用できない。Bridgeが起動する前のJS取得で詰まる。アドオンの初回HTMLへ固定JS/CSSをhash付きCSPで同梱し、認証済みAPIだけBridgeで取得する修正を進める。unsafe-inlineや匿名の資料APIは導入しない。
+- 実応答にはHost sandboxとアドオンCSPの2本があることも確認したが、現在のHTTPS試験では両方成功しておりこれだけを原因としない。このHostに登録済みの独立addonはPatentBuddyのみ、他アプリとの比較は埋め込み方式の違いを含む。
