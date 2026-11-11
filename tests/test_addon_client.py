@@ -1,4 +1,8 @@
 import json
+import base64
+import hashlib
+import re
+import urllib.request
 import os
 from pathlib import Path
 import tempfile
@@ -58,6 +62,17 @@ class AddonClientTests(unittest.TestCase):
                 thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
                 try:
                     browser = Client('http://127.0.0.1:%d' % server.server_port)
+                    with urllib.request.urlopen(browser.base + '/addon/workspace') as response:
+                        html = response.read().decode()
+                        policy = response.headers['Content-Security-Policy']
+                    self.assertNotIn('src="workspace.js"', html)
+                    self.assertNotIn('href="workspace.css"', html)
+                    self.assertNotIn('unsafe-inline', policy)
+                    for tag in ('script', 'style'):
+                        content = re.search('<' + tag + '>(.*?)</' + tag + '>', html, re.S).group(1)
+                        digest = base64.b64encode(hashlib.sha256(content.encode()).digest()).decode()
+                        self.assertIn("'sha256-" + digest + "'", policy)
+
                     self.assertEqual(browser.call('GET', '/addon/v1/status')[0], 401)
                     with mock.patch.object(app.client, 'authenticate', return_value={'subject': 'context:1'}):
                         status, state = browser.call('GET', '/addon/v1/status')

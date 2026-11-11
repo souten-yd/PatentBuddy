@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## v0.5.12
+
+- ControlDeck内の起動用JavaScript/CSSを初回画面へ同梱し、HTTP接続でCookieが利用できない環境でも起動できます。内容ハッシュによるCSP制限は維持します。
+- 通信失敗時に操作段階・HTTP/HTTPS・画面版を表示します。Safariのサンドボックス通信にはControlDeck側のCSP修正も必要です。
+
 ## v0.5.11
 
 - PatentBuddyに保存済み資料の一覧を追加。検索語を入力せずに原文・保存済み要約・請求項分析を開けます。
