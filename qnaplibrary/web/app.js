@@ -597,7 +597,7 @@ async function collectView(main) {
   await loadCollections();
   const cs = (await api("GET", "/api/v1/connectors")).connectors;
   await researchCard(main);
-  await researchSelectionCard(main);
+  await researchSelectionCard(main, cs);
   main.append(h("h1", {}, "収集（外部データ源）"),
     h("p", { class: "muted small" }, "公式 API・フィードのみ利用します。キーが必要なものは 設定 > 外部キー で登録してください。別PCからは REST API / MCP で直接投入できます。"));
   const number = h("input", {placeholder:"EP1004359B1", maxlength:40, "aria-label":"EPO公報番号"});
@@ -642,13 +642,43 @@ async function collectView(main) {
   main.append(h("datalist", { id: "colls" }, S.collections.map(c => h("option", { value: c.name }))));
 }
 
-async function researchSelectionCard(main) {
+async function researchSelectionCard(main, connectors) {
   const card=h('section',{class:'card',id:'research-selection'},h('h2',{},'調査候補の絞り込み'));
   const listing=h('div',{}), editor=h('div',{}), message=h('p',{'aria-live':'polite'});
   card.append(h('p',{},'保存済みの候補から今回の取得対象を選びます。分類の件数は重複を含みます。選定の保存だけではPDFを取得しません。'),listing,editor,message);main.append(card);
   let current=null, masks=new Set(), pins=new Set(), selected=new Set(), limit=10, page=0, saving=false;
+  const configured=connectors.find(c=>c.id==='epo_ops')?.configured;
+  const query=h('textarea',{maxlength:2000,placeholder:'ta="inverter" and ta="fault"','aria-label':'EPOへ送信する検索式'});
+  const candidateLimit=h('input',{type:'number',min:1,max:100,value:25,'aria-label':'収集する候補の上限'});
+  const consent=h('input',{type:'checkbox','aria-label':'検索式に未公開情報が含まれないことを確認'});
+  const discover=h('button',{class:'btn',disabled:true},'EPOで書誌候補を検索');
+  const progress=h('p',{'aria-live':'polite'});
+  const searchBox=h('div',{},h('h3',{},'公式APIから候補を集める'),
+    h('p',{},'EPO OPSに表示中のCQL検索式を送信します。PDFは取得せず、IPC分類付きの書誌を保存します。'),
+    configured?null:h('p',{},'EPO OPSキーが未設定です。設定 > 外部キーで登録してください。'),
+    field('送信する検索式（CQL）',query),field('候補上限（1〜100）',candidateLimit),
+    field('検索式に未公開情報が含まれないことを確認',consent),discover,progress);
+  listing.before(searchBox);
+  consent.onchange=()=>{discover.disabled=!configured||!consent.checked;};
+  query.oninput=()=>{consent.checked=false;discover.disabled=true;};
+  discover.onclick=async()=>{
+    const count=Number(candidateLimit.value);
+    if(!query.value.trim()||!Number.isInteger(count)||count<1||count>100){progress.textContent='検索式と候補上限1〜100を指定してください。';return;}
+    query.disabled=true;candidateLimit.disabled=true;consent.disabled=true;discover.disabled=true;
+    progress.textContent='EPO公式APIで書誌を検索しています…';
+    try {const result=await api('POST','/api/v1/research/discover/epo',{query:query.value,limit:count,confirm_public:consent.checked});await list();load(result);progress.textContent='候補を保存しました。分類と取得対象を確認してください。';}
+    catch(error){progress.textContent=error.message;}
+    finally{query.disabled=false;candidateLimit.disabled=false;consent.disabled=false;consent.checked=false;discover.disabled=true;}
+  };
+
   function draw() {
     clear(editor); if(!current)return;
+    if(current.discovery) {
+      const d=current.discovery;
+      editor.append(h('p',{},'EPO報告総数 '+d.reported_total+'件 / 今回の応答 '+d.fetched+'件'+(d.truncated?'（一部の候補です。全件を調査した結果ではありません）':'')),
+        d.query?h('p',{},'検索式: '+d.query):null);
+    }
+
     const items=current.snapshot.items, cells=new Map();
     for(const item of items)for(const cell of item.cells)cells.set(cell,(cells.get(cell)||0)+1);
     const hidden=item=>item.cells.every(cell=>masks.has(cell));

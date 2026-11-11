@@ -23,6 +23,10 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
 CREATE TABLE IF NOT EXISTS research_snapshots(
  id TEXT PRIMARY KEY, payload TEXT NOT NULL, created REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS research_discoveries(
+ id INTEGER PRIMARY KEY, snapshot_id TEXT NOT NULL REFERENCES research_snapshots(id) ON DELETE CASCADE,
+ context TEXT NOT NULL, created REAL NOT NULL);
+CREATE INDEX IF NOT EXISTS research_discoveries_snapshot ON research_discoveries(snapshot_id,id);
 CREATE TABLE IF NOT EXISTS research_selections(
  snapshot_id TEXT PRIMARY KEY REFERENCES research_snapshots(id) ON DELETE CASCADE,
  revision INTEGER NOT NULL, payload TEXT NOT NULL, updated REAL NOT NULL);

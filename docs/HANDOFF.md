@@ -258,3 +258,12 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - 実Chrome1280/320pxで片側分類マスクの候補保持、全分類マスクとpin競合、保存/再読込、マスク解除後pin保持を確認。overflow=false/JS例外0、/tmp/pb-selection-ui-browser.log。合成候補2件/temp DBでの画面受入、公式検索精度の評価ではない。一時fixture611000をSIGINT停止。
 - 全verify152 tests成功43.062秒（/tmp/pb-selection-ui-verify.log）。追加keyset51件/重複なし/本文非返却/不正cursor試験を含め関連3 tests成功0.670秒。JS構文/diff whitespace成功。今回LLM経路変更なし、直前turnの実ControlDeck local-only PDF疎通結果は /tmp/pb-research-store-llm.log。
 - これは分類facetの件数meterであり、機器×手法の二次元heatmap/自動分類/絞り込み提案は未完成。公式検索→snapshot作成、PatentBuddy限定権限、取得容量/承認/queue接続、10件原本評価、PR23/性能/P2/PR-Gも未完。本番v0.5.10不変、PR24 Draft、goal active。
+
+## 公式書誌検索と調査DBの接続（2026-11-12）
+
+- ユーザー優先指示: 調査機能/DB機能を先に充実。PatentBuddyからクエリ投入→正本の調査履歴・候補・選定を再開する流れを優先し、graph/rerank拡張より先に実用化する。
+- PR24にEPO OPS固定HTTPS/redirect拒否/proxy不使用/8MiB/候補100件/排他のsearchを追加。CQL全文とstrict公開確認、未設定キー409で通信0。認証data/provider errorをGETやログへ返さない。既存OPS parserの複数exchange-document対応、title language/family IDを保持。
+- 検索結果→重複統合snapshot→research_discoveries履歴を同じ正本transactionで保存。保存される検索式はprivate調査履歴でadmin限定。取得数とprovider報告総数/打切りを分離。管理Webの候補選定cardにCQL/上限/確認欄、未設定表示、検索後選定への導線を接続。PDF取得はしない。
+- discovery4 testsとstore3 tests成功1.277秒。複数結果/重複/未分類/IPC/family保持、不正総数/応答/入力/redirect/サイズ、同意/キー未設定時外部call0、正本履歴保持/一般文献へ混入0を確認。全verify157 tests成功（/tmp/pb-discovery-verify.log）、JS構文/diff確認成功。
+- 実OPSキー未設定につき公式検索の実通信・関連性評価は未実施。PATENTSCOPE自動取得は未導入。次は専用scopeとPatentBuddy UI・再開可能な調査queueに接続する。現時点は管理Web側の途中成果、未配布。PR23/P2/性能/PR-Gと10件原本評価も未完。
+- 通信修正: PatentBuddy PR27 main d8d1ee6/v0.5.12はRelease43095445376がqueuedで未公開。Host PR354 main b8568a2は統合/live proxy反映済み、WebKitのconnect-src self拒否を再現してexact Host origin指定で解消。PB boot同梱の署名配布物は /data1tb/PatentBuddy-loading/dist に検証済み、通常更新は公開待ち。live PB0.5.11/RDH0.5.10。追跡watch exec28266、installed read-only fixture exec4595/PID675193は後続の3経路受入用に稼働中。

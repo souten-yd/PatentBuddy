@@ -17,7 +17,7 @@ def _id(identifier):
     return identifier
 
 
-def create(store, records, actor):
+def create(store, records, actor, discovery=None):
     state = snapshot(records)
     # The identity covers merged content; duplicate input counts are not canonical.
     state.pop('input_count')
@@ -32,6 +32,9 @@ def create(store, records, actor):
             store.audit(actor, 'research.snapshot', identifier)
         elif old['payload'] != payload:
             raise StoreError('research snapshot content conflict')
+        if discovery is not None:
+            db.execute('INSERT INTO research_discoveries(snapshot_id,context,created) VALUES(?,?,?)',
+                       (identifier, _encode(discovery), time.time()))
     return get(store, identifier)
 
 
@@ -43,7 +46,9 @@ def get(store, identifier):
         if row is None:
             raise StoreError('research snapshot not found')
         selection = store.one('SELECT revision,payload FROM research_selections WHERE snapshot_id=?', (identifier,))
+        discovery = store.one('SELECT context,created FROM research_discoveries WHERE snapshot_id=? ORDER BY id DESC LIMIT 1', (identifier,))
         return dict(snapshot=json.loads(row['payload']),
+                    discovery=dict(json.loads(discovery['context']), acquired_at=discovery['created']) if discovery else None,
                     selection_revision=selection['revision'] if selection else 0,
                     selection=json.loads(selection['payload']) if selection else None)
 

@@ -1165,3 +1165,26 @@ def research_snapshot_get(req):
 def research_selection_save(req):
     from . import research_store
     return research_store.save_selection(req.app.store, req.params['sid'], req.json(), req.actor)
+
+
+@route('POST', '/api/v1/research/discover/epo', 'admin')
+def research_discover_epo(req):
+    from . import research_discovery, research_store
+    body = req.json(limit=16384)
+    if not isinstance(body, dict) or set(body) != {'query', 'limit', 'confirm_public'}:
+        raise _err(400, 'invalid discovery fields')
+    if body['confirm_public'] is not True:
+        raise _err(403, '外部へ送信する検索式を確認してください')
+    if (not isinstance(body['query'], str) or not body['query'].strip() or len(body['query']) > 2000
+            or type(body['limit']) is not int or not 1 <= body['limit'] <= 100):
+        raise _err(400, '検索式と候補上限1..100を指定してください')
+    key, secret = req.app.config.secret('epo_ops_key'), req.app.config.secret('epo_ops_secret')
+    if not key or not secret:
+        raise _err(409, 'EPO OPSキーが未設定です。設定 > 外部キーで登録してください')
+    try:
+        found = research_discovery.search(body['query'], body['limit'], key, secret)
+    except connectors.ConnectorError as error:
+        raise _err(502, str(error))
+    records = found.pop('records')
+    context = dict(found, query=body['query'], requested_limit=body['limit'])
+    return dict(research_store.create(req.app.store, records, req.actor, discovery=context), discovery=found)

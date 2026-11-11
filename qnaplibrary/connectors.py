@@ -172,12 +172,13 @@ def _epo_docs(data):
         results = data["ops:world-patent-data"]["ops:biblio-search"]["ops:search-result"]["exchange-documents"]
     except (KeyError, TypeError):
         return docs
-    for ed in as_list(results):
-        d = ed.get("exchange-document", {})
+    documents = [d for ed in as_list(results) for d in as_list(ed.get("exchange-document"))]
+    for d in documents:
         pn = "%s%s%s" % (d.get("@country", ""), d.get("@doc-number", ""), d.get("@kind", ""))
         bib = d.get("bibliographic-data", {})
         titles = as_list(bib.get("invention-title"))
-        title = next((txt(t) for t in titles if t.get("@lang") == "ja"), None) or (txt(titles[0]) if titles else pn)
+        chosen_title = next((t for t in titles if t.get("@lang") == "ja"), None) or (titles[0] if titles else {})
+        title = txt(chosen_title) or pn
         abstract = " ".join(txt(a.get("p")) for a in as_list(d.get("abstract")))
         parties = bib.get("parties", {})
         applicants = [txt(a.get("applicant-name", {}).get("name")) for a in as_list(parties.get("applicants", {}).get("applicant"))
@@ -188,7 +189,8 @@ def _epo_docs(data):
         docs.append({"id": pn, "title": title, "url": "https://worldwide.espacenet.com/patent/search?q=pn%3D" + pn,
                      "source": "EPO OPS", "date": ("%s-%s-%s" % (date[:4], date[4:6], date[6:8])) if len(date) == 8 else date,
                      "abstract": abstract, "body": abstract,
-                     "meta": {"publication_number": pn, "applicants": applicants, "ipc": ipc, "office": d.get("@country", "")}})
+                     "meta": {"publication_number": pn, "applicants": applicants, "ipc": ipc, "office": d.get("@country", ""),
+                              "language": chosen_title.get("@lang") or "und", "family_id": d.get("@family-id")}})
     return docs
 
 
