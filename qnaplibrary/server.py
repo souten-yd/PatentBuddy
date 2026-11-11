@@ -472,6 +472,12 @@ class Handler(BaseHTTPRequestHandler):
                             result = client.data("GET", "/api/v1/documents/" + path.split('/')[-2] + "/analyses")
                         elif method == "GET" and path == "/addon/v1/collections":
                             result = client.data("GET", "/api/v1/collections")
+                        elif method == "POST" and path == "/addon/v1/library":
+                            body = Request(self, method, path, {}, {}).json()
+                            if (not isinstance(body, dict) or set(body) != {"collection_id"}
+                                    or type(body["collection_id"]) is not int or not 1 <= body["collection_id"] < 10**18):
+                                raise AddonError(400, "保存先を選択してください")
+                            result = client.data("GET", "/api/v1/collections/%d/documents?limit=20" % body["collection_id"])
                         elif method == "POST" and path == "/addon/v1/search":
                             body = Request(self, method, path, {}, {}).json()
                             if not isinstance(body, dict) or not isinstance(body.get("q"), str) or len(body["q"]) > 180:

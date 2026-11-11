@@ -10,7 +10,8 @@ const knownJobs = new Map();
 const root = location.pathname.startsWith('/addon-frame/') ? '/' + location.pathname.split('/').filter(Boolean).slice(0, 2).join('/') : '';
 const el = id => document.getElementById(id);
 async function api(path, body, method) {
-  const response = await fetch(root + '/addon/v1/' + path, {method: method || (body ? 'POST' : 'GET'), credentials: 'include',
+  if (!nonce) throw new Error('ControlDeckとの接続を待っています。画面を開き直してください。');
+  const response = await fetch(root + '/addon/v1/' + path, {method: method || (body ? 'POST' : 'GET'), credentials: 'omit',
     headers: {'Content-Type': 'application/json', 'X-Control-Deck-Bridge-Session': nonce}, body: body ? JSON.stringify(body) : undefined});
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || '接続を確認してください');
@@ -27,8 +28,10 @@ async function load() {
       s.setup_required ? 'ResearchDataHubの管理Webで初期設定を完了してください。' : 'ResearchDataHubの接続トークン設定が必要です。';
     el('submit').disabled = !ready;
     el('import-pdf').disabled = !ready;
-  } catch (error) { el('message').textContent = error.message; }
+    if (ready) await loadLibrary();
+  } catch (error) { el('message').textContent = '読み込みに失敗しました。接続を再確認できます。' + (error instanceof TypeError ? '' : ' ' + error.message); }
 }
+el('reconnect').onclick = () => load();
 window.addEventListener('message', event => {
   let expected = location.origin;
   try { if (document.referrer) expected = new URL(document.referrer).origin; } catch (_) { return; }
@@ -194,7 +197,7 @@ async function openDocument(id) {
   download.onclick = async () => {
     download.disabled = true;
     try {
-      const response = await fetch(root + '/addon/v1/documents/' + id + '/original.pdf', {credentials: 'include', headers: {'X-Control-Deck-Bridge-Session': nonce}});
+      const response = await fetch(root + '/addon/v1/documents/' + id + '/original.pdf', {credentials: 'omit', headers: {'X-Control-Deck-Bridge-Session': nonce}});
       if (!response.ok) throw new Error('原本PDFを取得できません');
       const url = URL.createObjectURL(await response.blob());
       const a = document.createElement('a'); a.href = url; a.download = 'original.pdf'; a.click();
@@ -224,7 +227,7 @@ async function openDocument(id) {
       if (imageURL) { URL.revokeObjectURL(imageURL); imageURL = null; }
       if (!item) return;
       try {
-        const response = await fetch(root + '/addon/v1/documents/' + id + '/images/' + item.id + '.png', {credentials: 'include', headers: {'X-Control-Deck-Bridge-Session': nonce}});
+        const response = await fetch(root + '/addon/v1/documents/' + id + '/images/' + item.id + '.png', {credentials: 'omit', headers: {'X-Control-Deck-Bridge-Session': nonce}});
         if (!response.ok) throw new Error('画像を取得できません');
         const blob = await response.blob();
         if (request !== imageRequest || currentDoc !== id) return;
@@ -265,3 +268,32 @@ async function loadPDFJobs() {
     box.append(row);
   }
 }
+
+
+async function loadLibrary() {
+  const data = await api('collections');
+  const picker = el('library-collection');
+  const previous = picker.value;
+  picker.replaceChildren();
+  for (const collection of data.collections) {
+    const option = document.createElement('option'); option.value = collection.id;
+    option.textContent = collection.name; picker.append(option);
+  }
+  if ([...picker.options].some(option => option.value === previous)) picker.value = previous;
+  await showLibrary();
+}
+async function showLibrary() {
+  el('library-items').replaceChildren();
+  const cid = Number(el('library-collection').value);
+  if (!cid) { el('library-items').textContent = '保存済みの資料はありません。PDFを取り込むとここに表示されます。'; return; }
+  const data = await api('library', {collection_id: cid});
+  for (const row of data.items) {
+    const button = document.createElement('button'); button.className = 'result';
+    button.textContent = `${row.ext_id || ''} ${row.title || '無題'} — 原文・保存済み分析を開く`;
+    button.onclick = async () => { try { await openDocument(row.id); el('detail').scrollIntoView({behavior:'smooth'}); } catch(error) { el('message').textContent = error.message; } };
+    el('library-items').append(button);
+  }
+  if (!data.items.length) el('library-items').textContent = 'この保存先には資料がありません。';
+  el('library-note').textContent = '新しい資料を最大20件表示します。それ以前の資料はキーワードで検索できます。';
+}
+el('library-collection').onchange = () => showLibrary().catch(error => { el('message').textContent = error.message; });
