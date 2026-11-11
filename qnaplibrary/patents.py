@@ -14,15 +14,15 @@ from . import textproc
 
 STAGES = [
     {"id": "disclosure", "label": "発明発掘・記録", "goal": "発明の課題・構成・効果・実施例を記録（発明提案書）",
-     "ai": ["interview", "idea"]},
+     "ai": ["interview", "brainstorm", "idea", "invention_summary"]},
     {"id": "prior_art", "label": "先行技術調査", "goal": "検索式（キーワード・同義語・IPC/FI/Fターム）で先行文献を収集し X/Y/A 分類",
-     "ai": ["search_plan", "novelty"]},
+     "ai": ["search_plan", "novelty", "prior_art_gaps"]},
     {"id": "patentability", "label": "特許性評価", "goal": "新規性（29条1項）・進歩性（29条2項）・記載要件の見込み",
-     "ai": ["novelty", "inventive_step"]},
+     "ai": ["novelty", "inventive_step", "prior_art_gaps"]},
     {"id": "strategy", "label": "権利化方針", "goal": "国内/PCT/パリ優先、早期審査、権利範囲と回避設計",
-     "ai": ["strategy"]},
+     "ai": ["strategy", "claim_scope", "design_around"]},
     {"id": "drafting", "label": "明細書・請求項作成", "goal": "独立項・従属項の階層、実施形態、図面、要約",
-     "ai": ["claim_draft", "spec_outline"]},
+     "ai": ["claim_draft", "claim_scope", "invention_summary", "spec_outline"]},
     {"id": "filing", "label": "出願", "goal": "願書・明細書・請求の範囲・要約書・図面を提出（出願日の確定）",
      "ai": ["filing_check"]},
     {"id": "publication", "label": "公開（18か月）", "goal": "出願公開。必要なら補償金請求の警告",
@@ -34,7 +34,7 @@ STAGES = [
     {"id": "allowance", "label": "特許査定", "goal": "査定謄本送達から30日以内に第1〜3年分の特許料納付",
      "ai": []},
     {"id": "registered", "label": "設定登録・維持", "goal": "特許証、年金管理、侵害監視",
-     "ai": ["infringement", "fto"]},
+     "ai": ["infringement", "fto", "design_around"]},
 ]
 STAGE_IDS = [s["id"] for s in STAGES]
 
@@ -265,6 +265,14 @@ class Patents:
                                        "ext_id": h["ext_id"], "section": h["section"], "snippet": h["snippet"]} for h in hits]})
         return {"claim_no": int(claim_no), "claim": claim, "rows": rows}
 
+    def assess_claim_chart(self, pid, collections=None, claim_no=1, provider=None):
+        """Manual, ephemeral AI matching of retrieved evidence to each claim element."""
+        from .chart_ai import assess_chart
+        chart = self.claim_chart(pid, collections, claim_no)
+        if self.providers is None:
+            raise ValueError("AI プロバイダが設定されていません")
+        return assess_chart(chart, self.providers, provider)
+
     def assist(self, pid, task, collections=None, provider=None, extra=""):
         """Run a structured AI task with retrieved evidence. Returns {prompt, answer, evidence}."""
         if task not in PROMPTS:
@@ -350,6 +358,37 @@ PROMPTS = {
     "idea": {"label": "新規発明の創出", "prompt": "この発明を起点に、特許になり得る派生アイデアを7件提案してください。"
              "上位概念化、別用途、構成の置換・省略・組合せ、製造方法、システム化、ソフトウェア化の観点を使い、"
              "参照文献との差分（新規性の見込み）を各1〜2行で示してください。"},
+    "brainstorm": {"label": "技術テーマから発明ブレスト", "prompt":
+                   "ユーザーが設定した技術分野・課題・制約をもとに、未公開のアイデアをローカルで検討します。"
+                   "機能分解・SCAMPER・TRIZ（矛盾解決）・故障/異常条件・置換/省略/逆転・"
+                   "新たな用途・制御方法・製造方法の観点から候補を10個提案してください。"
+                   "各案を『課題/解決手段/必須構成/作用効果/別案/試作方法/未検証の前提』で表にまとめ、"
+                   "模倣容易性・実施可能性・権利化の仮説を示してください。"
+                   "必要な情報が不足しているときは、推測で発明内容を捏造せず質問を5個提示してください。"
+                   "検索語を外部サービスに送らないでください。"},
+    "invention_summary": {"label": "発明内容の構造化・不足情報", "prompt":
+                          "発明届に使えるよう、記載済みの『従来技術・課題・解決手段・必須構成・"
+                          "任意構成・作用効果・実施例・代替手段・実証データ・技術的差異』を整理してください。"
+                          "入力にない事実は『未記載』とし、請求項のサポートや実施可能性を高める"
+                          "追加実験・図面・数値条件・発明者への質問を優先順で示してください。"},
+    "prior_art_gaps": {"label": "先行技術との差分と新規性論点", "prompt":
+                       "入力に含まれる請求項と参照文献だけを根拠に、単独文献の新規性（29条1項）と"
+                       "引用文献組合せの進歩性（29条2項）を区別し、各構成要件と文献の該当部分・"
+                       "一致点/相違点/組合せの論点を一覧にしてください。"
+                       "根拠がない場合は『未調査』として扱い、進歩性・新規性の断定をしないでください。"
+                       "取り込み済み資料だけを使い、未公開内容を外部検索語にしないでください。"},
+    "claim_scope": {"label": "権利範囲の広狭・従属項設計", "prompt":
+                    "入力の技術的開示に基づき、広い・中間・狭い3段階の独立請求項の構成方針と"
+                    "従属項候補を検討してください。必須/任意要素・上位概念・代替要素・"
+                    "実施例/数値範囲・サポート要件・明確性・新規事項追加リスク・回避容易性を整理し、"
+                    "文献との対比を含めて推奨案ではなく比較材料を提示してください。"
+                    "開示されていない構成の創作は『新規提案』として明示し、既存原稿へ自動反映しないでください。"},
+    "design_around": {"label": "第三者権利の回避設計とFTO", "prompt":
+                     "参照文献の現存権利が未確認である前提で、対象請求項の各要件の充足可能性を分析し、"
+                     "構成の置換・省略・変更・別原理・製造方法・制御方式などの設計変更案を"
+                     "性能・コスト・実施可能性・別権利に抵触するリスクと併せて表にしてください。"
+                     "文言だけでなく均等論や国別権利範囲、存続、審査経過で必要な確認事項を挙げ、"
+                     "侵害しないとの断定は行わず専門家によるFTO確認の材料としてください。"},
     "search_plan": {"label": "検索式の設計", "prompt": "先行技術調査の検索戦略を作成してください。(1)構成要素ごとのキーワードと同義語・"
                     "英語表現、(2)推定される IPC / FI / Fターム候補と理由、(3)J-PlatPat・Espacenet・Google Patents 用の検索式例、"
                     "(4)本ライブラリで追加取得すべき文献の観点。"},

@@ -407,12 +407,57 @@ async function patentDetail(main, id) {
         h("p", { class: "small muted" }, "検索画面で文献を開き「特許案件の先行文献に追加」でも登録できます。")));
   } else if (tab === "chart") {
     const picker = collectionPicker(S.collections.filter(c => c.kind === "patent").map(c => c.name));
-    const no = h("input", { type: "number", value: 1, min: 1 }); const out = h("div", {});
-    body.append(h("div", { class: "card" }, h("div", { class: "row" }, "請求項", no, h("button", { class: "btn primary", onclick: guard(async () => {
-      const r = await api("POST", "/api/v1/patents/" + id + "/chart", { claim_no: +no.value, collections: picker.values() });
-      clear(out).append(h("table", {}, h("tr", {}, h("th", {}, "構成要件"), h("th", {}, "根拠候補（ライブラリ）")),
-        r.rows.map(row => h("tr", {}, h("td", {}, h("strong", {}, row.element.label + " "), row.element.text),
-          h("td", {}, row.evidence.length ? row.evidence.map(e => h("div", { class: "small" }, h("a", { href: "#", onclick: ev => { ev.preventDefault(); openDoc(e.doc_id); } }, (e.ext_id || "") + " " + e.title), " ", h("span", { class: "muted" }, e.section), h("div", { class: "muted" }, e.snippet))) : h("span", { class: "muted" }, "該当なし")))))); }) }, "作成")), picker), out);
+    const no = h("input", { type: "number", value: 1, min: 1, max: 999 });
+    const cfg = await api("GET", "/api/llm/providers");
+    const prov = sel(cfg.providers.filter(p => p.type !== "openrouter" && p.local_only_verified === true).map(p => [p.id, p.label || p.id]), cfg.default_provider);
+    const progress = h("div", { class: "small muted", role: "status", "aria-live": "polite" });
+    const out = h("div", {});
+    function showChart(chart) {
+      const content = h("div", {});
+      if (chart.note) content.append(h("p", { class: "small muted" }, chart.note));
+      if (chart.model) content.append(h("p", { class: "small muted" }, "利用モデル: " + chart.model));
+      if (!chart.rows.length) content.append(h("p", { class: "muted" }, "構成要件が見つかりません。"));
+      for (const row of chart.rows) {
+        const a = row.assessment, sources = h("div", {});
+        for (const e of row.evidence) sources.append(h("div", { class: "result" },
+          h("a", { href: "#", onclick: ev => { ev.preventDefault(); openDoc(e.doc_id); } },
+            (e.ext_id || "") + " " + e.title),
+          h("span", { class: "small muted" }, " " + (e.section || "")),
+          h("div", { class: "small muted" }, e.snippet || "")));
+        const assessment = a ? h("div", { class: "claim-assessment" },
+          h("div", { class: "row" },
+            h("strong", { class: "claim-mark" }, a.judgment),
+            h("span", {}, "AIの暫定判定")),
+          h("p", {}, a.reason),
+          (a.citations || []).length ? h("div", { class: "small" }, "根拠: ",
+            a.citations.map(c => h("a", { href: "#", onclick: ev => { ev.preventDefault(); openDoc(c.doc_id); } },
+              "[" + c.ref + "] " + c.title + " "))) : h("p", { class: "small muted" }, "有効な引用なし")) : null;
+        content.append(h("section", { class: "card" },
+          h("h3", {}, row.element.label + "　" + row.element.text),
+          assessment, h("details", { open: !a }, h("summary", {}, "検索された根拠候補（" + row.evidence.length + " 件）"), sources)));
+      }
+      clear(out).append(content);
+    }
+    async function run(ai, btn) {
+      btn.disabled = true;
+      clear(out);
+      progress.textContent = ai ? "AI が根拠を照合しています。結果は保存されません…" : "候補文献を検索しています…";
+      try {
+        const url = "/api/v1/patents/" + id + (ai ? "/chart/assess" : "/chart");
+        const result = await api("POST", url, {
+          claim_no: +no.value, collections: picker.values(), provider: ai ? prov.value : undefined
+        });
+        if (S.view === "patents" && S.patentId === id && S.patentTab === "chart") showChart(result);
+        progress.textContent = "";
+      } finally { btn.disabled = false; }
+    }
+    const search = h("button", { class: "btn", onclick: guard(async () => run(false, search)) }, "候補を検索");
+    const judge = h("button", { class: "btn primary", onclick: guard(async () => run(true, judge)) }, "AIで仮判定");
+    body.append(h("div", { class: "card" }, h("h2", {}, "構成要件と根拠の照合"),
+      h("p", { class: "small muted" }, "未公開発明を保護するため、ローカル専用と確認済みのAIだけを利用します。根拠断片から○（対応）/△（一部・不確か）/×（今回の断片に記載なし）/?（未判定）を提案します。自動保存や法的確定判断はしません。"),
+      h("div", { class: "row" }, field("請求項", no), field("AIプロバイダ", prov)),
+      field("調査対象のコレクション", picker),
+      h("div", { class: "row end" }, search, judge), progress), out);
   } else if (tab === "timeline") {
     const kind = sel(Object.entries(S.meta.events), "filing"), date = h("input", { type: "date" }), note = h("input", { placeholder: "メモ" });
     body.append(h("div", { class: "card" }, h("h2", {}, "期限（目安）"), p.deadlines.length ? h("table", {}, p.deadlines.map(d => h("tr", {}, h("td", {}, d.due), h("td", {}, h("span", { class: "tag " + (d.days_left < 0 ? "" : d.days_left < 14 ? "bad" : d.days_left < 60 ? "warn" : "ok") }, d.days_left < 0 ? "経過" : "あと" + d.days_left + "日")), h("td", {}, d.label), h("td", { class: "small muted" }, d.basis)))) : h("p", { class: "muted" }, "出願日などの経過を登録すると期限を計算します。"),
