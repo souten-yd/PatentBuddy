@@ -232,3 +232,12 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - 実Chrome1280pxで管理Web収集→EPO PDF取得→ダウンロード内容SHA一致、320pxで表示受入。両幅overflow/JS例外0（/tmp/pb-download-ui.log）。320pxは同じPDFを再取得せず表示のみ。一時管理Web fixture PID606660をSIGINT停止。本番データ/サービス不変。
 - PR24 Draft/未配布。次は調査snapshot・候補統合/重複/マスク/件数予算・キュー、API登録必須取得元、パワエレ10件の原本/比較評価。PR23/性能/P2/PR-Gも未完。goal active。
 - ControlDeck実Host Job/CPU lease/local-only LLMで取得PDFの先頭ページのみを入力し、157文字の説明生成とmodel/runtime証明を確認（/tmp/pb-epo-llm-live.log）。全文分析やパワエレ精度評価ではない。一時addon/user/session削除、Host job/audit保持、正常資源解放。管理Web fixtureもcleaned確認。
+
+## 候補snapshotと一時マスクの基礎（2026-11-11）
+
+- 前turn99e32edは公式PDF取得と比較設計のprogress。今回はresearch_selection.pyにネットワーク/DB書込みを伴わない候補統合・選定previewを実装。入力最大2000件、公報番号+言語で統合、元の複数出典/タイトルを保持し、順序に依存しないSHA256 revisionを生成。異なるfamily IDの矛盾は勝手に解決せず拒否。国/kindが違う公報は同じfamilyでも保持する。
+- 一時マスクは全所属セルがマスクされた公報だけ非表示とし、複数分類の片側だけの除外で丸ごと落とさない。未分類セルを保持。pinとマスクの矛盾、snapshot改版、未知ID/セル、不正型/重複入力を拒否またはblocking理由へ。選択数は公報数を計数しfamily数と分離、上限超過でも黙って先頭Nへ切り詰めない。
+- previewのcount_budget_okは件数条件だけ。bytes/公式取得元/承認/キュー未接続のためdownload_ready=falseを維持。これはUI/キュー機能の完成ではない。
+- 関連3 tests成功（重複統合・順序不変・family矛盾・多重分類・マスク解除・pin競合・公報数予算・snapshot不一致）。実パワエレ候補metadata10件へ重複2件を加え12→10を確認、上限5で10件をブロック、手動分類currentをマスクして5件preview成功。未検証familyは全件None。`.data/selection-power-electronics.json`。自動分類/関連性精度の評価ではなく、まだ原本抽出も未完。
+- 次はこのsnapshotの正本保存/版付き選定・ヒートマップUI・承認済み上限内取得キューを接続する。API鍵がない取得元は未設定表示し、候補不足を網羅と主張しない。本番0.5.10不変、PR24 Draft、PR23/性能/P2/PR-G含めgoal active。今回LLM処理変更なし、前turnの実Host疎通を維持。
+- 最終検証: 全verify150 tests成功40.176秒（/tmp/pb-selection-verify.log）。family既知/未知キーの衝突防止調整後も関連3 testsとdiff whitespace確認成功。新規previewは純粋計算で永続書込みなし。PR24の途中成果としてpushし、リリース/本番更新は未実施。
