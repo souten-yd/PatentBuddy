@@ -209,3 +209,9 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - 請求項分析も保存成功。正本DBは文献1件・原本1件・画像参照13件・要約3775文字/請求項確認6510文字を保持、quick_check成功。15ページのうち直接抽出10、直接抽出+OCR5。OCR/AIの内容精度は人手未承認。請求項ブラウザ試験初回は既存要約の表示完了前の件数取得で誤判定したため、再生成せず「請求項の確認」の表示待ちに修正して成功（/tmp/pb-pdf-installed-claims-recheck.log）。
 - 一時ユーザー/session/grantと試験ジョブ履歴を正常除去（remaining_jobs=0）。原本・抽出結果・分析は本番正本に保持。利用者は文献検索で「JPA」などから開ける。connection.jsonなし、同一UID自動認証を維持。
 - docs-only追記の全verifyも143 tests成功39.361秒。古いガイド記載のtest_docs_rulesは存在せずimport失敗、実際のtest_updater_docs 7 testsと全verifyで検証した。PR-F/P2/PR-Gは未完了、全体goalはactive。
+
+## iPhone Load failedと画面反映の優先対応（2026-11-11）
+
+- ユーザー画像でv0.5.10 PatentBuddy workspaceのLoad failed/操作disabled。評価成果を普段の画面で試せる状態を要求。main193f53aから /data1tb/PatentBuddy-loading / fix/addon-cookie-independent-loading を分離し、まず読込障害と既存分析結果への導線を修正する。
+- 実サービス3個active、RDH health正常。opaque sandboxからcredentials=includeのfetchを使用。Hostはbridge nonceでcookieなし認証にも対応しており比較候補。ただしiPhone原因は未確定。隔離Host addonでWebKit/Chrome比較中。
+- PR24の公式OPS候補検索追加は /data1tb/PatentBuddy-sources に未コミットで保持（research_discovery.py/api.py/connectors.py/research_store.py/store.py）。API/transport/parser変更は未テスト、未配布。既存662d685までのUIはpush済み。
