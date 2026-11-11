@@ -145,6 +145,12 @@ class Store:
                        "wal_autocheckpoint=2000", "busy_timeout=30000"):
             self.db.execute("PRAGMA " + pragma)
         self.db.executescript(SCHEMA)
+        from .evidence_graph import install as install_graph
+        install_graph(self.db)
+        from .chart_storage import install as install_chart_storage
+        install_chart_storage(self.db)
+        from .host_vectors import SCHEMA as HOST_VECTOR_SCHEMA
+        self.db.executescript(HOST_VECTOR_SCHEMA)
         self.fts = self._init_fts()
         self.vector_version = 0  # bumped on vector change; vector cache invalidation
         self.on_change = None    # callback after documents were added/updated (auto-embedding)
@@ -433,7 +439,7 @@ class Store:
         identifier, kind, content = value.get("id"), value.get("kind"), value.get("content")
         revision = value.get("source_revision")
         if (not isinstance(identifier, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", identifier)
-                or kind not in ("summary", "claims") or not isinstance(content, str)
+                or kind not in ("summary", "claims", "chart", "relations") or not isinstance(content, str)
                 or not content.strip() or len(content) > 100000
                 or not isinstance(revision, str) or not re.fullmatch(r"[a-f0-9]{64}", revision)):
             raise StoreError("invalid analysis fields")
@@ -443,6 +449,15 @@ class Store:
                 raise StoreError("document not found")
             if self.document_revision(doc) != revision:
                 raise StoreError("source revision changed; rerun analysis")
+            if kind == "relations":
+                from .relation_proposals import validate
+                validate(json.loads(content), self.get_document(doc_id))
+            chart = None
+            if kind == "chart":
+                from . import claim_chart
+                chart = claim_chart.validate(json.loads(content), self.get_document(doc_id)['body'], self.get_document)
+                from .chart_storage import validate_graph
+                validate_graph(db, chart)
             old = db.execute("SELECT * FROM document_analyses WHERE id=?", (identifier,)).fetchone()
             if old:
                 if (old["doc_id"], old["source_revision"], old["kind"], old["content"]) != (doc_id, revision, kind, content):
@@ -450,6 +465,9 @@ class Store:
             else:
                 db.execute("INSERT INTO document_analyses VALUES(?,?,?,?,?,?)",
                            (identifier, doc_id, revision, kind, content, now()))
+                if chart is not None:
+                    from .chart_storage import record
+                    record(db, identifier, doc_id, revision, chart)
                 self.audit(actor, "analysis.add", "%s %s %s" % (doc_id, kind, identifier))
         return {"id": identifier, "doc_id": doc_id, "review_status": "unreviewed"}
 
@@ -458,8 +476,11 @@ class Store:
         if doc is None:
             raise StoreError("document not found")
         revision = self.document_revision(doc)
-        return {"items": [dict(dict(row), stale=row["source_revision"] != revision, review_status="unreviewed")
-                          for row in self.q("SELECT * FROM document_analyses WHERE doc_id=? ORDER BY created DESC LIMIT 20", (doc_id,))]}
+        return {"items": [dict(dict(row), stale=bool(row["dependency_stale"]) or row["source_revision"] != revision)
+                          for row in self.q("""SELECT a.*, COALESCE(r.status,'unreviewed') AS review_status,
+                          COALESCE(r.stale,0) AS dependency_stale FROM document_analyses a
+                          LEFT JOIN analysis_reviews r ON r.analysis_id=a.id
+                          WHERE a.doc_id=? ORDER BY a.created DESC LIMIT 20""", (doc_id,))]}
 
     def get_document(self, doc_id, with_chunks=False):
         row = self.one("SELECT * FROM documents WHERE id=?", (int(doc_id),))

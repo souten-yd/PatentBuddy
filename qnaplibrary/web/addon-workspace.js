@@ -27,6 +27,7 @@ async function load() {
       s.setup_required ? 'ResearchDataHubの管理Webで初期設定を完了してください。' : 'ResearchDataHubの接続トークン設定が必要です。';
     el('submit').disabled = !ready;
     el('import-pdf').disabled = !ready;
+    el('build-index').disabled = !ready;
   } catch (error) { el('message').textContent = error.message; }
 }
 window.addEventListener('message', event => {
@@ -77,8 +78,22 @@ async function loadAnalyses(id) {
   for (const item of data.items) {
     const box = document.createElement('div'); box.className = 'analysis';
     const title = document.createElement('h3');
-    title.textContent = (item.kind === 'claims' ? '請求項の確認' : '要約') + (item.stale ? ' — 原文が更新されています' : ' — 未確認');
-    const text = document.createElement('pre'); text.textContent = item.content;
+    title.textContent = (item.kind === 'relations' ? '関係の提案（推定）' : item.kind === 'chart' ? 'クレームチャート' : item.kind === 'claims' ? '請求項の確認' : '要約') + (item.stale ? ' — 根拠が更新・削除されています' : item.review_status === 'approved' ? ' — 確認済み' : item.review_status === 'rejected' ? ' — 却下' : ' — 未確認');
+    const text = document.createElement('pre');
+    if (item.kind === 'chart') {
+      const chart = JSON.parse(item.content);
+      text.textContent = `請求項${chart.claim_no} · ${item.review_status === 'approved' ? '確認済み' : '未確認'}\n` +
+        (chart.generation?.executed ? '生成モデルの版を記録済み（ローカル実行）\n' : chart.generation?.executed === false ? '生成LLM未実行（対比根拠なし）\n' : '生成モデル版は未記録\n') +
+        (chart.retrieval?.stages?.includes('vector') ? 'キーワード・ベクトル・承認済み関係から検索し、ローカルAIで再順位付け\n' : '') +
+        (chart.retrieval?.vector_truncated || chart.retrieval?.graph_truncated ? '検索上限に達したため、候補は一部の範囲です。\n' : '') +
+        chart.rows.map(row => `${row.element.label}: ${row.element.text}\n${row.assessment.judgment} ${row.assessment.reason}\n引用: ${row.assessment.citations.join(', ') || 'なし'}\n候補の根拠:\n` +
+          row.evidence.map(e => `${e.ref} · 文献${e.doc_id} [${e.start},${e.end})\n${e.quote}`).join('\n')).join('\n\n');
+    } else if (item.kind === 'relations') {
+      const value = JSON.parse(item.content);
+      const names = {problem:'課題', solution:'解決手段', effect:'効果', substitution:'置換可能性'};
+      text.textContent = 'ローカル生成モデル版を記録済み。全候補は推定・未確認です。\n' +
+        (value.proposals.length ? value.proposals.map(p => `${names[p.relation]}: ${p.concept}\n信頼度: ${p.confidence} · 範囲 [${p.start},${p.end})\n${p.quote}`).join('\n\n') : '根拠に基づく候補はありません。');
+    } else { text.textContent = item.content; }
     box.append(title, text); el('analyses').append(box);
   }
 }
@@ -86,7 +101,7 @@ el('analyze').onclick = async () => {
   if (!currentDoc) return;
   el('analyze').disabled = true;
   try {
-    await api('jobs', {doc_id: currentDoc, kind: el('analysis-kind').value});
+    await api('jobs', {doc_id: currentDoc, kind: el('analysis-kind').value, claim_no: Number(el('claim-no').value)});
     el('message').textContent = 'ローカルAIの分析を開始しました。';
     await loadJobs();
   } catch (error) { el('message').textContent = error.message; }
@@ -101,7 +116,7 @@ async function loadJobs() {
     if (!data.items.length) el('jobs').textContent = '実行中の分析はありません。';
     for (const job of data.items) {
       const row = document.createElement('div'); row.className = 'job'; row.dataset.status = job.status;
-      const label = document.createElement('p'); label.textContent = `${job.kind === 'claims' ? '請求項の確認' : '要約'} · 文献 ${job.doc_id} — ${job.message}`;
+      const label = document.createElement('p'); label.textContent = `${job.kind === 'chart' ? 'クレームチャート' : job.kind === 'claims' ? '請求項の確認' : '要約'} · 文献 ${job.doc_id} — ${job.message}`;
       row.append(label);
       if (['queued', 'running'].includes(job.status)) {
         const cancel = document.createElement('button'); cancel.textContent = 'キャンセル';
@@ -112,18 +127,18 @@ async function loadJobs() {
           finally { await loadJobs(); }
         };
         row.append(cancel);
-      } else if (['failed', 'canceled', 'interrupted'].includes(job.status)) {
+      } else if (['failed', 'canceled', 'interrupted'].includes(job.status) && !job.host_sync_pending) {
         const rerun = document.createElement('button'); rerun.textContent = '現在の原文で再実行';
         rerun.onclick = async () => {
           rerun.disabled = true;
-          try { await api('jobs', {doc_id: job.doc_id, kind: job.kind, resume_id: job.id}); }
+          try { await api('jobs', {doc_id: job.doc_id, kind: job.kind, resume_id: job.id, claim_no: job.claim_no || 1}); }
           catch (error) { el('message').textContent = error.message; }
           finally { await loadJobs(); }
         };
         row.append(rerun);
       }
-      if (job.host_sync_pending) {
-        const sync = document.createElement('button'); sync.textContent = 'Hostへ完了状態を再送';
+      if (job.host_sync_pending && !['queued', 'running'].includes(job.status)) {
+        const sync = document.createElement('button'); sync.textContent = '保存結果・Host状態を確認';
         sync.onclick = async () => {
           sync.disabled = true;
           try { await api('jobs/' + job.id + '/reconcile', {}); }
@@ -148,6 +163,7 @@ async function loadJobs() {
       knownJobs.set(job.id, job.status);
     }
     await loadPDFJobs();
+    await loadEmbeddingJobs();
   } catch (error) { el('jobs').textContent = error.message; }
   finally { polling = false; }
 }
@@ -261,6 +277,43 @@ async function loadPDFJobs() {
         if (['failed', 'canceled'].includes(job.status)) button('PDFを再選択して実行', () => startPDF(job.id));
         button('履歴から除外（資料は保持）', () => api('pdf-jobs/' + job.id, undefined, 'DELETE'));
       }
+    }
+    box.append(row);
+  }
+}
+
+
+async function startIndex(resumeId) {
+  await api('embedding-jobs', {resume_id: resumeId || null});
+  el('message').textContent = '検索索引の構築を開始しました。';
+}
+el('build-index').onclick = async () => {
+  el('build-index').disabled = true;
+  try { await startIndex(); }
+  catch (error) { el('message').textContent = error.message; }
+  finally { await loadEmbeddingJobs(); }
+};
+async function loadEmbeddingJobs() {
+  const data = await api('embedding-jobs');
+  const box = el('embedding-jobs'); box.replaceChildren();
+  el('build-index').disabled = data.items.some(job => ['queued', 'running'].includes(job.status) || job.host_sync_pending);
+  for (const job of data.items) {
+    const row = document.createElement('div'); row.className = 'job'; row.dataset.status = job.status;
+    const label = document.createElement('p'); label.textContent = job.message; row.append(label);
+    function button(title, action) {
+      const b = document.createElement('button'); b.textContent = title;
+      b.onclick = async () => {
+        b.disabled = true;
+        try { await action(); } catch (error) { el('message').textContent = error.message; }
+        finally { await loadEmbeddingJobs(); }
+      };
+      row.append(b);
+    }
+    if (['queued', 'running'].includes(job.status)) button('索引構築を中断', () => api('embedding-jobs/' + job.id + '/cancel', {}));
+    else if (job.host_sync_pending) button('索引ジョブのHost状態を確認', () => api('embedding-jobs/' + job.id + '/reconcile', {}));
+    else {
+      if (['failed', 'canceled', 'interrupted'].includes(job.status)) button('索引構築を再開', () => startIndex(job.id));
+      button('索引履歴から除外（索引は保持）', () => api('embedding-jobs/' + job.id, undefined, 'DELETE'));
     }
     box.append(row);
   }

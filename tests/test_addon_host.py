@@ -92,3 +92,53 @@ class StreamCancellationTests(unittest.TestCase):
             self.assertFalse(worker.is_alive());self.assertEqual(errors, [502])
         finally:
             release.set();server.shutdown();server.server_close();thread.join(timeout=2)
+
+
+class GenerationProvenanceTests(unittest.TestCase):
+    def test_stream_requires_terminal_local_proof(self):
+        import http.server
+        import json
+        import threading
+        proof = {'execution_policy': 'local_only', 'revision_kind': 'host_process_file_metadata_v1',
+                 'model_ref': 'a'*64, 'runtime_ref': 'b'*64}
+        content = {'type': 'content', 'content': 'answer'}
+        stamp = {'type': 'provenance', 'provenance': proof}
+        done = {'type': 'done'}
+        events = []
+        requests = []
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *args): pass
+            def do_POST(self):
+                requests.append(json.loads(self.rfile.read(int(self.headers['Content-Length']))))
+                self.send_response(200); self.end_headers()
+                self.wfile.write(b''.join(('data: '+json.dumps(e)+'\n\n').encode() for e in events))
+        server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
+        try:
+            _, session = HostSessionTests().make_session()
+            session.client.host_url = 'http://127.0.0.1:%d' % server.server_port
+            caps = {'available': True, 'local_only_available': True, 'request_options': {
+                'local_only': {'supported': True}, 'require_provenance': {'supported': True}}}
+            session.call = mock.Mock(return_value={'text.generate': caps})
+            events[:] = [content, stamp, done]
+            self.assertEqual(session.stream([], require_provenance=True), 'answer')
+            self.assertEqual(session.generation_provenance, proof)
+            self.assertIs(requests[-1]['require_provenance'], True)
+            self.assertIs(requests[-1]['local_only'], True)
+            invalid = [[content, done], [content, stamp], [content, stamp, stamp, done],
+                       [content, stamp, content, done], [content, {'type': 'error'}, done],
+                       [content, done, stamp], [stamp, done]]
+            for change in ({'execution_policy': 'cloud'}, {'runtime_ref': 'bad'},
+                           {'secret': 'forbidden'}, {'revision_kind': 'unknown'}):
+                invalid.append([content, {'type': 'provenance', 'provenance': dict(proof, **change)}, done])
+            for case in invalid:
+                with self.subTest(events=case):
+                    events[:] = case
+                    with self.assertRaises(AddonError): session.stream([], require_provenance=True)
+                    self.assertIsNone(session.generation_provenance)
+            before = len(requests)
+            caps['request_options'].pop('require_provenance')
+            with self.assertRaises(AddonError): session.stream([], require_provenance=True)
+            self.assertEqual(len(requests), before)
+        finally:
+            server.shutdown(); server.server_close(); thread.join(timeout=2)

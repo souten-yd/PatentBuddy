@@ -4,8 +4,8 @@
 
 ## 現在地
 
-- Repo: `souten-yd/PatentBuddy`。最新公開 **v0.5.10**、main `7fd0cda`。最新受入は末尾「v0.5.10実導入」を参照。
-- 作業ブランチ **feat/patentbuddy-host-ai-jobs**。PR #13 / PR-Dはマージ・公開・更新済み。PR-C #15はマージ・v0.5.4公開・自動更新確認済み。
+- Repo: `souten-yd/PatentBuddy`。最新公開 **v0.5.10**、main `193f53a`（remote再確認済み）。公開版の受入は「v0.5.10実導入」を参照。
+- 作業場所 **`/data1tb/PatentBuddy-graph` / feat/evidence-graph / Draft PR #23**。Host統合/PDF/OCRは公開版へ導入済み。候補では索引Jobs・vector/graph/rerankチャートとgraph承認変更の依存管理まで実装/検証済みだが未配布。生成モデル版記録・管理Webレビュー・手動事実関係登録・Host関係提案Jobsまで候補実装済み。次は提案の人手採用/graph登録と残受入。
 - ユーザー目標は計画全体の完了。**PR-E残作業・PR-F/G、QNAP実機は未完了**。勝手にPR-Cだけを全体完了としない。
 - 内部package `qnaplibrary`、QPKG ID `QnapLibrary`、port17871、Cookie/パスキーRP ID、Release資産名を維持する。ResearchDataHubは唯一の正本、PatentBuddyはPC上のControlDeck Add-on。SQLiteをSMB/NFSで共有・同時二重書込みしない。
 - 未公開情報は検証済みローカルLLMのみ。既存privacy gateを弱めない。NAS↔PCの認証/TLS通信とクラウドLLM送信は区別する。
@@ -209,3 +209,168 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - 請求項分析も保存成功。正本DBは文献1件・原本1件・画像参照13件・要約3775文字/請求項確認6510文字を保持、quick_check成功。15ページのうち直接抽出10、直接抽出+OCR5。OCR/AIの内容精度は人手未承認。請求項ブラウザ試験初回は既存要約の表示完了前の件数取得で誤判定したため、再生成せず「請求項の確認」の表示待ちに修正して成功（/tmp/pb-pdf-installed-claims-recheck.log）。
 - 一時ユーザー/session/grantと試験ジョブ履歴を正常除去（remaining_jobs=0）。原本・抽出結果・分析は本番正本に保持。利用者は文献検索で「JPA」などから開ける。connection.jsonなし、同一UID自動認証を維持。
 - docs-only追記の全verifyも143 tests成功39.361秒。古いガイド記載のtest_docs_rulesは存在せずimport失敗、実際のtest_updater_docs 7 testsと全verifyで検証した。PR-F/P2/PR-Gは未完了、全体goalはactive。
+
+## PR-F 根拠付き関係データの基盤（2026-11-11・作業中）
+
+- 前turnはprogress: PDF/OCR v0.5.10を公開/導入、指定PDFの保存と実Host LLM要約/請求項確認まで完了。今回もgoal active。最新main193f53aとopen PR10の実diffを確認し、旧chart_aiには行別引用検証はあるがHost Jobs・永続根拠の版/人手承認が不足していると判断。
+- 新worktree `/data1tb/PatentBuddy-graph`、branch `feat/evidence-graph`、Draft PR23。`docs/evidence-graph.md`がPR-Fの作業契約。PR10はまだ未マージ。今回のサーバー基盤を旧サーバーLLM経路へ接続していない。
+- graph_nodes/graph_edgesを単一正本DBに追加。引用範囲と原文revisionの一致、取得日時/抽出法/モデル版/信頼度、factual/inferredの固定区別、人手reviewを保存。原文・sourceまたは文献ノード変更でtriggerによりstale・承認失効、元へ戻しても復活なし。FK削除・rollback・snapshot復元を検証。
+- 同じID同内容の再投入と探索はDB変更ゼロ。状態/承認/種別を含む隣接索引で出方向1〜2hop、seed20/ノード100/関係200以内。未承認・stale除外、推測は明示指定時のみ、上限はtruncated。API mutation/reviewは現在admin限定、private read可・published拒否。
+- 関連5 tests成功5.369秒、全verify148 tests成功42.363秒（/tmp/pb-graph-tests2.log、/tmp/pb-graph-verify.log）。EXPLAINでadjacency索引利用を確認。GraphRAG実LLM、性能/索引write bytes測定、アドオンUI、scope付きproposal、逆方向探索、検索→vector→graph→rerank、クレームチャート/確認操作は未完。本番v0.5.10へ未反映、版変更/公開なし。
+- 次はこの基盤をアドオンのHost Jobsと根拠付きクレームチャートへ接続する。PR-F完了後もP2汎用メタデータ検索とPR-G NAS移行を残す。現行データ/接続/サービスを維持する。
+
+## PR23 クレームチャートのHost接続（2026-11-11・作業中）
+
+- 前turnはprogress（根拠グラフ基盤99820cf push）。今回 `/data1tb/PatentBuddy-graph` のclean状態と実コードを確認して継続。claim_chart.py/chart_storage.pyを追加、AnalysisJobsにchart/claim_noを追加。
+- 原文の請求項見出しと説明文境界を検証し、最大16行・行別3根拠・引用650字でbounded化。構成要件の欠落/重複/別行引用を原子的に拒否。正本saveでも原文/根拠revisionと文字範囲を検証。review/dependency表で根拠改変/削除の承認を不可逆失効。
+- 既存Host Jobs・local_only推論・取消・再実行に接続し、請求項番号も再実行一致を検証。取得進捗は1Hz以下。検索はkeyword/rerank=falseを明示しサーバーLLMを呼ばない。最大3seedの2hop承認済みgraph候補も取得。vector/rerankは未実装として結果に明記し、代替済み/全体完成としない。
+- 関連9 tests成功5.438秒、最終全verify152 tests成功44.949秒（/tmp/pb-chart-verify.log）。その後UIの確認状態文言と採用引用の明示だけを修正、Node構文チェックは追記後に実施。
+- 実Host一時addon pb-chart-ui-acceptance/一時RDHを使い、合成請求項と対比文献でControlDeckの実ローカルLLM生成・保存・1280/320pxの引用表示DOM検証が成功、横溢れ/JSエラーなし（/tmp/pb-chart-ui-browser.log）。スクリーンショットは上部でチャート本体が画角外のため、チャートの目視受入とは呼ばない。fixtureをSIGINTで正常終了、一時addon/user/session/grants/DB除去を確認（/tmp/pb-chart-ui-fixture.log）。本番v0.5.10は不変。
+- 次: vector/Host rerank接続、モデル版の保存、狭い提案/人手承認scopeとUI、関係管理UI/逆方向、実根拠の誤判定・取消/応答消失の復旧・性能I/O・配布受入を継続。PR10未マージ、PR23 Draft。P2汎用索引とPR-G NAS移行も未完。goal active。
+
+## PR23 検索AI契約の追加（2026-11-11・作業中）
+
+- 前turnはprogress（chart Host接続3c8c2ec push）。今回actual Host AI contractを確認するとtext/visionのみでembedding/rerankなし。Host所有権を維持するためControlDeck別worktree `/data1tb/ControlDeck-retrieval-ai` / `feat/addon-local-retrieval-ai` / Draft PR351 / 6e49086を追加した。現行live Hostファイルは変更していない。
+- Host側 /ai/retrieval/capabilities と /execute はai.inference認可、ローカル登録GGUF役割・loopback確認、既存gateway lease/ensure_ready/releaseを使用。32入力/64KiB/応答4MiB/8192次元、有限数・行/index完全被覆、proxy/redirect拒否、切断時task cancelを検証。モデル名/pathを返さずfile metadata指紋model_refを返す（内容hashではない）。
+- Host関連46 tests成功3.04秒。初回4failは既存disable HTTP409の誤期待・asyncテストplugin不存在。asyncio.runに修正、依存追加なし。frontend build19.08秒、初回全体1fail/1231passはbuild完了前に起動したSPA routeの404/405。build完了後の全1232 tests成功105.70秒/2skip。logs /tmp/pb-host-retrieval-tests2.log、*-build.log、*-full2.log。
+- PatentBuddy HostSession.retrievalと応答契約を実装。古いHostへ本文を送る前に能力/ローカル方針/model_refを確認。返答の指紋・次元/行数・重複/欠落/非有限数を拒否。取消時にsocketを閉じる実HTTP試験を追加。全verify156 tests成功47.169秒（/tmp/pb-retrieval-client-verify.log）。生成/検索パイプラインへまだ接続していない。
+- 実登録モデルはQwen3.8-27B LLMのみと確認。既存role-presets APIからBGE-M3（job04d5b26334e3）/Qwen3-Reranker-4B（job6a49ba113107）を通常導入中。前者は直近API succeeded、後者running。helperPID480692、exec26005、logs /tmp/pb-retrieval-model-install2.log/.err。初回helperがjob_id応答をidと誤読したが、作成済みjobをDBで特定して再投入せず監視を引継いだ。
+- 導入済みrootは /data1tb/LLM、二つのpreset directory。既存モデルは変更しない。ダウンロード中のHost再起動を避ける。helper終了時は一時ユーザー/sessionを除去（進行中ならinactiveとして保持）し監査/jobsは保持する設計。成功/cleanupは次turnで実確認が必要。
+- 次: 残りpreset導入の実handleを再確認→Host PR351最終review/mergeと既存dirty passkey変更を保持した限定反映→実retrieval APIと取消/モデル指紋確認→正本vector索引のscoped保存/版・モデル空間・再構築→keyword/vector/graph/rerank→人手review UI。文章生成のモデル版記録、性能/配布、P2/PR-Gも引き続き未完。本番PatentBuddy/RDHは0.5.10のまま、goal active。
+
+## Host検索AIの実反映・ベクトル保存（2026-11-11・最新）
+
+- 前turnはprogress（PB d017a12 / Host PR351 6e49086 push）。今回job/helper実PIDを確認して待機を継続し、BGE/Reranker両preset導入succeeded、一時user除去まで確認（/tmp/pb-retrieval-model-install2.log）。同じdownloadを再実行していない。
+- Host PR351をmain8296974へmerge。live routerがpre-change5e1dde7とbyte一致、新retrieval_ai.pyが存在しないこと、active queued/running Jobsゼロを確認して当該2ファイルだけ反映。既存dirty passkey等の全ファイルhashを保持し、正規./deck.shで正常再起動（PID486674、/api/v1/health200）。restart後も既存変更hash不変。/api/healthを最初に誤指定して404だったが正規pathで確認済み。
+- 実Host scoped API→HostSession.retrievalでBGEの2文/1024次元、Rerankerの2文/関連文上位が成功。execution_policy=local_only/model_ref確認。cold観測10.30秒/11.33秒、性能保証ではない。/tmp/pb-host-retrieval-live.log。一時addon/user/session除去、audit/Host Jobs履歴保持。
+- 正本serverにhost_vector_spaces/host_vectorsを追加（旧vectorsを上書きしない）。最大8モデル空間/バッチ32/8192次元。chunk text SHAとdocument revisionを送信前後で検証して原子的保存、異なる結果上書き拒否、無変更再送write0。本文/source変更triggerとchunk FKで除去。専用embeddingと新research_analysis scope、独立同一UID qle_ credential/socketを追加。旧pdf_analysisには権限追加なし。
+- pending readは最大32/cursor、space削除adminのみ。一般CRUD/admin/publicとのscope分離、無効数/float32 overflow/重複id・モデル分離・改変/削除・batchrollback・Unixsocket再起動失効を検証。関連8 tests成功3.463秒（その後embedding socket test追加）、全160 tests成功48.414秒（/tmp/pb-host-vector-verify.log）。diff末尾空行のみ全test後に修正。
+- 実Hostの埋め込み2件を一時RDHへembedding tokenで保存し、再送unchanged2/DB変更0を確認。warm観測0.11秒（保存往復含む）/rerank1.79秒、synthetic2件のみ。/tmp/pb-host-vector-storage-live.log。実client→Host→model→canonical serverの結合成功。一時RDH/addon/user/sessionを除去、本番文献DB不変。
+- 次はこの正本vectorのbounded検索/索引・再構築Host Jobsを実装し、keyword→vector→graph→rerankと画面へ接続。現在chart生成はkeyword/graphのみで、vector/rerank未実装表示を残している。推論モデル版保存/人手review UI/graph管理/性能I/O/配布も未完。PR23 Draft、本番PatentBuddy/RDHは0.5.10のまま。Host docsの実機前記録はPR351時点の履歴で、最新live結果は本節。P2/PR-Gを含めgoal active。
+
+## ベクトルsnapshotと再構築可能cache（2026-11-11・最新）
+
+- 前turnはprogress（1cf253d、実Host検索AI/正本vector保存まで確認）。今回最新worktree clean/HEADを確認して継続。
+- 正本host_vector_versionsにepoch/generation/countを追加。既存モデル空間の不足行だけ初期化。vector変更と同一transactionのtriggerで識別子/件数更新、rollbackで戻る。manifest/page GET、同一vector再送は書込みなし。ページ128件/float32-le/base64、本文を転送しない。page前後のetag照合。
+- vector_cache.pyはPCの0700 vector-cache配下に0600 SQLiteで再生成可能なvector/ID/revisionのみ保存。最大2GiB/100万件/完成2ファイル、一時ファイルで整合性・件数・最終manifestを検証してatomic replace。部分同期の公開禁止/取消・変更時のscratch除去。warm syncはmanifestのみ。検索は128行ずつのexact cosine/top-k heap、最大30秒、超過truncated。大量RAMロード・常時server全vector転送なし。ANNや大規模性能の合格とは扱わない。
+- 関連7 tests成功4.162秒、全164 tests成功51.563秒（/tmp/pb-vector-cache-tests.log、/tmp/pb-vector-cache-verify.log）。snapshot途中変更の拒否、削除/rollback/epoch再生成、warm転送なし、private API、取消/time limit、cacheが本文を持たないことを確認。
+- 実Hostの2GiB CPU/RAM leaseとlocal-only BGEを使い、2文を一時RDHへ保存→PCcache同期→query embedding→関連文上位を確認。warm syncはGET manifest1回のみ、cache20,480 bytes。/tmp/pb-vector-cache-live.log。一時addon/user/session/DB/cacheを除去、audit/Jobs履歴保持。これは2件の機能受入で、タイミングは性能保証ではない。
+- 本番PatentBuddy/RDHは0.5.10のまま。PR23 Draft。次はEmbeddingJobs（全資料の版検証・小バッチ・取消/再開/Host CPU lease/Model ref保持）と構築ボタン、vector/graph/Host rerankへのchart接続。cacheの大規模物理I/O/CPU/RSS、source更新競合・応答消失の復旧、generation model provenance、人手承認UI、PR-F残、P2/PR-Gも未完、goal active。
+
+## 索引構築workerと共通Host資源管理（2026-11-11）
+
+- 前turnのOCR回答は状態確認のみでgoalのコード進捗なし。今回PR23で`ComputeHostSession`を抽出し、PDF既存権限を変えずCPU/RAM lease/heartbeat/release/進捗頻度制御を共有化。
+- `embedding_build.build`: 全コーパスpendingのkeyset、32件/8192文字/UTF-8 64KiB分割、原文hash/版/model_ref/次元照合、保存済みを再計算しない再開、カーソル前の更新検出、取消/応答消失後の再開。PC本文DBやworker中間vectorファイルは追加しない。既存正本vector保存以外の永続書込みなし。
+- 実HostのJob+CPU lease下でBGE-M3 2文/1024次元のworker構築成功、再実行DB更新0、cache検索関連文上位/再同期manifestのみ、Qwen3-Reranker実推論成功。`/tmp/pb-embedding-build-live.log`、err空。一時addon/user/session/DB/cacheは除去済み、Host Job/auditは保持。初回は日本語phaseがHostの英数字契約に反しHTTP422、修正して同試験成功。fixture `/tmp/pb-embedding-build-live.py` は終了済み。
+- 次はこのworkerを製品EmbeddingJobsへ接続（所有者/取消/再開/heartbeat/再起動・terminal照合/CPU lease）、構築ボタンとvector→graph→rerank chart接続。worker単独の完成を画面機能の完成としない。推論モデル版/人手レビュー/大規模性能/PR-F残/P2/PR-Gは引き続き未完。本番0.5.10は不変、PR23 Draft、goal active。
+- 最終全verify **169 tests成功51.036秒**（`/tmp/pb-embedding-build-verify-final.log`）。新增5 testsはUTF-8分割/無変更無推論・書込み0/取消再開/model変更・本文hash不正/カーソル前更新/commit応答消失後再開を確認。PDF lease回帰4 testsも成功。配布ビルド・リリースはPR23の残機能完成後。
+
+## 索引構築の製品Jobs・画面接続（2026-11-11）
+
+- 前turnはworker実装/実Host検証/8bf2efe pushのprogress。今回は`EmbeddingJobs`と`/addon/v1/embedding-jobs`、独立した構築・更新ボタン/取消/再開/Host照合/履歴除外を実装。全資料が対象で、選択文献に依存しない。owner分離、最大32件、同時実行1、未同期があれば先に照合。
+- ComputeHostSessionのrequest/lease ID取得直後にメタデータを保存。再起動後はinterruptedとして資源解放→terminal照合。heartbeatはlease activate後に開始し、部分activate状態をrenewしない。モデルをジョブへ固定し、再開時モデル変更は拒否。書込みは資源/状態遷移・5秒ごとの小さな進捗だけ、本文/ベクトル/tokenはPCジョブJSONへ保存しない。
+- 全verify **172 tests成功55.036秒**（`/tmp/pb-embedding-jobs-verify.log`）。その後HTTP認証・不正body/任意model/URL拒否の回帰を既存testへ追加し、関連12 tests成功3.032秒。JS構文成功。所有者越境/取消→Host失敗→照合→再開/モデル変更拒否/再起動資源照合/履歴除外後vector保持を検証。
+- 実Host UI fixture `/tmp/pb-index-ui-fixture.py` で一時ResearchDataHub+research_analysis scopeを使用。1280pxで実BGEモデル2文/1024次元の索引構築、320pxで再実行0件、両方succeeded/host_sync_pending=false、横溢れ/JS例外0（`/tmp/pb-index-ui-browser.log`）。`.data/index-320.png`で構築ボタンの目視確認。完了ジョブはスクリーンショットの下方外なので状態はDOM/API検証と区別。
+- fixture PID494273をSIGINTで正常cleanup、一時addon/user/session/grants/DBとsecret除去。末尾KeyboardInterruptは待機解除の終了で、cleanup完了行を確認。Host Job/auditは保持。本番の接続/DB/0.5.10は変更していない。
+- 次はクレームチャートへkeyword→vector→bounded graph→Host rerankを接続する。exact chunk read API、CPU lease/cache利用、原文/model revisionの保存が必要。人手承認UI/graph提案権限・管理/生成モデル版/大量検索性能/PR-F残/P2/PR-Gは未完。PR23 Draft、goal active。
+
+## チャート用のbounded候補検索（2026-11-11）
+
+- 前turnはEmbeddingJobs/UI接続e9d6610 pushのprogress。今回は`evidence_read.py`のchunk evidence/文献range read APIと`chart_retrieval.py`を追加。650文字上限、原文位置と版、本文に一致しないsection除外、公開token拒否/GET書込み0。
+- ChartRetrieval: keyword8→Host query embedding→cache上位8→keyword/vectorから最大3doc/20seed・2hop/20node/20edgeのapproved factual graph→Host reranker。各経路最大4/計12候補、最終3根拠。未索引/モデル変更/原文変更/取消は停止、黙示fallbackなし。traceにモデル版/索引etag/走査数・truncated/候補数を返す。生成UIへの接続はまだ行っていない。
+- cache旧版清掃に4世代同期→完成cache2個だけ保持の回帰を追加。途中でregex不具合と誤認したが、実diffと通常文字列のescape解釈を再確認し既存実装が正しいことを確認。vector_cache.pyのコード変更はない。
+- 実Host Job/CPU leaseでBGE-M3とQwen3-Rerankerを使用し、一時RDH2文→索引構築→新候補検索エンジン→関連文上位・引用2件・truncated=falseを確認（`/tmp/pb-chart-retrieval-live.log`、err空）。graphは実fixtureでは空、非空承認graph候補のrerankはAPI回帰テスト。fixture終了・一時addon/user/session/DB/cache除去済み、Host Job/audit保持。
+- 次は`claim_chart.generate`を新エンジンへ切替、AnalysisJobsのchartだけComputeHostSessionとCPU lease/永続request・lease/終了前解放/再起動照合へ接続する。現chart.generateのnot_implemented表示はまだ正しいので維持。最終保存時のモデル/traceとgraph承認変更の扱い、人手レビューUI、生成モデル版、性能/配布、P2/PR-Gも未完。本番0.5.10不変、PR23 Draft、goal active。
+- 最終全verify **177 tests成功55.941秒**（`/tmp/pb-chart-retrieval-verify-final.log`）。初回は「全文APIなし」テストの末尾一致判定がgraph/documents APIも誤って拾い1件失敗。正しい完全一致へ直し、モデル変更/取消停止の回帰も追加して最終全件成功。関連5 tests成功3.063秒。コードdiff確認済み、配布前の中間コミットとして保持。
+
+## 全検索経路をチャート生成へ接続（2026-11-11）
+
+- 前turnは候補検索エンジンea862f3 pushのprogress。今回`claim_chart.generate`をChartRetrievalへ切替し、旧not_implementedを除去。keyword→vector→approved factual graph→rerankと行別モデル/索引/打切りtraceを保存。LLM回答の全行/同一行引用・正本保存時の原文版/範囲照合は維持。
+- AnalysisJobs chartのみComputeHostSession。request/lease即時保存、同時chart1件、heartbeatはCPUactivate後に開始、取消後/終了前にmonitor停止→資源解放→Host terminal照合。再起動はhost_sync_pendingとして保持し、未同期履歴の自動除去を禁止。新receipt APIはID/doc/kind/source_revisionだけ、保存POST応答消失/再起動時に重複生成せず保存済み結果を確認する。
+- 書込み理由: チャートtraceは正本の根拠/モデル再現性、PCの資源IDとterminal確認状態は中断復旧に必要。本文/LLM回答/秘密をPCジョブJSONへ追加しない。通常分析もterminal一致確認時に小さなメタデータ更新1回を追加し、未同期状態を解消する。
+- 全verify **180 tests成功58.249秒**（`/tmp/pb-chart-integration-verify.log`）、JS構文成功。追加ChartJobs3 testsで全pipeline/保存応答消失/取消・再開・再起動済み結果照合、CPU解放がterminalより先・永続leaseID・検索モデルtrace保存を確認。既存summary/claims回帰も成功。
+- 実Host UI一時fixture `/tmp/pb-chart-full-ui-fixture.py` で、索引構築→実BGE-M3→Qwen3-Reranker→Qwen3.8-27Bローカル生成→3要件チャート保存が成功。1280/320pxで引用A-E1/B-E1・全検索経路表示、横溢れ/JS例外0（`/tmp/pb-chart-full-ui-browser.log`）。`.data/chart-full-320.png`はチャート本体を目視し、3要件/引用/未確認表示を確認。追加実ブラウザAPI照合でhost_sync_pending=false、lease/request=None、行別model trace保存を確認。
+- 実fixtureのgraphは空、非空graph候補の検証は前turnのAPI回帰範囲。fixture PID500256はSIGINTで終了し、一時addon/user/session/grants/DB/secret除去済み（`/tmp/pb-chart-full-ui-fixture.log`）。本番0.5.10や接続/資料は変更なし。
+- 次: 生成LLMのモデル版の確実な保存/Host attestation、graph承認変更・削除に対するチャート依存管理、人手レビューとgraph提案・管理UIを実装する。大量検索性能/物理I/O、配布更新受入、P2一般メタデータ、PR-G NAS最終移行までgoal active。PR23はDraftで未配布。
+- 全verify後の変更は再照合後メッセージ/phaseの整合と案内文、receipt境界テスト。関連12 tests再成功、receipt含むchart5 tests成功2.931秒。receiptの未認証401/published403/本文なし・GET更新0を確認。最終HTML案内追加は文言のみ。
+
+## グラフ承認変更に対するチャート依存管理（2026-11-11）
+
+- 前turnは73eee43の全検索経路チャート/実Host UI成功のprogress。今回graph_revisionとanalysis_graph_dependencies、保存時graph snapshot検証、変更/削除時の不可逆stale/unreviewedを追加。同一review再送は版を変えず、取消→再承認は別版。引用していない探索端点の原文更新でもgraph stale経由でチャートを無効化。
+- graph旧候補schemaは列追加/版付与をatomic transaction、再openで書換えなし。旧chart graph引用は初回のみ32件ずつ読み、本文を保持しstale化。移行markerで毎起動の全chart scanを避ける。追加書込み理由は承認版/依存索引と変更時失効。新Storeインストールはgraph→chart→vectorの順を維持。
+- 全verify **187 tests成功61.999秒**（`/tmp/pb-chart-graph-deps-verify.log`）。追加6 testsで取消/再承認、関係削除、非引用の端点文献更新、snapshot欠落/偽造・原子的拒否、同一再送0更新、旧チャート本文保持/一度だけ移行、既存edge入り旧schema→版付与/reopen/quick_checkを確認。
+- 実Host fixture `/tmp/pb-chart-graph-ui-fixture.py` で承認済みfactual edgeを作り、実BGE/Qwen3-reranker/Qwen3.8生成を通したchartを保存。graph依存1件、chartのテスト承認後にedge承認取消→stale/unreviewed、再承認後もstaleを確認（`/tmp/pb-chart-graph-ui-fixture.log`）。1280/320px生成・引用表示・全検索経路、横溢れ/JS例外0（`/tmp/pb-chart-graph-ui-browser.log`）。`.data/chart-graph-stale-320.png`で根拠変更表示と未確認・引用を目視、API stateと一致。
+- 最初のfixture生成コマンドはcwd誤りでFileNotFoundErrorとなり起動前に停止。絶対pathへ修正して実行。途中の新表示文言テストは起動済みStaticCacheの旧JSを参照してtimeout、文言変更を本差分から外して既存根拠変更表示で再検証成功。状態変更の不具合ではない。
+- fixture PID504352をSIGINTで終了し一時addon/user/session/grants/DB/secret除去を確認、Host jobs/audit保持。本番0.5.10は不変。remote main193f53aを再確認し、HANDOFF冒頭の旧作業branch表記を現PR23へ訂正。
+- 次は生成LLMのmodel versionのHost attestationと保存、人手レビュー/graph提案・管理UI。検索traceの保存境界検証、graphの推測表示/逆方向要否、性能/物理I/O・配布更新、P2一般メタデータ、PR-G最終NAS移行は未完。goal active、PR23 Draft。
+
+## 生成モデル版のHost API実装・実導入（2026-11-11）
+
+- 前turnはgraph承認依存d84b63a pushのprogress。今回はHostの独立worktree `/data1tb/ControlDeck-generation-provenance`、branch `feat/addon-generation-provenance`、PR352を作成しmain **2c951d7**へ統合。実装commit2a828a4。Host本体のAGENTS/statusと実ai_gateway/llama/systemdを確認。
+- 新要求 `require_provenance:true` はlocal_only必須/strict bool。capabilities.request_options.require_provenance.supported=true。complete応答のprovenance、stream正常終了直前の `{type:'provenance',provenance:{...}}` → done を追加。既定falseの既存呼出は互換。証明はexecution_policy=local_only、revision_kind=host_process_file_metadata_v1、model_ref/runtime_ref各SHA256 64hexだけ。
+- Host helperは選択モデル/補助mmproj・draft/実行binaryのstat（path/dev/inode/size/mtime/ctime）を指紋化。admission/ensure_ready後にsystemd MainPID、同一UID、実exe/argvのmodel/alias/port/host、LISTEN所有者、ファイルがprocess開始後に変わっていないことを確認。推論後も同じmodel/runtime指紋の場合だけ証明を返す。変化/取消時はstreamに証明/doneを返さない。stat/process readはasyncio.to_thread。重み内容hashや完全な数値再現性の証明ではない。秘密/alias/path/PID/argvは応答しない。
+- 関連61 tests成功3.29秒、frontend build17.98秒、全 **1253 passed/2 skipped/既存warning** 107.00秒（`/tmp/pb-provenance-host-full.log`）。補助draft被覆を追加後helper12 tests成功0.02秒。初回helper11 testsと既存API回帰、生成前/後差替え・strict opt-in・stream cancel/lease解放も確認。新CIや新依存なし。
+- ライブHost `/data1tb/ControlDeck/app` はactive jobs=0、ai.pyが変更前main8296974とbyte一致を確認。新mainのai.py/generation_provenance.py **2ファイルだけ**反映し通常`./deck.sh`再起動、health200。既存dirty/untracked **21ファイル**はhashを前後照合し保持（`/tmp/pb-host-generation-preserved.json`、backup `/tmp/pb-host-ai-pre-generation.py`、restart log `/tmp/pb-host-generation-restart.log`）。ユーザーpasskey作業を維持。Host checkout自体は切替えていない。
+- 実Host正規一時addon/Job/CPU leaseで実Qwen3.8生成、complete61文字とstream provenance→doneの両方を確認。helper前後のmodel_ref/runtime_refとも一致（`/tmp/pb-generation-provenance-api-live.log`、err空）。先行helper-only試験59文字は `/tmp/pb-generation-provenance-live.log`。一時addon/user/session削除、Host jobs/audit保持。全fixture終了済み。本番PatentBuddy/RDHは0.5.10のまま。
+- Host実機受入文書の追加commit b40989cをpushしdocs-only follow-up PRを作成。Host `.venv`/frontend/node_modules symlink、生成tsbuildinfoはstageしない。旧worktree `/data1tb/ControlDeck-retrieval-ai` のdirtyも不変。
+- **次の実装:** PB `/data1tb/PatentBuddy-graph` のHostSession.streamにopt-inを追加。要求前にcapabilities対応確認、provenance eventのpolicy/kind/64hex/重複・欠落・done順を厳密検証し、欠落時は原文を送らない/結果を保存しない。chart.generateから要求し、実際に生成した場合だけ検証済み生成版を正本chart JSONへ保存（候補なしでLLM未実行なら明示）。旧schemaの保存/閲覧互換と新schemaの検証を検討。既存HostSession/summary/claimsを暗黙に壊さない。Host新APIはすでに実導入済みなので再反映/再起動不要。
+- その後、人手レビュー/graph提案・管理UI、検索trace保存境界の検証、性能/配布、P2/PR-Gを続ける。goal active。
+
+## チャート生成モデル版の保存・実LLM確認（2026-11-11）
+
+- 前turnはOCR状態回答のみでコード進捗なし。今回、残っていたHostSession/claim_chart変更を確認して完成。Host docs follow-up PR353はmain bfb0e42へ統合済み。
+- HostSession.streamのrequire_provenance opt-inは要求前にHost capabilitiesを確認。対応なしではPOSTしない。正常content→provenance→doneのみ受理し、policy/kind/64hex/余剰field、欠落/重複/順序/異常終了を検査。成功確定までsessionへ証明を保持しない。通常summary/claimsは従来契約を維持。
+- 新生成chart schema2にgeneration.executedとHostのopaque model_ref/runtime_refを保存。根拠候補なしではLLMを呼ばずno_evidenceを保存。正本保存境界も形式/実行状態を検証し不正時はatomic拒否。schema1は互換維持しUIで版未記録と表示。schema2の形式検証自体は、任意APIクライアントが提出した指紋の真正性を暗号的に証明するものではない。
+- 関連15 tests成功7.096秒、全verify189 tests成功65.191秒（/tmp/pb-generation-verify.log）。その後no-evidence非実行/保存テストを追加しchart全7 tests成功4.038秒（/tmp/pb-generation-chart-final.log）。JS構文、diff whitespace確認成功。新しい依存なし。保存JSONの小さい版情報のみ追加し、GET/検索時の書込み追加なし。
+- 実ControlDeck一時addon/一時RDHで索引→検索→実ローカルLLM→chart保存を検証。正本chart schema2/3行、generation.executed=true、model/runtime各64hexを読取確認（/tmp/pb-chart-provenance-saved.json）。1280/320pxで引用・生成版記録表示、overflow/JSエラー0（/tmp/pb-chart-provenance-browser.log、.data/chart-provenance-*.png）。UI表示検証であり指紋値の視認性改善は今後検討。
+- fixture PID540215をSIGINTで終了、temporary_addon_user_session_grants_removed=trueを確認。Host jobs/auditは保持。本番PatentBuddy/RDH 0.5.10と利用者資料は不変。PR23 Draft、未配布。
+- 次: 人手レビュー/graph提案・管理UI、検索trace保存境界の検証、graph推定表示/逆方向要否、性能/物理I/O・配布更新、P2一般メタデータ、PR-G最終NAS移行。goal active。現作業場所 /data1tb/PatentBuddy-graph。
+
+## 管理Webの人手レビュー初期画面（2026-11-11）
+
+- 前turn30054f1は生成モデル版保存のprogress。今回は管理者専用の既存review APIへResearchDataHub文献詳細UIを接続。チャートの要件/判定/理由/引用全文/版/範囲、関係のsource→target/事実根拠と推定/取得日時/抽出法/モデル版/信頼度を表示。原文画面への導線、照合checkbox、確認/却下/未確認への変更を追加。staleは操作不可。PatentBuddy自動接続tokenを管理者へ昇格していない。
+- 新GET /api/v1/graph/documents/{did}/edgesは根拠文献・incoming・outgoingの3経路を重複除去して50件keysetページング。未承認/却下/staleも管理用一覧へ含む。検索用expandは従来の承認済み条件を維持。各経路51件までの候補SQLとevidence_doc_id/id・source_node/id索引を追加。索引書込み増の理由は大規模グラフで文献別レビューの走査/ソートを抑えるため。GET自体に書込みなし。
+- graph関連6 tests成功3.607秒。53関係の両方向/重複除去/50+3ページ/匿名401/公開token403/不正cursor400/GET書込み0を確認。既存chart/graph関連12 tests成功7.081秒。
+- 管理Web実Chrome1280/320pxでチャート承認→未確認、推定関係承認→却下を保存。DBをread-onlyで照合しchart=unreviewed、edge=inferred/rejectedを確認。overflow/JS例外0（/tmp/pb-review-ui3.log）。一時fixture PID542989はSIGINT停止、cleanedを確認。合成データのみで、本番資料/サービスは不変。今回LLM再実行なし、前turnのControlDeck実LLM生成受入を維持。
+- 初回全verifyは新関数をホーム/検索の境界コメント前へ置いたことで既存のホームread-only検査1件が失敗。検索側へ関数配置を修正し再検証。ブラウザ試験初回は検索button複数、次は対比文献選択と保存後再描画待ち不足が原因で失敗。固有検索語/閉じたdetailsの再描画待ちで修正、製品側の承認不具合ではない。
+- まだPR23 Draft/未配布。これは管理Webの既存結果レビューであり、PatentBuddy内のレビュー認証導線、関係の新規提案/抽出UI、全分析履歴ページング（既存最新20件制限）、検索trace保存境界、性能I/O、配布更新、P2/PR-Gは未完。goal active。
+- 修正後全verify **191 tests成功67.311秒**（/tmp/pb-review-verify2.log）、JS構文・diff whitespace成功。変更diff確認済み。
+
+## 原文選択による関係登録UI（2026-11-11）
+
+- 前turn c6eab03は人手レビュー画面のprogress。今回、管理Web文献詳細へ事実関係の新規登録フォームを追加。本文のread-only textareaから根拠を選択、文献引用/ファミリー/優先権/出願人/分類/クレーム要件と関連先を指定し、既存admin専用graph APIへ保存。自動承認なし。推定関係のAI提案はこの手動フォームとは別の未実装工程。
+- Pythonの引用範囲と一致するようDOMのUTF-16 selectionをUnicode code pointへ変換。1〜4000文字、原文/改行がtextareaで変化していれば拒否。現在文献の版/引用/範囲/UTC取得時刻/manual_selectionを保存。文献ノードの既存ラベルをAPIから取得し、同じ文献への再登録時のラベル衝突を避ける。関連先に指定できる数値IDを文献詳細の「文献番号」として表示。
+- 同じフォーム内容を再試行するとedge ID・取得時刻を再利用。サーバーの既存冪等保存と合わせ、応答消失で同じ関係を重複登録しない。新規DB schema/認証権限変更なし。新規書込みは利用者が明示登録した関係/根拠/ノード/監査のみ。
+- 実Chrome1280/320pxで絵文字を含む合成本文「😀根拠確認…」の引用を保存し、Python範囲1〜5/quote根拠確認と一致。未確認/factualを保持、overflow/JS例外0（/tmp/pb-proposal-ui.log）。追加でPOSTをサーバー処理後にroute.abortして応答消失を発生させ、手動再試行が同じpayload/IDで成功（/tmp/pb-proposal-retry.log）。正本一時DBで計4件、再試行による重複0、全引用一致を確認。スクリーンショット .data/graph-proposal-*.png。
+- 一時fixture PID546705はSIGINT停止/cleaned確認。本番v0.5.10・原資料は不変。最後の「文献番号」表示追加はJS構文チェック済み、ブラウザfixtureは追加前のstatic cacheなので同表示自体のブラウザ受入は未実施。LLM処理は変更なし、30054f1でのControlDeck実LLM受入を維持。
+- PR23 Draft/未配布。次はHost local-onlyでの推定関係提案・根拠検証/限定保存/Jobs・UI接続、PatentBuddyからレビューへの認証導線、分析履歴ページング、trace保存境界、性能I/O、配布更新、P2/PR-G。全体goal active。
+- 全verify191 tests成功64.098秒（/tmp/pb-proposal-verify.log）、最終JS構文・diff whitespace成功。実差分レビュー済み。
+
+## ControlDeck実LLMによる推定関係の提案Jobs（2026-11-11）
+
+- 前turn0a57f04は手動事実関係登録のprogress。今回はrelation_proposals.pyでproblem/solution/effect/substitutionを最大12件抽出するstrict JSON契約を実装。本文10万文字上限/無断切詰めなし、引用最大2000文字/一意な原文一致/Unicode範囲を検証。種類・概念長・有限confidence・重複・余剰field・不正範囲を拒否。Host require_provenance=true、local-only model/runtime指紋必須。候補0件も空配列として扱う。
+- 新analysis kind=relationsを正本の既存analysis保存へ追加。保存境界で文献ID/版/引用/モデル版/inferred/unreviewedを再検証。原文変更でstale、新しい分析IDの再生成を必要とする。提案をgraph_edgesへ自動登録せず、既存analysis scope以上へ権限昇格しない。追加書込みは上限付き提案JSON/既存audit/Job metadataに限り、新DBテーブルなし。
+- AnalysisJobsの既存chart向けComputeHostSession/CPU lease/開始・終了同期/中断/再起動照合/応答消失receiptをrelationsへ共用。チャートのclaim_noとretrievalは専用のまま。証明失敗時は結果保存しない。PatentBuddy分析メニュー・推定関係/引用範囲/信頼度表示へ接続。人手採用してグラフへ登録する画面は未実装。
+- core3 tests成功1.749秒（/tmp/pb-relations-tests.log）、既存Jobs含む11 tests成功7.420秒、relations保存応答消失/CPU release→finish/重複なしを追加したJobs4 tests成功3.195秒（/tmp/pb-relations-job-final.log）。偽引用・曖昧引用・過剰件数・重複・勝手なapproved/factual・非有限confidence・改版・冪等保存・graph自動登録0を確認。
+- 実ControlDeck正規一時addon/Job/CPU leaseのHost streamで合成電池資料から4提案(problem/solution/effect/effect)を生成し引用検証/正本保存成功。local-onlyモデル/実行版指紋記録、graph_edges=0（/tmp/pb-relations-live.log）。一時addon/user/session除去済み、Host jobs/audit保持。
+- 実Host Chrome1280/320pxでも分析メニューから関係提案→実LLM→正本保存→引用表示に成功、overflow/JS例外0（/tmp/pb-relations-ui-browser.log、.data/relations-*.png）。正本DBで4件/inferred/unreviewed/graph_edges0、PC metadataでjob succeeded/host_sync_pending=false/request_idとlease_id=nullを確認。一時fixture PID549330停止、temporary_addon_user_session_grants_removed=true。secretもcleanup。本番0.5.10/利用者資料は不変。
+- 次: 管理者が提案の根拠を照合して個別採用/却下し、推定区分を維持してgraphへ登録する導線、PatentBuddy→管理Web認証導線、履歴ページング、trace保存境界、性能I/O・配布更新、P2/PR-G。PR23 Draft、全体goal active。
+- 全verify **195 tests成功67.414秒**（/tmp/pb-relations-verify.log）、workspace JS構文/diff whitespace/変更diff確認成功。
+
+## 推定候補の個別登録と人手レビュー（2026-11-11）
+
+- 生成Jobs変更を318d64dとしてpush後、保存済みrelations候補から1件を選びgraphへ登録するadmin専用POST /api/v1/analyses/{aid}/relations/{index}/registerを追加。confirm_evidenceはstrict true必須、read/research_analysis token不可。原分析のID/文献版/厳密引用/モデル版を再検証し、edgeはinferred/unreviewedで作成。既存graph.reviewで承認/却下し、推定区分は維持。
+- analysis ID+候補indexから決定的edge IDを作成し、同じ候補を再登録しても重複しない。concept nodeは概念名hash、source documentは既存ラベルを保持。モデル版:実行版(129文字)、原分析作成日時、host_relation_proposal、原文範囲/quoteを保持。source更新競合はgraph.saveのtransaction内の版/引用再検証でも拒否する。新規書込みは利用者の明示登録edge/node/auditのみ、新テーブルなし。
+- 管理Web文献詳細にAI候補/引用/信頼度、原文照合checkbox、個別登録button。保存後は既存関係一覧から確認/却下。原文変更時は登録不可。候補のまま却下する独立statusは未実装（登録後のgraph却下は実装済み）。
+- core/API4 tests成功2.360秒（/tmp/pb-relation-register-tests.log）。匿名401/research_analysis403/同意なし・false・数値1は400、冪等書込み0、推定維持、改版拒否を確認。
+- 新一時fixtureでControlDeck実LLM→候補保存→PatentBuddy1280/320px引用表示を再確認（/tmp/pb-relation-register-generation.log）。続けてResearchDataHub実Chrome1280で候補登録→承認、320で同じ候補再登録→却下。overflow/JS例外0、edge重複0（/tmp/pb-relation-register-browser.log）。正本DBでedge1/inferred/rejected/method=host_relation_proposal/model欄129文字を照合。
+- fixture PID571342をSIGINT停止、一時addon/user/session/grants除去。本番0.5.10・利用者資料は不変。PR23 Draft/未配布。次は候補レビュー状態の整理・PatentBuddy→管理Web導線、履歴ページング、検索trace保存境界、性能I/O/配布更新、P2/PR-G。goal active。
+- 全verify **196 tests成功67.512秒**（/tmp/pb-relation-register-verify.log）、JS構文・diff whitespace・変更diff確認成功。
+
+## チャート検索traceの保存境界（2026-11-11）
+
+- 前turn f190faeは推定候補の登録/レビューprogress。今回、schema2チャートの正本保存境界で検索trace検証が欠けていたことを確認しchart_trace.pyを追加。4検索段階・行ラベル/件数・固定field、embedding/reranker 64hex・索引epoch/generation・revision_kindを検証。モデル/索引/総vector数は全行同一。scanned/total上限とstrict整数、打切りstrict boolと全体summary一致、候補0〜12と採用min(3,candidate_count)を確認。
+- 各引用の取得経路keyword/vector/graph:id、有限rerank scoreの降順、重複引用範囲を検証。不整合は保存transaction前半で拒否し部分保存しない。schema1閲覧/保存互換は維持。traceは認証済みクライアントの整合性検証であり、検索実行自体を暗号的に証明するものではない。新規schema/索引/GET書込みなし。
+- 関連12 tests成功7.870秒（/tmp/pb-chart-trace-tests.log）。その後candidate_countと採用件数の厳密一致を追加、no-evidence fixtureを実契約のcandidate_count=0へ修正。テストには行/モデル/索引/範囲/件数/型/打切り/非有限順位の不正とatomic拒否、schema1互換を含む。
+- 全verify197 tests成功69.079秒（/tmp/pb-chart-trace-verify.log）。実Host local-only LLMの3行chart生成/保存成功、正本traceを再検証。1280/320pxで引用/検索段階/生成版表示、overflow/JS例外0（/tmp/pb-chart-trace-browser.log）。fixture PID574617を停止し一時addon/user/session/grants除去を確認。本番不変。
+- ユーザー追加要求: パワエレ機器の異常検知手法について約10件の特許を調査・情報抽出。日本語公報優先、特許ファミリー重複を避け、検知対象/信号/手法/請求項/図を比較する実資料受入へ進む。PR-F全体・P2/PR-Gは引き続き未完、goal active。

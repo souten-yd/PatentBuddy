@@ -37,6 +37,7 @@ class HostSession:
         self.owner = owner_key(self.identity)
         self.job_id = None
         self.transport = None
+        self.generation_provenance = None
         self.aborted = threading.Event()
         self.require_capabilities()
 
@@ -67,6 +68,45 @@ class HostSession:
                 or not result['content'].strip() or len(result['content']) > 100000):
             raise AddonError(502, 'ローカルAIの応答を検証できません')
         return result['content']
+
+    def retrieval(self, capability, inputs, query=None):
+        from .retrieval_contract import validate_result
+        if capability not in ('text.embed', 'text.rerank'):
+            raise AddonError(400, '検索AIの処理方法が不正です')
+        caps = self.call('GET', '/ai/retrieval/capabilities').get(capability, {})
+        if (caps.get('available') is not True or caps.get('execution_policy') != 'local_only'
+                or caps.get('revision_kind') != 'host_file_metadata_v1'
+                or not re.fullmatch(r'[a-f0-9]{64}', str(caps.get('model_ref', '')))):
+            raise AddonError(503, 'Hostのローカル検索AIを利用できません')
+        body = {'capability': capability, 'inputs': inputs}
+        if query is not None:
+            body['query'] = query
+        url = urllib.parse.urlsplit(self.client.host_url)
+        cls = http.client.HTTPSConnection if url.scheme == 'https' else http.client.HTTPConnection
+        connection = cls(url.hostname, url.port, timeout=315)
+        try:
+            connection.connect()
+            with self.lock:
+                if self.aborted.is_set():
+                    raise AddonError(409, '分析はキャンセルされました')
+                self.transport = connection.sock
+                headers = dict(self.headers, **{'Content-Type': 'application/json'})
+            connection.request('POST', BASE + '/ai/retrieval/execute', body=json.dumps(body).encode(), headers=headers)
+            response = connection.getresponse()
+            if response.status != 200:
+                raise AddonError(503, 'Hostの検索AI要求が拒否されました')
+            raw = response.read(4 * 1024 * 1024 + 1)
+            if len(raw) > 4 * 1024 * 1024 or self.aborted.is_set():
+                raise AddonError(502, '検索AI応答が上限を超えたか処理が中断されました')
+            return validate_result(json.loads(raw), capability, len(inputs), caps['model_ref'])
+        except (OSError, ValueError, http.client.HTTPException) as error:
+            if isinstance(error, AddonError):
+                raise
+            raise AddonError(502, '検索AIとの通信または応答検証に失敗しました') from None
+        finally:
+            with self.lock:
+                self.transport = None
+            connection.close()
 
     def create_job(self, title="PatentBuddy 文献分析"):
         if self.job_id is not None:
@@ -129,8 +169,16 @@ class HostSession:
             except OSError:
                 pass
 
-    def stream(self, messages):
-        if not self.local_available():
+    def stream(self, messages, require_provenance=False):
+        from .generation_contract import validate_provenance
+        self.generation_provenance = None
+        if require_provenance:
+            caps = self.call('GET', '/ai/capabilities').get('text.generate', {})
+            if (caps.get('available') is not True or caps.get('local_only_available') is not True
+                    or caps.get('request_options', {}).get('local_only', {}).get('supported') is not True
+                    or caps.get('request_options', {}).get('require_provenance', {}).get('supported') is not True):
+                raise AddonError(503, '生成モデル版の検証に対応したControlDeckが必要です')
+        elif not self.local_available():
             raise AddonError(503, 'Hostのローカル限定AIを利用できません')
         if self.aborted.is_set():
             raise AddonError(409, '分析はキャンセルされました')
@@ -146,13 +194,17 @@ class HostSession:
                     raise AddonError(409, "分析はキャンセルされました")
                 self.transport = connection.sock
                 headers = dict(self.headers, **{'Content-Type': 'application/json'})
-            body = json.dumps({'capability': 'text.generate', 'local_only': True, 'messages': messages,
-                               'max_tokens': 4096, 'timeout_seconds': 300, 'temperature': 0.0}).encode()
+            payload = {'capability': 'text.generate', 'local_only': True, 'messages': messages,
+                       'max_tokens': 4096, 'timeout_seconds': 300, 'temperature': 0.0}
+            if require_provenance:
+                payload['require_provenance'] = True
+            body = json.dumps(payload).encode()
             connection.request('POST', BASE + '/ai/stream', body=body, headers=headers)
             response = connection.getresponse()
             if response.status != 200:
                 raise AddonError(502, 'HostのローカルAI要求が拒否されました')
             done = False
+            proof = None
             while True:
                 line = response.readline(65537)
                 if not line:
@@ -162,6 +214,13 @@ class HostSession:
                 if not line.startswith(b'data: '):
                     continue
                 event = json.loads(line[6:])
+                if not isinstance(event, dict):
+                    raise AddonError(502, 'AI応答の形式が不正です')
+                if require_provenance and proof is not None and event.get('type') != 'done':
+                    raise AddonError(502, '生成モデル版の応答順序が不正です')
+                if event.get('type') == 'provenance' and require_provenance:
+                    proof = validate_provenance(event.get('provenance'))
+                    continue
                 if event.get('type') == 'error':
                     raise AddonError(502, 'ローカルAIの生成に失敗しました')
                 if event.get('type') == 'done':
@@ -176,8 +235,10 @@ class HostSession:
                         raise AddonError(502, 'AI応答が上限を超えました')
                     content.append(value)
             answer = ''.join(content)
-            if not done or not answer.strip():
+            if not done or not answer.strip() or self.aborted.is_set() or (require_provenance and proof is None):
                 raise AddonError(502, 'AI応答が完了していません')
+            if require_provenance:
+                self.generation_provenance = proof
             return answer
         except (OSError, ValueError, http.client.HTTPException):
             raise AddonError(502, 'ローカルAIとの接続が終了しました') from None

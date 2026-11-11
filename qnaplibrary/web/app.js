@@ -235,6 +235,143 @@ async function homeView(main) {
 }
 
 // ---------- search ----------
+// Selection offsets are converted from DOM UTF-16 to Python Unicode code points.
+function graphProposal(panel, d) {
+  const form = h("details", { id: "graph-proposal" }, h("summary", {}, "原文から事実関係を登録"));
+  const body = h("textarea", { readonly: true, rows: 8, "aria-label": "関係の根拠となる本文", value: d.body });
+  const quote = h("div", { class: "pre", "aria-live": "polite" }, "本文で根拠の範囲を選択してください。");
+  let evidence = null;
+  const selectQuote = h("button", { class: "btn", onclick: guard(async () => {
+    const start = body.selectionStart, end = body.selectionEnd;
+    const text = body.value.slice(start, end);
+    if (!text.trim() || Array.from(text).length > 4000) throw new Error("根拠は1〜4000文字で選択してください");
+    // Textareas normalize CRLF, so refuse changed text rather than save shifted ranges.
+    if (body.value !== d.body) throw new Error("改行形式が異なるため範囲を保存できません");
+    evidence = { start: Array.from(body.value.slice(0, start)).length, end: Array.from(body.value.slice(0, end)).length, quote: text };
+    quote.textContent = text;
+  }) }, "選択範囲を根拠にする");
+  const relation = sel([["citation","文献引用"],["family","特許ファミリー"],["priority","優先権"],["applicant","出願人"],["classification","分類"],["requirement","クレーム要件"]], "citation", {"aria-label":"関係の種類"});
+  const kind = sel([["document","文献"],["party","出願人"],["classification","分類"],["claim","クレーム要件"],["family","ファミリー"],["priority","優先権"]], "document", {"aria-label":"関連先の種類"});
+  const key = h("input", { maxlength: 200, "aria-label": "関連先の識別子" });
+  const label = h("input", { maxlength: 300, "aria-label": "関連先の表示名" });
+  let pending = null;
+  const save = h("button", { class: "btn" }, "未確認の関係として登録");
+  save.addEventListener("click", guard(async () => {
+    if (!evidence || !key.value.trim()) throw new Error("根拠の選択と関連先の識別子が必要です");
+    save.disabled = true;
+    try {
+      const sourceNodes = await api("GET", "/api/v1/graph/documents/" + d.id);
+      const source = {kind:"document",key:String(d.id),label:sourceNodes.nodes[0]?.label || (d.title || String(d.id)).slice(0,300)};
+      let target = {kind:kind.value,key:key.value,label:label.value};
+      if (kind.value === "document") {
+        if (!/^[1-9][0-9]{0,17}$/.test(key.value)) throw new Error("文献の数値IDを指定してください");
+        const other = await api("GET", "/api/v1/documents/" + key.value);
+        const nodes = await api("GET", "/api/v1/graph/documents/" + key.value);
+        target = {kind:"document",key:String(other.id),label:nodes.nodes[0]?.label || (other.title || String(other.id)).slice(0,300)};
+      } else if (!label.value.trim()) throw new Error("関連先の表示名が必要です");
+      const data = {source,target,relation:relation.value,basis:"factual",model:"",confidence:1,
+        evidence:{...evidence,doc_id:d.id,revision:d.revision,method:"manual_selection"}};
+      const signature = JSON.stringify(data);
+      // Retry a lost response with the same ID and timestamp, never duplicate the edge.
+      if (!pending || pending.signature !== signature) {
+        const bytes = crypto.getRandomValues(new Uint8Array(16));
+        pending = {signature, payload:{...data,id:"manual-"+Array.from(bytes,x=>x.toString(16).padStart(2,"0")).join(""),
+          evidence:{...data.evidence,retrieved_at:new Date().toISOString().replace(/\.\d{3}Z$/, "Z")}}};
+      }
+      await api("POST", "/api/v1/graph/edges", pending.payload);
+      toast("未確認の関係を登録しました"); await openDoc(d.id);
+    } finally { save.disabled = false; }
+  }));
+  form.append(h("p", {}, "現在の文献を起点に登録します。文献の関連先には管理画面の数値IDを指定してください。登録後に別途、原文と照合して確認します。"),
+    field("本文の根拠範囲", body), selectQuote, quote, field("関係",relation), field("関連先の種類",kind),
+    field("関連先の識別子",key), field("関連先の表示名（文献は自動取得）",label),save);
+  panel.append(form);
+}
+
+// Human approvals stay in the authenticated ResearchDataHub management UI.
+async function documentReviews(main, d) {
+  const panel = h("section", { class: "card", id: "document-reviews" }, h("h2", {}, "分析と関係の確認"));
+  main.append(panel);
+  graphProposal(panel, d);
+  const statuses = { approved: "確認済み", rejected: "却下", unreviewed: "未確認" };
+  function controls(item, path, box) {
+    const select = sel(Object.entries(statuses), item.review_status);
+    const check = h("input", { type: "checkbox" });
+    const button = h("button", { class: "btn", disabled: true }, "確認状態を保存");
+    check.addEventListener("change", () => { button.disabled = !check.checked || !!item.stale; });
+    button.addEventListener("click", guard(async () => {
+      button.disabled = true;
+      try {
+        await api("POST", path, { status: select.value });
+        toast("確認状態を保存しました");
+        await openDoc(d.id);
+      } finally { button.disabled = !check.checked || !!item.stale; }
+    }));
+    box.append(h("p", {}, item.stale ? "根拠が変更されています。再生成・再登録が必要です。" : "確認状態: " + (statuses[item.review_status] || "未確認")),
+      field("変更後の状態", select), field("引用と原文を照合しました", check), button);
+    if (item.stale) { select.disabled = true; check.disabled = true; }
+  }
+  const analyses = await api("GET", "/api/v1/documents/" + d.id + "/analyses");
+  for (const item of analyses.items.filter(x => x.kind === "relations")) {
+    const value = JSON.parse(item.content);
+    const box = h("details", { class: "relation-proposals" }, h("summary", {}, "AIの関係提案（推定・未確認）"));
+    if (item.stale) box.append(h("p", {}, "原文が変更されています。PatentBuddyで再生成してください。"));
+    if (!value.proposals.length) box.append(h("p", {}, "根拠に基づく候補はありません。"));
+    value.proposals.forEach((proposal, index) => {
+      const checked = h("input", {type:"checkbox", disabled:item.stale});
+      const button = h("button", {class:"btn", disabled:true}, "推定関係として登録");
+      checked.addEventListener("change", () => {button.disabled = item.stale || !checked.checked;});
+      button.addEventListener("click", guard(async () => {
+        button.disabled = true;
+        try {
+          await api("POST", "/api/v1/analyses/" + encodeURIComponent(item.id) + "/relations/" + index + "/register", {confirm_evidence:true});
+          toast("推定関係を登録しました。関係一覧で確認状態を変更できます。");
+          await openDoc(d.id);
+        } finally {button.disabled = item.stale || !checked.checked;}
+      }));
+      box.append(h("div", {class:"relation-proposal"}, h("h3", {}, proposal.relation + ": " + proposal.concept),
+        h("p", {}, "信頼度: " + proposal.confidence + " / 範囲 " + proposal.start + "–" + proposal.end),
+        h("div", {class:"pre"}, proposal.quote), field("引用と原文を照合しました", checked), button));
+    });
+    panel.append(box);
+  }
+  for (const item of analyses.items.filter(x => x.kind === "chart")) {
+    const chart = JSON.parse(item.content);
+    const box = h("details", { class: "review-chart" }, h("summary", {}, "クレームチャート: 請求項" + chart.claim_no),
+      h("p", {}, "人手の確認は特許性・侵害の法的な確定を意味しません。"));
+    for (const row of chart.rows) {
+      box.append(h("h3", {}, row.element.label + ": " + row.element.text),
+        h("p", {}, row.assessment.judgment + " " + row.assessment.reason));
+      for (const e of row.evidence) box.append(h("div", { class: "pre" }, e.ref + " / 文献" + e.doc_id + " / 版 " + e.revision + " / 範囲 " + e.start + "–" + e.end + "\n" + e.quote),
+        h("button", { class: "btn", onclick: guard(() => openDoc(e.doc_id)) }, "引用元の文献を開く"));
+    }
+    controls(item, "/api/v1/analyses/" + encodeURIComponent(item.id) + "/review", box);
+    panel.append(box);
+  }
+  const edges = h("div", { id: "review-edges" });
+  panel.append(h("h3", {}, "文献に関係する根拠"), edges);
+  let cursor = "";
+  const more = h("button", { class: "btn" }, "関係をさらに表示");
+  async function load() {
+    more.disabled = true;
+    try {
+      const result = await api("GET", "/api/v1/graph/documents/" + d.id + "/edges?after=" + encodeURIComponent(cursor));
+      for (const e of result.items) {
+        const box = h("details", { class: "review-edge" }, h("summary", {}, (e.basis === "inferred" ? "推定" : "事実根拠") + " · " + e.relation + " · " + e.source_label + " → " + e.target_label),
+          h("p", {}, "推定関係は確認後も推定のまま保持されます。"),
+          h("div", { class: "pre" }, "文献 " + e.evidence_doc_id + " / 版 " + e.revision + " / 範囲 " + e.start + "–" + e.end + "\n" + e.quote),
+          h("p", {}, "取得: " + e.retrieved_at + " / 方法: " + e.method + " / モデル版: " + (e.model || "なし") + " / 信頼度: " + e.confidence),
+          h("button", { class: "btn", onclick: guard(() => openDoc(e.evidence_doc_id)) }, "根拠文献を開く"));
+        controls(e, "/api/v1/graph/edges/" + encodeURIComponent(e.id) + "/review", box);
+        edges.append(box);
+      }
+      cursor = result.next_cursor || ""; more.hidden = !cursor;
+    } finally { more.disabled = false; }
+  }
+  more.addEventListener("click", guard(load)); panel.append(more);
+  await load();
+}
+
 async function searchView(main) {
   await loadCollections();
   main.append(h("h1", {}, "検索"));
@@ -264,12 +401,13 @@ async function openDoc(id) {
   const main = $app.querySelector("main"); clear(main);
   main.append(h("div", { class: "row" }, h("button", { class: "btn", onclick: () => { S.view = "search"; render(); } }, "← 戻る")),
     h("h1", {}, d.title || "(無題)"),
-    h("div", { class: "card" }, h("dl", { class: "dl" }, h("dt", {}, "ID"), h("dd", {}, d.ext_id || "-"), h("dt", {}, "日付"), h("dd", {}, d.date || "-"),
+    h("div", { class: "card" }, h("dl", { class: "dl" }, h("dt", {}, "文献番号"), h("dd", {}, String(d.id)), h("dt", {}, "ID"), h("dd", {}, d.ext_id || "-"), h("dt", {}, "日付"), h("dd", {}, d.date || "-"),
       h("dt", {}, "出典"), h("dd", {}, d.source || "-"), h("dt", {}, "URL"), h("dd", {}, d.url ? h("a", { href: d.url, target: "_blank", rel: "noopener noreferrer" }, d.url) : "-")),
       h("details", {}, h("summary", {}, "メタデータ"), h("div", { class: "pre" }, JSON.stringify(d.meta, null, 2)))),
     h("div", { class: "card" }, h("div", { class: "row" }, h("h2", {}, "本文"), h("span", { class: "spacer" }),
       h("button", { class: "btn", onclick: guard(() => addRefDialog(d)) }, "特許案件の先行文献に追加")), h("div", { class: "pre" }, d.body || "(本文なし)")),
     h("div", { class: "card" }, h("h2", {}, "チャンク（索引単位） " + d.chunks.length), d.chunks.map(c => h("details", {}, h("summary", {}, "#" + c.ord + " " + c.section), h("div", { class: "pre" }, c.text)))));
+  await documentReviews(main, d);
   const excerpt = h("textarea", { maxlength: 12000, placeholder: "公開本文から共有してよい箇所だけを選択（最大12000文字）" });
   const approvalCheck = h("input", { type: "checkbox" });
   const previewBox = h("div", {});
@@ -660,7 +798,7 @@ async function settingsView(main) {
         h("button", { class: "btn", onclick: guard(async () => { await api("POST", "/api/auth/logout", {}); S.me = null; render(); }) }, "ログアウト")));
   } else if (tab === "devices") {
     const d = await api("GET", "/api/devices");
-    const pc = h("input", { type: "password", placeholder: "8文字以上" }), dn = h("input", { placeholder: "デバイス名" }), out = h("div", {}), scope = sel([["published", "外部AI用・公開資料のみ"], ["ro", "全データの読み取り"], ["pdf_analysis", "PDF取り込み・分析結果保存"], ["pdf_import", "PDF取り込みのみ"], ["analysis", "分析結果保存のみ"], ["rw", "全データの読み書き"]], "published");
+    const pc = h("input", { type: "password", placeholder: "8文字以上" }), dn = h("input", { placeholder: "デバイス名" }), out = h("div", {}), scope = sel([["published", "外部AI用・公開資料のみ"], ["ro", "全データの読み取り"], ["research_analysis", "PDF・分析・ベクトル保存"], ["embedding", "ベクトル保存のみ"], ["pdf_analysis", "PDF取り込み・分析結果保存"], ["pdf_import", "PDF取り込みのみ"], ["analysis", "分析結果保存のみ"], ["rw", "全データの読み書き"]], "published");
     body.append(h("div", { class: "card" }, h("h2", {}, "LAN ペアリング用パスコード"), h("p", { class: "small muted" }, "別PC・AI アシスタント・ControlDeck が POST /api/v1/pair {\"passcode\":\"…\",\"name\":\"…\"} で長期トークンを取得します（LAN / Tailscale からのみ、取得後は無制限に利用可）。"),
       h("p", {}, "状態: ", h("span", { class: "tag " + (d.pairing_enabled ? "ok" : "warn") }, d.pairing_enabled ? "有効" : "未設定")),
       h("div", { class: "row" }, pc, h("button", { class: "btn primary", onclick: guard(async () => { await api("PUT", "/api/devices/pairing", { passcode: pc.value }); toast("設定しました"); render(); }) }, "設定"),

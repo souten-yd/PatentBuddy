@@ -1120,3 +1120,130 @@ def pdf_image(req):
     from . import pdf_store
     return req.h.send_bytes(200, pdf_store.image_for(req.app.store, int(req.params['did']), int(req.params['iid'])),
                             'image/png', {'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff'})
+
+
+@route('POST', '/api/v1/graph/edges', 'admin')
+def graph_save(req):
+    from . import evidence_graph
+    return evidence_graph.save(req.app.store, req.json(limit=32 * 1024), req.actor)
+
+
+@route('POST', '/api/v1/graph/edges/{eid}/review', 'admin')
+def graph_review(req):
+    from . import evidence_graph
+    body = req.json()
+    if not isinstance(body, dict):
+        raise _err(400, '確認内容を指定してください')
+    return evidence_graph.review(req.app.store, req.params['eid'], body.get('status'), req.actor)
+
+
+@route('GET', '/api/v1/graph/edges/{eid}', 'read')
+def graph_edge(req):
+    row = req.app.store.one('SELECT * FROM graph_edges WHERE id=?', (req.params['eid'],))
+    if row is None:
+        raise _err(404, '関係がありません')
+    return dict(row)
+
+
+@route('GET', '/api/v1/graph/documents/{did}', 'read')
+def graph_document(req):
+    return {'nodes': [dict(row) for row in req.app.store.q(
+        'SELECT * FROM graph_nodes WHERE doc_id=? LIMIT 1', (int(req.params['did']),))]}
+
+
+@route('GET', '/api/v1/graph/documents/{did}/edges', 'read')
+def graph_document_edges(req):
+    did = int(req.params['did'])
+    after = req.arg('after', '')
+    if not isinstance(after, str) or (after and not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', after)):
+        raise _err(400, 'invalid graph cursor')
+    # Indexed UNION bounds each adjacency path without loading the graph.
+    rows = req.app.store.q("""SELECT e.*, s.label AS source_label, t.label AS target_label
+ FROM graph_edges e JOIN graph_nodes s ON s.id=e.source_node JOIN graph_nodes t ON t.id=e.target_node
+ WHERE e.id IN (
+ SELECT id FROM (SELECT id FROM graph_edges WHERE evidence_doc_id=? AND id>? ORDER BY id LIMIT 51)
+ UNION SELECT id FROM (SELECT e.id FROM graph_edges e JOIN graph_nodes n ON n.id=e.source_node WHERE n.doc_id=? AND e.id>? ORDER BY e.id LIMIT 51)
+ UNION SELECT id FROM (SELECT e.id FROM graph_edges e JOIN graph_nodes n ON n.id=e.target_node WHERE n.doc_id=? AND e.id>? ORDER BY e.id LIMIT 51))
+ ORDER BY e.id LIMIT 51""", (did, after, did, after, did, after))
+    return {'items': [dict(r) for r in rows[:50]], 'next_cursor': rows[49]['id'] if len(rows)>50 else None}
+
+
+@route('GET', '/api/v1/graph/expand', 'read')
+def graph_expand(req):
+    from . import evidence_graph
+    seeds = str(req.arg('seeds', '')).split(',')
+    if len(seeds) > 20 or any(not re.fullmatch(r'[1-9][0-9]{0,17}', seed) for seed in seeds):
+        raise _err(400, '開始ノードを1〜20件指定してください')
+    inferred = req.arg('include_inferred', 'false')
+    if inferred not in ('true', 'false'):
+        raise _err(400, 'include_inferredはtrue/falseで指定してください')
+    return evidence_graph.expand(req.app.store, [int(x) for x in seeds],
+        hops=int(req.arg('hops', '1')), max_nodes=int(req.arg('max_nodes', '50')),
+        max_edges=int(req.arg('max_edges', '100')), include_inferred=inferred == 'true')
+
+
+@route('POST', '/api/v1/analyses/{aid}/review', 'admin')
+def chart_review(req):
+    from .chart_storage import review
+    body = req.json()
+    if not isinstance(body, dict):
+        raise _err(400, '確認内容を指定してください')
+    return review(req.app.store, req.params['aid'], body.get('status'), req.actor)
+
+
+@route('GET', '/api/v1/host-vectors/pending', 'read')
+def host_vectors_pending(req):
+    from .host_vectors import pending
+    return pending(req.app.store, req.arg('model_ref'), int(req.arg('after', '0')), int(req.arg('limit', '32')))
+
+
+@route('POST', '/api/v1/host-vectors', 'embedding')
+def host_vectors_save(req):
+    from .host_vectors import save
+    return save(req.app.store, req.json(limit=4 * 1024 * 1024), req.actor)
+
+
+@route('DELETE', '/api/v1/host-vectors/{model_ref}', 'admin')
+def host_vectors_remove(req):
+    from .host_vectors import remove
+    return remove(req.app.store, req.params['model_ref'], req.actor)
+
+
+@route('GET', '/api/v1/host-vectors/{model_ref}/manifest', 'read')
+def host_vector_manifest(req):
+    from .host_vectors import manifest
+    return manifest(req.app.store,req.params['model_ref'])
+
+
+@route('GET', '/api/v1/host-vectors/{model_ref}/page', 'read')
+def host_vector_page(req):
+    from .host_vectors import page
+    return page(req.app.store,req.params['model_ref'],req.arg('etag'),int(req.arg('after','0')),int(req.arg('limit','128')))
+
+
+@route('GET', '/api/v1/chunks/{chunk_id}/evidence', 'read')
+def chunk_evidence(req):
+    from .evidence_read import chunk
+    return chunk(req.app.store, int(req.params['chunk_id']))
+
+
+@route('GET', '/api/v1/documents/{did}/evidence', 'read')
+def document_evidence(req):
+    from .evidence_read import document_range
+    return document_range(req.app.store, int(req.params['did']), int(req.arg('start', -1)),
+                          int(req.arg('end', -1)), req.arg('revision', ''))
+
+
+@route('GET', '/api/v1/analyses/{aid}/receipt', 'read')
+def analysis_receipt(req):
+    row = req.app.store.one('SELECT id,doc_id,kind,source_revision FROM document_analyses WHERE id=?', (req.params['aid'],))
+    return {'found': row is not None, 'analysis': dict(row) if row else None}
+
+
+@route('POST', '/api/v1/analyses/{aid}/relations/{index}/register', 'admin')
+def register_relation_proposal(req):
+    from .relation_proposals import register
+    body = req.json()
+    if not isinstance(body, dict) or set(body) != {'confirm_evidence'} or body['confirm_evidence'] is not True:
+        raise _err(400, '根拠の照合が必要です')
+    return register(req.app.store, req.params['aid'], int(req.params['index']), req.actor)

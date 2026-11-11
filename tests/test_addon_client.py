@@ -59,6 +59,15 @@ class AddonClientTests(unittest.TestCase):
                 try:
                     browser = Client('http://127.0.0.1:%d' % server.server_port)
                     self.assertEqual(browser.call('GET', '/addon/v1/status')[0], 401)
+                    self.assertEqual(browser.call('GET', '/addon/v1/embedding-jobs')[0], 401)
+                    self.assertEqual(browser.call('POST', '/addon/v1/embedding-jobs', {})[0], 401)
+                    with mock.patch.object(app.client, 'authenticate', return_value={'subject': '1'}):
+                        self.assertEqual(browser.call('GET', '/addon/v1/embedding-jobs'), (200, {'items': []}))
+                        with mock.patch.object(app.embedding_jobs, 'start') as start:
+                            for invalid in ([], {'model_ref': 'untrusted'}, {'url': 'https://example.test'}):
+                                self.assertEqual(browser.call('POST', '/addon/v1/embedding-jobs', invalid)[0], 400)
+                            start.assert_not_called()
+
                     with mock.patch.object(app.client, 'authenticate', return_value={'subject': 'context:1'}):
                         status, state = browser.call('GET', '/addon/v1/status')
                         self.assertEqual(status, 200)
@@ -75,6 +84,6 @@ class AddonClientTests(unittest.TestCase):
                         self.assertEqual(browser.call('POST', '/addon/v1/search', {'q': []})[0], 400)
                     self.assertFalse((Path(tmp) / 'library.sqlite3').exists())
                 finally:
-                    app.pdf_jobs.close(); app.jobs.close()
+                    app.pdf_jobs.close(); app.jobs.close(); app.embedding_jobs.close()
                     server.shutdown(); server.server_close(); thread.join()
         finally: hub.close()

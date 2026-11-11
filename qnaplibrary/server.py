@@ -429,6 +429,20 @@ class Handler(BaseHTTPRequestHandler):
                         if method == "GET" and path == "/addon/v1/status":
                             result = client.status()
                             result["addon"]["version"] = VERSION
+                        elif path == "/addon/v1/embedding-jobs" and method == "GET":
+                            result = self.server.app.embedding_jobs.list(identity)
+                        elif path == "/addon/v1/embedding-jobs" and method == "POST":
+                            body = Request(self, method, path, {}, {}).json()
+                            if not isinstance(body, dict) or set(body) - {'resume_id'}:
+                                raise AddonError(400, '索引構築条件が不正です')
+                            result = self.server.app.embedding_jobs.start(self.headers, body.get('resume_id'))
+                        elif re.fullmatch(r"/addon/v1/embedding-jobs/[a-f0-9]{32}", path) and method == "DELETE":
+                            result = self.server.app.embedding_jobs.forget(path.rsplit('/', 1)[1], identity)
+                        elif re.fullmatch(r"/addon/v1/embedding-jobs/[a-f0-9]{32}/(cancel|reconcile)", path) and method == "POST":
+                            Request(self, method, path, {}, {}).json()
+                            identifier = path.split('/')[-2]
+                            result = (self.server.app.embedding_jobs.cancel(identifier, identity) if path.endswith('/cancel')
+                                      else self.server.app.embedding_jobs.reconcile(self.headers, identifier))
                         elif path == "/addon/v1/pdf-jobs" and method == "GET":
                             result = self.server.app.pdf_jobs.list(identity)
                         elif path == "/addon/v1/pdf-jobs" and method == "POST":
@@ -461,7 +475,7 @@ class Handler(BaseHTTPRequestHandler):
                             body = Request(self, method, path, {}, {}).json()
                             if not isinstance(body, dict):
                                 raise AddonError(400, "分析条件を指定してください")
-                            result = self.server.app.jobs.start(self.headers, body.get("doc_id"), body.get("kind"), body.get("resume_id"))
+                            result = self.server.app.jobs.start(self.headers, body.get("doc_id"), body.get("kind"), body.get("resume_id"), body.get("claim_no", 1))
                         elif method == "POST" and re.fullmatch(r"/addon/v1/jobs/[a-f0-9]{32}/reconcile", path):
                             Request(self, method, path, {}, {}).json()
                             result = self.server.app.jobs.reconcile(self.headers, path.split('/')[-2])
@@ -516,7 +530,7 @@ class Handler(BaseHTTPRequestHandler):
                     raise HTTPError(401, "認証が必要です")
                 if access == "admin" and req.actor != "admin":
                     raise HTTPError(403, "管理者のみ実行できます")
-                if req.device and method != "GET" and req.device["scopes"] != "rw" and access not in ("read", "published") and not (access in ("analysis", "pdf_import") and req.device["scopes"] in (access, "pdf_analysis")):
+                if req.device and method != "GET" and req.device["scopes"] != "rw" and access not in ("read", "published") and not (access in ("analysis", "pdf_import", "embedding") and (req.device["scopes"] in (access, "research_analysis") or (access != "embedding" and req.device["scopes"] == "pdf_analysis"))):
                     raise HTTPError(403, "読み取り専用デバイスです")
             if req.session and access != "public" and method not in ("GET", "HEAD"):
                 origin = self.headers.get("Origin")
@@ -566,10 +580,13 @@ class AddonShell:
         self.jobs = AnalysisJobs(self.client, self.data_dir)
         from .addon_pdf_jobs import PDFJobs
         self.pdf_jobs = PDFJobs(self.client, self.data_dir)
+        from .addon_embedding_jobs import EmbeddingJobs
+        self.embedding_jobs = EmbeddingJobs(self.client, self.data_dir)
 
     def request_shutdown(self, exit_code=0):
         self.jobs.close()
         self.pdf_jobs.close()
+        self.embedding_jobs.close()
         self.exit_code = exit_code
         if self.httpd:
             threading.Thread(target=self.httpd.shutdown, daemon=True).start()
@@ -638,6 +655,7 @@ def main(argv=None):
             local_auth.append(LocalAuthServer(app.auth, httpd.server_port))
             local_auth.append(LocalAuthServer(app.auth, httpd.server_port, "analysis"))
             local_auth.append(LocalAuthServer(app.auth, httpd.server_port, "pdf_import"))
+            local_auth.append(LocalAuthServer(app.auth, httpd.server_port, "embedding"))
         except OSError:
             LOG.warning("Local automatic authentication unavailable; explicit device authentication remains available")
 
