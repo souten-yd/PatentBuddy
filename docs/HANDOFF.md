@@ -209,3 +209,52 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - 請求項分析も保存成功。正本DBは文献1件・原本1件・画像参照13件・要約3775文字/請求項確認6510文字を保持、quick_check成功。15ページのうち直接抽出10、直接抽出+OCR5。OCR/AIの内容精度は人手未承認。請求項ブラウザ試験初回は既存要約の表示完了前の件数取得で誤判定したため、再生成せず「請求項の確認」の表示待ちに修正して成功（/tmp/pb-pdf-installed-claims-recheck.log）。
 - 一時ユーザー/session/grantと試験ジョブ履歴を正常除去（remaining_jobs=0）。原本・抽出結果・分析は本番正本に保持。利用者は文献検索で「JPA」などから開ける。connection.jsonなし、同一UID自動認証を維持。
 - docs-only追記の全verifyも143 tests成功39.361秒。古いガイド記載のtest_docs_rulesは存在せずimport失敗、実際のtest_updater_docs 7 testsと全verifyで検証した。PR-F/P2/PR-Gは未完了、全体goalはactive。
+
+## 公式特許取得元の追加（2026-11-11・進行中）
+
+- ユーザー追加要求: パワエレ異常検知の約10件調査と、PATENTSCOPE/無料APIの特許ダウンロード機能。候補一覧は /home/souten/ダウンロード/power-electronics-anomaly-patents/ 。本文/図未取得。公開ミラー利用可否への明示回答はまだないため、まず公式API経路を実装。
+- main193f53aから独立worktree /data1tb/PatentBuddy-sources、feat/patent-download-sources。PR23 graphとは分離。公式条件と実装計画は docs/patent-download-sources.md。PATENTSCOPE自動robotは禁止、SOAPは有料。登録不要のEPO Publication Server REST v1.2を先行実装する。API鍵は既存設定に未登録、値は出力していない。
+- 本番0.5.10不変。全体計画PR-F/P2/PR-Gと10件原本抽出は未完。
+
+## ヒートマップ・調査キュー・QNAP保存継続の要望（2026-11-11）
+
+- ユーザーはキーワード→各種公式取得元の候補統合→重複排除→ヒートマップで一時マスク/絞り込み提案→規定件数以内のDLを要求。さらにPatentBuddyからResearchDataHubへ調査キューを投入、NAS低CPUで可能な収集/保存を行い、重い処理はPCへ分担し、容量の大きいNASを保存先として維持したいと指定。
+- `docs/research-queue-design.md`と正本planに反映。QNAP正本/キュー/書誌・公式収集、PC Host OCR/embed/rerank/LLMのpull worker。CPUが弱いことを理由にOpenRouterへ切り替えない。公開検索語自体の外部送信、ファミリーと公報の違い、色の件数/未分類、上限打切りと真の総件数、入力snapshotの版、DL実ファイル数/bytes上限、leaseとHost資源所有権を区別。
+- PR24 /data1tb/PatentBuddy-sources は公式番号指定PDF取得のコード実装途中（未コミット qnaplibrary/patent_download.py、api.py、web/app.js）。EPO公式RESTから仕様例EP1004359B1.pdfを302833bytes取得成功、SHA256 070f17fdac403ceed8808e376644250242a899656d79899576749bc8f84a49ee（/tmp/pb-epo-live.log）。これはパワエレ10件の取得ではなくAPI疎通。UI/権限/リダイレクト/上限テスト、verify、配布は未完。次はこれらを完了し、調査プレビュー/キューを段階実装する。
+- PR23 graphはcc1ea97までpush済み。全体PR-F/性能/P2/PR-G、10件原本抽出、キーワード横断検索/マスク/収集キューとも未完。目標active。本番v0.5.10は不変。
+
+## 改善方式の評価と公式PDF取得の検証（2026-11-11）
+
+- ユーザーはより良い方法の調査・評価・採用を指示。一次資料（WIPO/USPTO/IP Australia/EPO、Sentence Transformers公式）を調査し、上位N切詰め・ヒートマップ単独・全件LLM・段階検索の設計比較を docs/research-selection-evaluation.md に記録。目的別検索、基準文献pin、除外再確認、偏り表示、候補限定rerank、差分取得を採用方針へ反映。MMR等の具体的方式/重みと実資料精度は未評価で、性能向上を主張しない。
+- EPO公式PDF取得を実装。固定HTTPS REST origin/公報番号のみ・redirect拒否・proxy不使用・16MiB/時間上限/1並列/100000 bytes/sec。GETや検索で自動取得せずadmin POST+CSRF+strict同意、PDF magic/Content-Length検査。応答をブラウザ保存し、正本への登録は既存PatentBuddy PDF取込で行う。追加常駐DB書込みなし。PATENTSCOPEは公式ブラウザへの導線だけで自動robot禁止を維持。
+- 関連4 tests成功0.602秒（/tmp/pb-download-tests.log）。URL/不正公報拒否、PDF以外/未完/サイズ上限、排他/redirect拒否、匿名401/readonly403/CSRF403/不正同意400、拒否時外部呼出0を確認。全verify147 tests成功41.789秒（/tmp/pb-download-verify.log）、JS構文/diff whitespace成功。
+- 実EPO RESTからEP1004359B1.pdf取得、302833 bytes/SHA256 070f17fdac403ceed8808e376644250242a899656d79899576749bc8f84a49ee。既存extract_pdfで14ページ抽出成功（/tmp/pb-epo-extraction.log）。これはAPI仕様例の疎通資料でパワエレ10件ではない。
+- 実Chrome1280pxで管理Web収集→EPO PDF取得→ダウンロード内容SHA一致、320pxで表示受入。両幅overflow/JS例外0（/tmp/pb-download-ui.log）。320pxは同じPDFを再取得せず表示のみ。一時管理Web fixture PID606660をSIGINT停止。本番データ/サービス不変。
+- PR24 Draft/未配布。次は調査snapshot・候補統合/重複/マスク/件数予算・キュー、API登録必須取得元、パワエレ10件の原本/比較評価。PR23/性能/P2/PR-Gも未完。goal active。
+- ControlDeck実Host Job/CPU lease/local-only LLMで取得PDFの先頭ページのみを入力し、157文字の説明生成とmodel/runtime証明を確認（/tmp/pb-epo-llm-live.log）。全文分析やパワエレ精度評価ではない。一時addon/user/session削除、Host job/audit保持、正常資源解放。管理Web fixtureもcleaned確認。
+
+## 候補snapshotと一時マスクの基礎（2026-11-11）
+
+- 前turn99e32edは公式PDF取得と比較設計のprogress。今回はresearch_selection.pyにネットワーク/DB書込みを伴わない候補統合・選定previewを実装。入力最大2000件、公報番号+言語で統合、元の複数出典/タイトルを保持し、順序に依存しないSHA256 revisionを生成。異なるfamily IDの矛盾は勝手に解決せず拒否。国/kindが違う公報は同じfamilyでも保持する。
+- 一時マスクは全所属セルがマスクされた公報だけ非表示とし、複数分類の片側だけの除外で丸ごと落とさない。未分類セルを保持。pinとマスクの矛盾、snapshot改版、未知ID/セル、不正型/重複入力を拒否またはblocking理由へ。選択数は公報数を計数しfamily数と分離、上限超過でも黙って先頭Nへ切り詰めない。
+- previewのcount_budget_okは件数条件だけ。bytes/公式取得元/承認/キュー未接続のためdownload_ready=falseを維持。これはUI/キュー機能の完成ではない。
+- 関連3 tests成功（重複統合・順序不変・family矛盾・多重分類・マスク解除・pin競合・公報数予算・snapshot不一致）。実パワエレ候補metadata10件へ重複2件を加え12→10を確認、上限5で10件をブロック、手動分類currentをマスクして5件preview成功。未検証familyは全件None。`.data/selection-power-electronics.json`。自動分類/関連性精度の評価ではなく、まだ原本抽出も未完。
+- 次はこのsnapshotの正本保存/版付き選定・ヒートマップUI・承認済み上限内取得キューを接続する。API鍵がない取得元は未設定表示し、候補不足を網羅と主張しない。本番0.5.10不変、PR24 Draft、PR23/性能/P2/PR-G含めgoal active。今回LLM処理変更なし、前turnの実Host疎通を維持。
+- 最終検証: 全verify150 tests成功40.176秒（/tmp/pb-selection-verify.log）。family既知/未知キーの衝突防止調整後も関連3 testsとdiff whitespace確認成功。新規previewは純粋計算で永続書込みなし。PR24の途中成果としてpushし、リリース/本番更新は未実施。
+
+## 調査候補の正本保存API（2026-11-11）
+
+- PR24へresearch_store.py、research_snapshots/research_selectionsテーブルを追加。候補内容hashのimmutable snapshotと選定revisionを同じ正本SQLiteへ保存。POST /api/v1/research/snapshots、GET /api/v1/research/snapshots/{sid}、POST .../{sid}/selection はadmin限定。候補最大2000件/JSON 8MiB、任意URL取得や自動DLなし。調査履歴をro/rw deviceへ開放しない。
+- 同一候補は入力順/重複入力数に依存せず同じ保存内容。選定はexpected_revision比較とtransactionで古い更新を拒否。同一結果の再送はaudit含め無変更。マスク/pin/明示選択を別々に保持し解除可能。download_readyは未接続のためfalse。
+- 新規snapshot/変更選定の永続書込みは再開/復元/競合防止に必要。auditにはsnapshot IDとrevisionのみ。小規模Linux測定で同一候補再投入とGET相当を20回実行しprocess write_bytes増分0、SQLite total_changes増分0。大量/NASの性能契約を満たしたという意味ではない。
+- 関連5 tests成功、HTTP管理者保存/読出し・匿名/ro/rw/CSRF拒否、再送無変更、競合拒否、SQLite backup復元/quick_checkを確認。全verify152 tests成功（/tmp/pb-research-store-verify.log）。最終の明示選択保持/HTTP選定成功assert追加後も関連tests成功。
+- ControlDeck実Host Job/CPU lease/local-only LLMでEPO PDF先頭ページ説明157文字、model/runtime証明、lease解放、一時addon/user/session除去を再確認（/tmp/pb-research-store-llm.log）。これはLLM疎通であり候補の関連性精度評価ではない。
+- 未完: snapshot一覧/削除管理、ヒートマップUI、PatentBuddy用の限定scope、公式検索結果接続、容量/取得元/承認付き収集キュー。実装はPR24 Draftのみで本番v0.5.10不変。PR23/性能/P2/PR-G含めgoal active。
+
+## 候補選定の管理画面（2026-11-11）
+
+- PR24管理Web「収集」に保存済み候補の一覧・分類別件数meter・一時マスク・公報選択/固定・件数上限・保存/再読込を接続。全所属分類がマスクされた公報だけ非表示とし、選択/固定との競合と件数超過を表示。未分類と未確認familyを明示。操作だけではPDF取得しない。
+- 候補DOMは50件ずつ、snapshot一覧APIもkeyset50件/本文なし。GET /api/v1/research/snapshots は旧research/{jid}より先に登録しroute衝突を回避。admin限定、ro/rwの一覧取得403も確認。保存中は編集を凍結し、別snapshot応答への切替を抑制する。
+- 実Chrome1280/320pxで片側分類マスクの候補保持、全分類マスクとpin競合、保存/再読込、マスク解除後pin保持を確認。overflow=false/JS例外0、/tmp/pb-selection-ui-browser.log。合成候補2件/temp DBでの画面受入、公式検索精度の評価ではない。一時fixture611000をSIGINT停止。
+- 全verify152 tests成功43.062秒（/tmp/pb-selection-ui-verify.log）。追加keyset51件/重複なし/本文非返却/不正cursor試験を含め関連3 tests成功0.670秒。JS構文/diff whitespace成功。今回LLM経路変更なし、直前turnの実ControlDeck local-only PDF疎通結果は /tmp/pb-research-store-llm.log。
+- これは分類facetの件数meterであり、機器×手法の二次元heatmap/自動分類/絞り込み提案は未完成。公式検索→snapshot作成、PatentBuddy限定権限、取得容量/承認/queue接続、10件原本評価、PR23/性能/P2/PR-Gも未完。本番v0.5.10不変、PR24 Draft、goal active。

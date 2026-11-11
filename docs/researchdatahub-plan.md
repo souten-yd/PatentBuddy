@@ -78,3 +78,7 @@ PR #16の設計はmainへ統合済み。PR #17でLinux別名入口・doctor/serv
 ## 2026-11-10 実装の更新
 
 PR-A/B/CとPR-Eの検索閲覧・同一ユーザーローカル自動認証はv0.5.6で公開/実導入済み。PR-D #13はv0.5.7候補。P0/P1の1千/1万/10万件測定と15分idle、全6再起動/復元受入が完了し、結果・索引の費用・遅くなった観測を `benchmark-datahub.md` と `benchmarks/pr-d-linux.json` に記録した。P2の一般フィールド/改版/出典/ライセンスと段階的索引設計は `document-metadata-design.md`。P2の検索表実装とP3のNAS移設は未完で、P0/P1完了から推定しない。旧節のDraft/未実装表記は設計当時の履歴。
+
+### 2026-11-11 調査キューと保存・計算分担の追加
+
+ユーザー指定により、NASの大容量を活かす保存継続を第一候補とする。ResearchDataHubが唯一の正本と調査キューを管理し、軽い公式API収集/書誌/集計を担当、PatentBuddy/ControlDeckがOCR・埋め込み・rerank・LLMを担当する。キーワードからまず書誌候補を集め、重複/ファミリー整理、ヒートマップの一時マスク・絞り込み提案で実公報数/bytes上限以内のsnapshotを確定してからPDF取得する。具体的段階/権限/lease/復旧/受入契約は `research-queue-design.md`。これは設計追加であり現実装の完了を示さない。

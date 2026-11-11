@@ -770,6 +770,12 @@ def research_list(req):
     return {"jobs": req.app.research.list()}
 
 
+@route('GET', '/api/v1/research/snapshots', 'admin')
+def research_snapshots_list(req):
+    from . import research_store
+    return research_store.list_snapshots(req.app.store, req.arg('cursor'))
+
+
 @route("GET", "/api/v1/research/{jid}", "read")
 def research_get(req):
     return req.app.research.get(req.params["jid"])
@@ -1120,3 +1126,42 @@ def pdf_image(req):
     from . import pdf_store
     return req.h.send_bytes(200, pdf_store.image_for(req.app.store, int(req.params['did']), int(req.params['iid'])),
                             'image/png', {'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff'})
+
+
+@route('POST', '/api/v1/patent-downloads/epo', 'admin')
+def download_epo_publication(req):
+    from . import patent_download, connectors
+    body = req.json(limit=1024)
+    if not isinstance(body, dict) or set(body) != {'publication', 'confirm_public'} or body['confirm_public'] is not True:
+        raise _err(400, '外部に送信する公開公報番号を確認してください')
+    try:
+        patent_download.publication(body['publication'])
+    except connectors.ConnectorError as error:
+        raise _err(400, str(error)) from None
+    try:
+        name, raw = patent_download.download(body['publication'])
+    except connectors.ConnectorError as error:
+        raise _err(502, str(error)) from None
+    return req.h.send_bytes(200, raw, 'application/pdf', {
+        'Content-Disposition':'attachment; filename="'+name+'"', 'Cache-Control':'no-store', 'X-Content-Type-Options':'nosniff'})
+
+
+@route('POST', '/api/v1/research/snapshots', 'admin')
+def research_snapshot_create(req):
+    from . import research_store
+    body = req.json(limit=8 * 1024 * 1024)
+    if not isinstance(body, dict) or set(body) != {'records'}:
+        raise _err(400, 'records required')
+    return research_store.create(req.app.store, body['records'], req.actor)
+
+
+@route('GET', '/api/v1/research/snapshots/{sid}', 'admin')
+def research_snapshot_get(req):
+    from . import research_store
+    return research_store.get(req.app.store, req.params['sid'])
+
+
+@route('POST', '/api/v1/research/snapshots/{sid}/selection', 'admin')
+def research_selection_save(req):
+    from . import research_store
+    return research_store.save_selection(req.app.store, req.params['sid'], req.json(), req.actor)

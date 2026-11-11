@@ -21,6 +21,12 @@ KINDS = ("generic", "patent", "standard", "news", "market", "law", "paper", "not
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
+CREATE TABLE IF NOT EXISTS research_snapshots(
+ id TEXT PRIMARY KEY, payload TEXT NOT NULL, created REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS research_selections(
+ snapshot_id TEXT PRIMARY KEY REFERENCES research_snapshots(id) ON DELETE CASCADE,
+ revision INTEGER NOT NULL, payload TEXT NOT NULL, updated REAL NOT NULL);
+
 CREATE TABLE IF NOT EXISTS collections(
   id INTEGER PRIMARY KEY, name TEXT UNIQUE NOT NULL, kind TEXT NOT NULL DEFAULT 'generic',
   description TEXT NOT NULL DEFAULT '', settings TEXT NOT NULL DEFAULT '{}',

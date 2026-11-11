@@ -597,8 +597,34 @@ async function collectView(main) {
   await loadCollections();
   const cs = (await api("GET", "/api/v1/connectors")).connectors;
   await researchCard(main);
+  await researchSelectionCard(main);
   main.append(h("h1", {}, "収集（外部データ源）"),
     h("p", { class: "muted small" }, "公式 API・フィードのみ利用します。キーが必要なものは 設定 > 外部キー で登録してください。別PCからは REST API / MCP で直接投入できます。"));
+  const number = h("input", {placeholder:"EP1004359B1", maxlength:40, "aria-label":"EPO公報番号"});
+  const consent = h("input", {type:"checkbox"});
+  const status = h("p", {"aria-live":"polite"});
+  const getPDF = h("button", {class:"btn",disabled:true}, "EPO公式PDFをダウンロード");
+  consent.addEventListener("change", () => {getPDF.disabled = !consent.checked;});
+  getPDF.addEventListener("click", guard(async () => {
+    getPDF.disabled = true; consent.disabled = true; number.disabled = true;
+    status.textContent = "EPOの公式APIから取得しています…";
+    try {
+      const response = await api("POST", "/api/v1/patent-downloads/epo", {publication:number.value,confirm_public:true}, {raw:true});
+      if (!response.ok) {const error=await response.json();throw new Error(error.error || "取得に失敗しました");}
+      const blob = await response.blob();
+      const name = /filename="([A-Z0-9]+\.pdf)"/.exec(response.headers.get("Content-Disposition") || "")?.[1] || "publication.pdf";
+      const url = URL.createObjectURL(blob), link=h("a", {href:url,download:name});document.body.append(link);link.click();link.remove();
+      setTimeout(() => URL.revokeObjectURL(url),60000);
+      status.textContent = "PDFを保存しました。PatentBuddyの「PDFを選択して取り込む」で読み込めます。";
+    } catch(error) {status.textContent=error.message;}
+    finally {consent.disabled=false;number.disabled=false;getPDF.disabled=!consent.checked;}
+  }));
+  main.append(h("section", {class:"card",id:"patent-downloads"}, h("h2", {}, "特許の検索と原本PDF"),
+    h("p", {}, h("a", {href:"https://patentscope.wipo.int/search/ja/search.jsf",target:"_blank",rel:"noopener noreferrer"}, "PATENTSCOPEで検索・手動ダウンロード")),
+    h("p", {}, "PATENTSCOPEの無料画面は手動で利用します。自動ロボットは禁止、機械連携Webサービスは有料です。ダウンロードしたPDFはPatentBuddyで取り込めます。"),
+    h("h3", {}, "EPO European Publication Server（登録不要）"),
+    h("p", {}, "欧州A/B公報の番号指定取得です。日本公報やキーワード検索には対応しません。1件16MiBまで、転送量を制限して取得します。"),
+    field("公開公報番号",number),field("この公報番号をEPOへ送信する",consent),getPDF,status));
   cs.forEach(c => {
     const inputs = {};
     const coll = h("input", { placeholder: "保存先コレクション（空なら " + c.kind + "-" + c.id + "）", list: "colls" });
@@ -614,6 +640,61 @@ async function collectView(main) {
           out.textContent = r.collection + ": 取得 " + r.fetched + " / 追加 " + r.added + " / 更新 " + r.updated + "（" + r.ms + "ms）"; } finally { e.target.disabled = false; } }) }, "実行"))));
   });
   main.append(h("datalist", { id: "colls" }, S.collections.map(c => h("option", { value: c.name }))));
+}
+
+async function researchSelectionCard(main) {
+  const card=h('section',{class:'card',id:'research-selection'},h('h2',{},'調査候補の絞り込み'));
+  const listing=h('div',{}), editor=h('div',{}), message=h('p',{'aria-live':'polite'});
+  card.append(h('p',{},'保存済みの候補から今回の取得対象を選びます。分類の件数は重複を含みます。選定の保存だけではPDFを取得しません。'),listing,editor,message);main.append(card);
+  let current=null, masks=new Set(), pins=new Set(), selected=new Set(), limit=10, page=0, saving=false;
+  function draw() {
+    clear(editor); if(!current)return;
+    const items=current.snapshot.items, cells=new Map();
+    for(const item of items)for(const cell of item.cells)cells.set(cell,(cells.get(cell)||0)+1);
+    const hidden=item=>item.cells.every(cell=>masks.has(cell));
+    const visible=items.filter(item=>!hidden(item)), chosen=new Set([...selected,...pins]);
+    const conflicts=items.filter(item=>hidden(item)&&chosen.has(item.id));
+    const facets=h('div',{class:'research-facets','aria-label':'分類別の候補数'});
+    const max=Math.max(1,...cells.values());
+    for(const [cell,count] of [...cells].sort((a,b)=>a[0].localeCompare(b[0]))) {
+      const check=h('input',{type:'checkbox',checked:masks.has(cell),onchange:()=>{check.checked?masks.add(cell):masks.delete(cell);page=0;draw();}});
+      facets.append(h('label',{class:'research-facet'},check,cell==='unclassified'?'未分類':cell,' '+count+'件',h('meter',{min:0,max,value:count,'aria-label':cell+'の候補数'},count)));
+    }
+    const cap=h('input',{type:'number',min:1,max:100,value:limit,'aria-label':'取得件数の上限',onchange:()=>{limit=Number(cap.value);draw();}});
+    editor.append(h('p',{},'分類にチェックすると一時マスクします。複数分類の候補は全分類がマスクされたときだけ非表示になります。'),facets,
+      h('button',{class:'btn',onclick:()=>{masks.clear();page=0;draw();}},'マスクを解除'),field('取得件数の上限',cap),
+      h('p',{'data-testid':'selection-count'},'全候補 '+items.length+'件 / 表示 '+visible.length+'件 / 選択（固定含む） '+chosen.size+'件'),
+      h('p',{},conflicts.length?'マスクと選択・固定が競合しています。解除または選択を見直してください。':chosen.size>limit?'件数上限を超えています。候補を絞ってください。':!chosen.size?'候補を選択してください。':'件数条件を満たしています。容量・取得元の確認は別途必要です。'),
+      h('button',{class:'btn',onclick:()=>{for(const item of visible)selected.add(item.id);draw();}},'表示中の全候補を選択'),
+      h('button',{class:'btn',onclick:()=>{selected.clear();pins.clear();draw();}},'選択と固定を解除'));
+    page=Math.min(page,Math.max(0,Math.ceil(visible.length/50)-1));
+    for(const item of visible.slice(page*50,page*50+50)) {
+      const choose=h('input',{type:'checkbox',checked:selected.has(item.id),'aria-label':item.publication+'を選択',onchange:()=>{choose.checked?selected.add(item.id):selected.delete(item.id);draw();}});
+      const pin=h('input',{type:'checkbox',checked:pins.has(item.id),'aria-label':item.publication+'を固定',onchange:()=>{pin.checked?pins.add(item.id):pins.delete(item.id);draw();}});
+      editor.append(h('div',{class:'research-candidate'},h('label',{},choose,'選択'),h('label',{},pin,'固定'),h('strong',{},item.publication+' / '+item.language),h('p',{},item.titles.join(' / ')),h('p',{class:'small'},'出典: '+item.sources.join(', ')+' / ファミリー: '+(item.family||'未確認'))));
+    }
+    editor.append(h('p',{},(page+1)+' / '+Math.max(1,Math.ceil(visible.length/50))+' ページ（50件ずつ表示）'),
+      h('button',{class:'btn',disabled:page===0,onclick:()=>{page--;draw();}},'前の候補'),
+      h('button',{class:'btn',disabled:(page+1)*50>=visible.length,onclick:()=>{page++;draw();}},'次の候補'));
+    const save=h('button',{class:'btn primary'},'選定条件を保存');
+    save.addEventListener('click',async()=>{
+      if(saving)return; saving=true;
+      const payload={snapshot_revision:current.snapshot.revision,expected_revision:current.selection_revision,masked_cells:[...masks],pinned:[...pins],selected:[...selected],limit};
+      // Freeze the editor until this exact revision has been acknowledged.
+      for(const control of editor.querySelectorAll('input,button'))control.disabled=true;
+      try {const result=await api('POST','/api/v1/research/snapshots/'+current.snapshot.revision+'/selection',payload);saving=false;load(result);message.textContent='選定条件を保存しました。PDF取得は開始していません。';}
+      catch(error){saving=false;message.textContent=error.message+'。保存済みの条件を読み直して確認してください。';draw();}
+    });
+    editor.append(save,h('button',{class:'btn',onclick:guard(async()=>{load(await api('GET','/api/v1/research/snapshots/'+current.snapshot.revision));message.textContent='保存済みの条件を読み込みました。';})},'保存済みの条件に戻す'));
+  }
+  function load(value) {if(saving)return;current=value;const s=value.selection;masks=new Set(s?.masked_cells||[]);pins=new Set(s?.pinned||[]);selected=new Set(s?.selected||[]);limit=s?.preview.limit||10;page=0;draw();}
+  async function list(cursor) {
+    const result=await api('GET','/api/v1/research/snapshots'+(cursor?'?cursor='+encodeURIComponent(cursor):''));clear(listing);
+    if(!result.items.length)listing.append(h('p',{},'保存済みの候補はありません。公式検索との接続は準備中です。'));
+    for(const row of result.items)listing.append(h('button',{class:'btn',onclick:guard(async()=>{load(await api('GET','/api/v1/research/snapshots/'+row.id));message.textContent='';})},fmtDate(row.created)+' / '+row.id.slice(0,12)));
+    listing.append(h('button',{class:'btn',disabled:!cursor,onclick:guard(()=>list())},'候補一覧の先頭'),h('button',{class:'btn',disabled:!result.next_cursor,onclick:guard(()=>list(result.next_cursor))},'次の候補一覧'));
+  }
+  await list();
 }
 
 async function researchCard(main) {
