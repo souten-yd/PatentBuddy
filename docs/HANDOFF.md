@@ -224,3 +224,11 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - 関連addon_client4 tests成功1.148秒、追加API型/余剰field拒否・本文非取得確認。全143 testsの初回はHANDOFFに0.5.11未記載の文書テストだけ失敗し追記。Linux/Feature build成功。最終verify再実行と公開/本番更新はこの時点で未実施。
 - 隔離fixture /tmp/pb-loading-fixture.pyは実Host temporary addon/userと合成RDHで稼働。正本ユーザーPDFを変更していない。PR23/24は未統合、全体goal active。
 - 最終全verify143 tests成功38.538秒（/tmp/pb-loading-final2-verify.log）。隔離fixture639378停止、一時addon/user/session/grants除去確認。署名Feature buildも既存publisher鍵で検証済み。
+
+## v0.5.11実導入（2026-11-11）
+
+- PR25 main8cf5d17へmerge、Release42990308386成功。Linux/QPKG公開、署名Featureを追加公開してHost正規feature updateで0.5.10→0.5.11 healthy/enabledを確認（/tmp/pb-loading-installed-update.json）。Feature SHA256 2c5113546d74798cee6278233f7b6b55e18f938620680ae6c6d0c9f8d0ce5083。
+- 実Host HTTPSのPatentBuddy画面でLinux WebKit/Chrome 390pxとも保存済み資料一覧→ユーザーPDF原文→既存分析2件を表示、版0.5.11確認。/tmp/pb-loading-installed-browser.log。Chrome例外0、WebKitは親画面遷移時Host API中断/CORSログあり。iPhone実機の元のLoad failedは未再現で、改善完了とは主張しない。今回Cookie非依存通信と再確認ボタンを提供。
+- 本番PDF/分析は読み取りのみ、一時ユーザー/session削除確認。サーバーRDHは0.5.10のまま互換接続。アドオンのみ更新。隔離合成資料では実ControlDeck local-only LLM要約生成/保存/表示も成功済み。
+- 旧Linux0.5.8→公開0.5.11の管理API自己更新、認証cookie/CSRF・文献保持を確認（/tmp/pb-autoupdate-0511.json）。初回試験はversion dir期待値に0.5.10が残る試験script誤りで失敗、期待値修正して再実行成功。
+- PR23/24の調査/graphは未公開。公式OPS候補検索の未コミット作業はsources worktreeに保持。次はこの途中作業のテスト/統合と、評価済み機能を普段のPatentBuddy UIへ段階配布する。全体PR-F/P2/PR-GとQNAP性能/10件原本評価も未完、goal active。
