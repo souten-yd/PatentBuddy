@@ -75,3 +75,13 @@ def save_selection(store, identifier, value, actor):
                    (identifier, revision, payload, time.time()))
         store.audit(actor, 'research.selection', identifier + ':' + str(revision))
         return get(store, identifier)
+
+
+def list_snapshots(store, cursor=None):
+    if cursor is not None:
+        _id(cursor)
+    rows = store.q('SELECT id,created FROM research_snapshots ' +
+                   ('WHERE id>? ' if cursor else '') + 'ORDER BY id LIMIT 51',
+                   (cursor,) if cursor else ())
+    return dict(items=[dict(row) for row in rows[:50]],
+                next_cursor=rows[49]['id'] if len(rows) > 50 else None)

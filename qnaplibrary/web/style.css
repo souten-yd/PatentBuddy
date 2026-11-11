@@ -117,3 +117,5 @@ input[type=number]{width:110px}
  .home-kpi:last-child:nth-child(odd){grid-column:span 2}
  .home-stat-value{font-size:27px}
 }
+
+.research-facets{display:flex;flex-wrap:wrap;gap:8px}.research-facet{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px;border:1px solid #888;border-radius:6px;overflow-wrap:anywhere;max-width:100%}.research-facet meter{width:70px}.research-candidate{padding:10px 0;border-bottom:1px solid #888;overflow-wrap:anywhere}.research-candidate label{display:inline-flex;gap:4px;margin-right:12px}#research-selection{overflow-wrap:anywhere}

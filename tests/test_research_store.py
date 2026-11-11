@@ -47,6 +47,24 @@ class ResearchStoreTests(unittest.TestCase):
             finally:
                 store.close()
 
+    def test_snapshot_list_is_bounded_and_does_not_return_private_payload(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = Store(directory + '/db.sqlite')
+            try:
+                for index in range(51):
+                    research.create(store, [dict(self.record(), title=str(index))], 'test')
+                first = research.list_snapshots(store)
+                second = research.list_snapshots(store, first['next_cursor'])
+                self.assertEqual(len(first['items']), 50)
+                self.assertEqual(len(second['items']), 1)
+                self.assertIsNone(second['next_cursor'])
+                self.assertEqual(set(first['items'][0]), {'id', 'created'})
+                self.assertEqual(len({r['id'] for r in first['items'] + second['items']}), 51)
+                with self.assertRaises(StoreError):
+                    research.list_snapshots(store, 'invalid')
+            finally:
+                store.close()
+
     def test_real_http_auth_and_private_snapshot(self):
         server = LiveServer(); self.addCleanup(server.close)
         admin = Client(server.base); admin.login_setup()
@@ -59,10 +77,12 @@ class ResearchStoreTests(unittest.TestCase):
         status, result = admin.call('POST', path, body)
         self.assertEqual(status, 200)
         target = path + '/' + result['snapshot']['revision']
+        self.assertEqual(admin.call('GET', path)[1]['items'][0]['id'], result['snapshot']['revision'])
         for scope in ('ro', 'rw'):
             device = Client(server.base)
             device.token = server.app.auth.create_device('research-test', scope)['token']
             self.assertEqual(device.call('GET', target)[0], 403)
+            self.assertEqual(device.call('GET', path)[0], 403)
             self.assertEqual(device.call('POST', path, body)[0], 403)
         self.assertEqual(admin.call('GET', target), (200, result))
         selection = dict(snapshot_revision=result['snapshot']['revision'], expected_revision=0,

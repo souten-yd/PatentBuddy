@@ -770,6 +770,12 @@ def research_list(req):
     return {"jobs": req.app.research.list()}
 
 
+@route('GET', '/api/v1/research/snapshots', 'admin')
+def research_snapshots_list(req):
+    from . import research_store
+    return research_store.list_snapshots(req.app.store, req.arg('cursor'))
+
+
 @route("GET", "/api/v1/research/{jid}", "read")
 def research_get(req):
     return req.app.research.get(req.params["jid"])

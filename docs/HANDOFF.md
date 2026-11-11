@@ -250,3 +250,11 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - 関連5 tests成功、HTTP管理者保存/読出し・匿名/ro/rw/CSRF拒否、再送無変更、競合拒否、SQLite backup復元/quick_checkを確認。全verify152 tests成功（/tmp/pb-research-store-verify.log）。最終の明示選択保持/HTTP選定成功assert追加後も関連tests成功。
 - ControlDeck実Host Job/CPU lease/local-only LLMでEPO PDF先頭ページ説明157文字、model/runtime証明、lease解放、一時addon/user/session除去を再確認（/tmp/pb-research-store-llm.log）。これはLLM疎通であり候補の関連性精度評価ではない。
 - 未完: snapshot一覧/削除管理、ヒートマップUI、PatentBuddy用の限定scope、公式検索結果接続、容量/取得元/承認付き収集キュー。実装はPR24 Draftのみで本番v0.5.10不変。PR23/性能/P2/PR-G含めgoal active。
+
+## 候補選定の管理画面（2026-11-11）
+
+- PR24管理Web「収集」に保存済み候補の一覧・分類別件数meter・一時マスク・公報選択/固定・件数上限・保存/再読込を接続。全所属分類がマスクされた公報だけ非表示とし、選択/固定との競合と件数超過を表示。未分類と未確認familyを明示。操作だけではPDF取得しない。
+- 候補DOMは50件ずつ、snapshot一覧APIもkeyset50件/本文なし。GET /api/v1/research/snapshots は旧research/{jid}より先に登録しroute衝突を回避。admin限定、ro/rwの一覧取得403も確認。保存中は編集を凍結し、別snapshot応答への切替を抑制する。
+- 実Chrome1280/320pxで片側分類マスクの候補保持、全分類マスクとpin競合、保存/再読込、マスク解除後pin保持を確認。overflow=false/JS例外0、/tmp/pb-selection-ui-browser.log。合成候補2件/temp DBでの画面受入、公式検索精度の評価ではない。一時fixture611000をSIGINT停止。
+- 全verify152 tests成功43.062秒（/tmp/pb-selection-ui-verify.log）。追加keyset51件/重複なし/本文非返却/不正cursor試験を含め関連3 tests成功0.670秒。JS構文/diff whitespace成功。今回LLM経路変更なし、直前turnの実ControlDeck local-only PDF疎通結果は /tmp/pb-research-store-llm.log。
+- これは分類facetの件数meterであり、機器×手法の二次元heatmap/自動分類/絞り込み提案は未完成。公式検索→snapshot作成、PatentBuddy限定権限、取得容量/承認/queue接続、10件原本評価、PR23/性能/P2/PR-Gも未完。本番v0.5.10不変、PR24 Draft、goal active。
