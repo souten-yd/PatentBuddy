@@ -238,3 +238,7 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - ユーザーはv0.5.11でもTailscale/ローカル双方失敗と報告。HTTPSホスト名の実HostはLinux WebKit/Chrome iPhone13設定とも成功。一方 http://192.168.68.200:8765 は両方で接続待ち、JS/CSS/iconの子リクエストが拒否/ORBとなることを再現（/tmp/pb-loading-lan.log）。ユーザーのTailscale URL scheme/IPかhostnameかは確認中で、同一原因とはまだ断定しない。
 - Hostはopaque iframe内の静的資産にもcookie認証を要求するが、HTTP LANではSameSite=None;Secure cookieが利用できない。Bridgeが起動する前のJS取得で詰まる。アドオンの初回HTMLへ固定JS/CSSをhash付きCSPで同梱し、認証済みAPIだけBridgeで取得する修正を進める。unsafe-inlineや匿名の資料APIは導入しない。
 - 実応答にはHost sandboxとアドオンCSPの2本があることも確認したが、現在のHTTPS試験では両方成功しておりこれだけを原因としない。このHostに登録済みの独立addonはPatentBuddyのみ、他アプリとの比較は埋め込み方式の違いを含む。
+
+- v0.5.12候補: 起動固定JS/CSSを初回HTMLに同梱、SHA256 CSP hashで許可、iconはdata URI。API認証維持、unsafe-inlineなし。起動時1回読込/RAM保持、追加永続書込みなし。addon_client4 tests/CSP hash検証成功、全143 tests39.288秒成功（/tmp/pb-bootstrap-verify.log）。
+- その後WebKit HTTPでstatusのconnect-src self拒否を実再現（/tmp/pb-http-bootstrap-debug.log）。ControlDeck PR354で上流CSPのselfにブラウザ側exact originを追加、none/hash/sandbox維持。live proxy.pyだけ変更しdeck.sh再起動、既存dirty/untracked23files hash不変。修正後同じWebKit HTTPでstatus/文献表示成功（/tmp/pb-http-bootstrap-fixed.log）。他の親画面の遷移時中断ログは別件。Host全体テスト/mergeとPB公開更新は進行中。
+- v0.5.12最終verify143 tests成功39.753秒、Linux/署名Feature build成功。署名Feature SHA256 cea9a906cc343178ce677ef8b3d74e4f2c46377c949fe097efcf9e6810232351。公開/更新は次工程。

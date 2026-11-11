@@ -1,5 +1,6 @@
 """HTTP server and application wiring (standard library only)."""
 import argparse
+import base64
 import gzip
 import hashlib
 import json
@@ -292,8 +293,11 @@ class Handler(BaseHTTPRequestHandler):
         addon = self.server.app.addon_mode
         self.send_header("X-Frame-Options", "SAMEORIGIN" if addon else "DENY")
         ancestors = "'self'" if addon else "'none'"
+        asset_hashes = getattr(self.server.app, "workspace_hashes", {}) if addon else {}
+        script_hash = asset_hashes.get("script", "")
+        style_hash = asset_hashes.get("style", "")
         self.send_header("Content-Security-Policy",
-                         "default-src 'self'; img-src 'self' data:" + (" blob:" if addon else "") + "; style-src 'self'; script-src 'self'; "
+                         "default-src 'self'; img-src 'self' data:" + (" blob:" if addon else "") + "; style-src 'self' " + style_hash + "; script-src 'self' " + script_hash + "; "
                          "connect-src 'self'; frame-ancestors " + ancestors + "; base-uri 'none'; form-action 'self'")
         # No HSTS on purpose: plain http on the LAN must keep working for the same host name.
 
@@ -419,7 +423,10 @@ class Handler(BaseHTTPRequestHandler):
                         "/addon/workspace.js": "/addon-workspace.js",
                         "/addon/workspace.css": "/addon-workspace.css",
                     }[path]
-                    status = self._static(entry)
+                    if path == "/addon/workspace" and hasattr(self.server.app, "workspace_html"):
+                        status = self.send_bytes(200, self.server.app.workspace_html, "text/html; charset=utf-8", {"Cache-Control": "no-store"})
+                    else:
+                        status = self._static(entry)
                     return
                 if path.startswith("/addon/v1/") and hasattr(self.server.app, "client"):
                     from .addon_client import AddonError
@@ -565,6 +572,20 @@ class AddonShell:
         self.data_dir = Path(data_dir)
         self.started = time.time()
         self.static = StaticCache(WEB_DIR)
+        # Bootstrap cannot require third-party cookies: HTTP LAN frames cannot
+        # store SameSite=None;Secure cookies before the authenticated Bridge runs.
+        script = (WEB_DIR / 'addon-workspace.js').read_text()
+        style = (WEB_DIR / 'addon-workspace.css').read_text()
+        if '</script' in script.lower() or '</style' in style.lower():
+            raise ValueError('invalid inline workspace assets')
+        self.workspace_hashes = {kind: "'sha256-" + base64.b64encode(hashlib.sha256(content.encode()).digest()).decode() + "'"
+                                 for kind, content in [('script', script), ('style', style)]}
+        html = (WEB_DIR / 'addon-workspace.html').read_text()
+        icon = base64.b64encode((WEB_DIR / 'icon.svg').read_bytes()).decode()
+        html = html.replace('<link rel="stylesheet" href="workspace.css">', '<style>' + style + '</style>')
+        html = html.replace('<script src="workspace.js"></script>', '<script>' + script + '</script>')
+        html = html.replace('src="icon.svg"', 'src="data:image/svg+xml;base64,' + icon + '"')
+        self.workspace_html = html.encode()
         self.httpd = None
         from .addon_client import AddonClient
         self.client = AddonClient(self.data_dir)

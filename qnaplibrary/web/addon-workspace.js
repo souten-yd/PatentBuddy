@@ -11,8 +11,10 @@ const root = location.pathname.startsWith('/addon-frame/') ? '/' + location.path
 const el = id => document.getElementById(id);
 async function api(path, body, method) {
   if (!nonce) throw new Error('ControlDeckとの接続を待っています。画面を開き直してください。');
-  const response = await fetch(root + '/addon/v1/' + path, {method: method || (body ? 'POST' : 'GET'), credentials: 'omit',
-    headers: {'Content-Type': 'application/json', 'X-Control-Deck-Bridge-Session': nonce}, body: body ? JSON.stringify(body) : undefined});
+  let response;
+  try { response = await fetch(root + '/addon/v1/' + path, {method: method || (body ? 'POST' : 'GET'), credentials: 'omit',
+    headers: {'Content-Type': 'application/json', 'X-Control-Deck-Bridge-Session': nonce}, body: body ? JSON.stringify(body) : undefined}); }
+  catch (_) { throw new Error('通信失敗: ' + path.split('/')[0] + ' / ' + location.protocol + ' / v0.5.12。ControlDeckの画面を開き直してください。'); }
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || '接続を確認してください');
   return data;
