@@ -21,6 +21,11 @@ KINDS = ("generic", "patent", "standard", "news", "market", "law", "paper", "not
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
+CREATE TABLE IF NOT EXISTS research_requests(
+ id TEXT PRIMARY KEY, params TEXT NOT NULL, state TEXT NOT NULL, revision INTEGER NOT NULL,
+ lease TEXT, lease_until REAL NOT NULL DEFAULT 0, snapshot_id TEXT REFERENCES research_snapshots(id),
+ error TEXT NOT NULL DEFAULT '', created REAL NOT NULL, updated REAL NOT NULL);
+CREATE INDEX IF NOT EXISTS research_requests_pending ON research_requests(state,created,id);
 CREATE TABLE IF NOT EXISTS research_snapshots(
  id TEXT PRIMARY KEY, payload TEXT NOT NULL, created REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS research_discoveries(

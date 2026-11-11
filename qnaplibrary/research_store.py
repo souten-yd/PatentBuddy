@@ -1,5 +1,6 @@
 """Canonical research snapshots; no provider calls or implicit download approval."""
 import json
+from contextlib import nullcontext
 import re
 import time
 
@@ -17,7 +18,7 @@ def _id(identifier):
     return identifier
 
 
-def create(store, records, actor, discovery=None):
+def create(store, records, actor, discovery=None, _connection=None):
     state = snapshot(records)
     # The identity covers merged content; duplicate input counts are not canonical.
     state.pop('input_count')
@@ -25,7 +26,9 @@ def create(store, records, actor, discovery=None):
     if len(payload.encode()) > 8 * 1024 * 1024:
         raise StoreError('research snapshot exceeds size limit')
     identifier = state['revision']
-    with store.tx() as db:
+    if _connection is not None and (_connection is not store.db or not store.db.in_transaction):
+        raise StoreError('internal research transaction is not active')
+    with (nullcontext(_connection) if _connection is not None else store.tx()) as db:
         old = db.execute('SELECT payload FROM research_snapshots WHERE id=?', (identifier,)).fetchone()
         if old is None:
             db.execute('INSERT INTO research_snapshots VALUES(?,?,?)', (identifier, payload, time.time()))

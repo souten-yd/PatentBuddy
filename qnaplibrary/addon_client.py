@@ -105,6 +105,12 @@ class AddonClient:
 
     def data(self, method, path, body=None):
         config = self.settings()
+        if config.get('auth_method') == 'local_peer' and path.startswith('/api/v1/research/'):
+            from .local_auth import connect
+            try:
+                config = connect(17871, 'research')
+            except (OSError, ValueError):
+                raise AddonError(503, 'ResearchDataHubの調査用認証を利用できません') from None
         if config.get('auth_method') == 'local_peer' and method == 'POST' and (path.endswith('/analyses') or path == '/api/v1/pdf-imports'):
             from .local_auth import connect
             try:

@@ -27,6 +27,7 @@ async function load() {
       s.setup_required ? 'ResearchDataHubの管理Webで初期設定を完了してください。' : 'ResearchDataHubの接続トークン設定が必要です。';
     el('submit').disabled = !ready;
     el('import-pdf').disabled = !ready;
+    if (ready) refreshResearch();
   } catch (error) { el('message').textContent = error.message; }
 }
 window.addEventListener('message', event => {
@@ -263,5 +264,84 @@ async function loadPDFJobs() {
       }
     }
     box.append(row);
+  }
+}
+
+
+let researchPending = null;
+function researchExpression() {
+  const value = el('research-query').value.trim();
+  return el('research-mode').value === 'cql' ? value : 'ta="' + value.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+}
+function updateResearchPreview() {
+  el('research-preview').textContent = researchExpression();
+  el('research-confirm').checked = false;
+  el('research-submit').disabled = true;
+  researchPending = null;
+}
+el('research-query').oninput = updateResearchPreview;
+el('research-mode').onchange = updateResearchPreview;
+el('research-limit').oninput = updateResearchPreview;
+el('research-confirm').onchange = () => { el('research-submit').disabled = !el('research-confirm').checked || !nonce; };
+el('research-form').onsubmit = async event => {
+  event.preventDefault();
+  if (!el('research-confirm').checked) return;
+  const query = researchExpression(), limit = Number(el('research-limit').value);
+  if (!el('research-query').value.trim() || query.length > 2000 || !Number.isInteger(limit) || limit < 1 || limit > 100) {
+    el('research-message').textContent = '検索式と候補上限を確認してください。'; return;
+  }
+  if (!researchPending) {
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    researchPending = {id:[...bytes].map(v=>v.toString(16).padStart(2,'0')).join(''),query,limit,confirm_public:true};
+  }
+  el('research-submit').disabled = true;
+  try {
+    const saved = await api('research/requests', researchPending);
+    researchPending = null;
+    el('research-confirm').checked = false;
+    el('research-message').textContent = '調査要求を保存しました。処理状況は調査履歴から確認できます。';
+    await refreshResearch(); await openResearch(saved.id);
+  } catch(error) { el('research-message').textContent = error.message; }
+  finally { el('research-submit').disabled = !el('research-confirm').checked; }
+};
+const researchStates = {queued:'処理待ち',discovering:'書誌を収集中',waiting_credentials:'EPO OPSキーの設定待ち',failed:'取得失敗',canceled:'キャンセル済み',awaiting_selection:'候補の選定待ち'};
+async function refreshResearch(cursor) {
+  if (!nonce) return;
+  try {
+    const data = await api('research/requests' + (cursor ? '?cursor=' + cursor : ''));
+    el('research-requests').replaceChildren();
+    for (const item of data.items) {
+      const button = document.createElement('button');button.className='result';
+      button.textContent=new Date(item.created*1000).toLocaleString()+' — '+(researchStates[item.state]||item.state);
+      button.onclick=()=>openResearch(item.id).catch(e=>{el('research-message').textContent=e.message;});
+      el('research-requests').append(button);
+    }
+    if (!data.items.length) el('research-requests').textContent='調査履歴はまだありません。';
+    if (data.next_cursor) {
+      const more=document.createElement('button');more.textContent='次の調査履歴';more.onclick=()=>refreshResearch(data.next_cursor);el('research-requests').append(more);
+    }
+  } catch(error) { el('research-message').textContent='調査履歴: '+error.message+'。ResearchDataHubの対応版への更新が必要な場合があります。'; }
+}
+el('research-refresh').onclick=()=>refreshResearch();
+async function openResearch(id) {
+  const job=await api('research/requests/'+id);const box=el('research-detail');box.replaceChildren();
+  const heading=document.createElement('h3');heading.textContent=researchStates[job.state]||job.state;
+  const query=document.createElement('pre');query.textContent=job.params.query;
+  box.append(heading,query);
+  if (job.state==='waiting_credentials') {
+    const note=document.createElement('p');note.textContent='ResearchDataHubの設定 > 外部キーにEPO OPSキーを登録し、この調査を再開してください。';box.append(note);
+  }
+  const actions=['queued','discovering','waiting_credentials'].includes(job.state)?['cancel']:[];
+  if (['failed','canceled','waiting_credentials'].includes(job.state))actions.push('retry');
+  for (const action of actions) {
+    const button=document.createElement('button');button.textContent=action==='cancel'?'調査をキャンセル':'調査を再開';
+    button.onclick=async()=>{button.disabled=true;try{await api('research/requests/'+id+'/transition',{revision:job.revision,action});await refreshResearch();await openResearch(id);}catch(error){el('research-message').textContent=error.message;button.disabled=false;}};box.append(button);
+  }
+  if (job.snapshot_id) {
+    const saved=await api('research/snapshots/'+job.snapshot_id);
+    const info=document.createElement('p');info.textContent='重複統合後 '+saved.snapshot.unique_publications+'件。'+(saved.discovery?.truncated?'取得上限により候補は一部です。':'');box.append(info);
+    for (const item of saved.snapshot.items) {
+      const row=document.createElement('p');row.textContent=item.publication+' — '+item.titles.join(' / ');box.append(row);
+    }
   }
 }

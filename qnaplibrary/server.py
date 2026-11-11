@@ -68,6 +68,8 @@ class App:
         self.watches = Watches(self)
         self.scheduler = Scheduler(self)
         self.research = Research(self)
+        from .research_worker import ResearchWorker
+        self.research_worker = ResearchWorker(self)
         self.patents = Patents(self.store, self.searcher, self.providers)
         self.challenges = webauthn.Challenges()
         self.exit_code = 0
@@ -472,6 +474,22 @@ class Handler(BaseHTTPRequestHandler):
                             result = client.data("GET", "/api/v1/documents/" + path.split('/')[-2] + "/analyses")
                         elif method == "GET" and path == "/addon/v1/collections":
                             result = client.data("GET", "/api/v1/collections")
+                        elif path == '/addon/v1/research/requests' and method in ('GET', 'POST'):
+                            target = '/api/v1/research/requests'
+                            if method == 'GET' and parts.query:
+                                query = parse_qs(parts.query)
+                                cursor = query.get('cursor', [''])[0]
+                                if set(query) != {'cursor'} or len(query['cursor']) != 1 or not re.fullmatch('[a-f0-9]{32}', cursor):
+                                    raise AddonError(400, 'invalid research cursor')
+                                target += '?cursor=' + cursor
+                            body = Request(self, method, path, {}, {}).json(limit=16384) if method == 'POST' else None
+                            result = client.data(method, target, body)
+                        elif method == 'GET' and re.fullmatch(r'/addon/v1/research/requests/[a-f0-9]{32}', path):
+                            result = client.data('GET', '/api/v1/research/requests/' + path.rsplit('/', 1)[1])
+                        elif method == 'POST' and re.fullmatch(r'/addon/v1/research/requests/[a-f0-9]{32}/transition', path):
+                            result = client.data('POST', '/api/v1/research/requests/' + path.split('/')[-2] + '/transition', Request(self, method, path, {}, {}).json())
+                        elif method == 'GET' and re.fullmatch(r'/addon/v1/research/snapshots/[a-f0-9]{64}', path):
+                            result = client.data('GET', '/api/v1/research/snapshots/' + path.rsplit('/', 1)[1])
                         elif method == "POST" and path == "/addon/v1/search":
                             body = Request(self, method, path, {}, {}).json()
                             if not isinstance(body, dict) or not isinstance(body.get("q"), str) or len(body["q"]) > 180:
@@ -511,12 +529,16 @@ class Handler(BaseHTTPRequestHandler):
             if access == "published" and req.actor != "admin" and (
                     not req.device or req.device["scopes"] != "published"):
                 raise HTTPError(403, "公開資料専用の認証が必要です")
+            if req.device and req.device['scopes'] == 'research' and access not in ('public', 'research'):
+                raise HTTPError(403, "調査専用トークンは調査APIのみ利用できます")
+            if access == 'research' and req.actor is not None and req.actor != 'admin' and (not req.device or req.device['scopes'] != 'research'):
+                raise HTTPError(403, "調査専用の認証が必要です")
             if access != "public":
                 if req.actor is None:
                     raise HTTPError(401, "認証が必要です")
                 if access == "admin" and req.actor != "admin":
                     raise HTTPError(403, "管理者のみ実行できます")
-                if req.device and method != "GET" and req.device["scopes"] != "rw" and access not in ("read", "published") and not (access in ("analysis", "pdf_import") and req.device["scopes"] in (access, "pdf_analysis")):
+                if req.device and method != "GET" and req.device["scopes"] != "rw" and access not in ("read", "published") and not (access in ("analysis", "pdf_import", "research") and req.device["scopes"] in (access, "pdf_analysis")):
                     raise HTTPError(403, "読み取り専用デバイスです")
             if req.session and access != "public" and method not in ("GET", "HEAD"):
                 origin = self.headers.get("Origin")
@@ -638,6 +660,7 @@ def main(argv=None):
             local_auth.append(LocalAuthServer(app.auth, httpd.server_port))
             local_auth.append(LocalAuthServer(app.auth, httpd.server_port, "analysis"))
             local_auth.append(LocalAuthServer(app.auth, httpd.server_port, "pdf_import"))
+            local_auth.append(LocalAuthServer(app.auth, httpd.server_port, "research"))
         except OSError:
             LOG.warning("Local automatic authentication unavailable; explicit device authentication remains available")
 
@@ -650,6 +673,7 @@ def main(argv=None):
         app.embedder.start()
         app.embedder.kick()
         app.scheduler.start()
+        app.research_worker.start()
     LOG.warning("%s %s listening on %s://%s:%d (data: %s)", APP_NAME, VERSION, "https" if tls else "http", bind, port, data_dir)
     try:
         httpd.serve_forever(poll_interval=1.0)
@@ -658,6 +682,7 @@ def main(argv=None):
         for local_server in local_auth:
             local_server.close()
         if not args.addon:
+            app.research_worker.close()
             app.embedder.stop()
             app.scheduler.stop()
         if not args.addon:

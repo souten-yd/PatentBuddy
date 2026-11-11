@@ -5,3 +5,5 @@ select{max-width:100%;padding:10px;border:1px solid #99a9bd;border-radius:7px;fo
 #pdf-evidence{overflow-wrap:anywhere}#pdf-jobs button{margin-right:8px}#ocr-pages{max-width:100%}
 
 #pdf-image-viewer img{display:block;max-width:100%;max-height:75vh;object-fit:contain;margin:12px 0}#pdf-image-viewer img[hidden]{display:none}#pdf-image-viewer select{display:block;margin-top:8px}
+
+#research-panel textarea{display:block;width:100%;min-height:90px;box-sizing:border-box}#research-panel pre{white-space:pre-wrap;overflow-wrap:anywhere}#research-panel input[type=checkbox]{width:auto}#research-detail button{margin:4px}

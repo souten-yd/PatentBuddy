@@ -268,3 +268,11 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - 実OPSキー未設定につき公式検索の実通信・関連性評価は未実施。PATENTSCOPE自動取得は未導入。次は専用scopeとPatentBuddy UI・再開可能な調査queueに接続する。現時点は管理Web側の途中成果、未配布。PR23/P2/性能/PR-Gと10件原本評価も未完。
 - 通信修正: PatentBuddy PR27 main d8d1ee6/v0.5.12はRelease43095445376がqueuedで未公開。Host PR354 main b8568a2は統合/live proxy反映済み、WebKitのconnect-src self拒否を再現してexact Host origin指定で解消。PB boot同梱の署名配布物は /data1tb/PatentBuddy-loading/dist に検証済み、通常更新は公開待ち。live PB0.5.11/RDH0.5.10。追跡watch exec28266、installed read-only fixture exec4595/PID675193は後続の3経路受入用に稼働中。
 - チェックポイントで一時installed user/session fixture675193を停止しcleaned確認。継続ポーリングだけのgh watch752502も停止（GitHub Release43095445376自体は取消していない）。以後はrun IDを直接照会する。
+
+## PatentBuddy調査要求・正本キューの接続（2026-11-12・進行中）
+
+- research_requestsへclient id/query/候補上限/state/revision/lease/snapshot FKを正本保存。同条件再送は無変更、同ID異条件拒否。claim180秒leaseと世代を照合し、cancel/期限切れ後の旧worker結果は保存しない。snapshot/出典検索履歴/結果参照を同一transactionで確定。候補上限100/未処理要求100、query2000字、一覧50件cursor、lease/tokenはGET非返却。
+- ResearchWorkerは書誌のみ1並列。キー未設定はwaiting_credentials、失敗はgeneric code、明示retryで同じ要求を再開。main起動時にstartし再起動後もqueued/期限切れleaseを回収。アイドル時は10秒ごとの読み出しで書込みなし。取得は全体時間のcheckを追加、snapshot書込み前のstop/fencingを維持。
+- research専用device/同一UID Unix認証を追加、調査API以外のcollections/settings/debugへアクセス不可。ro/rw/公開専用と混同しない。PatentBuddyから限定request/snapshot APIだけを中継する。
+- PatentBuddyへキーワード/CQL・送信式preview・確認・候補上限・調査要求・履歴・cancel/retry・結果候補表示を追加中。まだ画面受入/本番更新未実施。選定操作と取得キューは未接続。
+- queue3 tests成功0.658秒、関連15 tests成功3.596秒。HTTP auth/CSRF/readonly、キー待ち→再開→snapshot、重複再送無書込み、cancel/期限切れ旧結果拒否、原子的失敗rollback、backup復元/quick_checkを確認。scope初回変更で匿名403になったテスト失敗は認証優先順を修正し401へ復帰。全verifyはmain最新の通信修正を統合後に実施する。

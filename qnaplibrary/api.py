@@ -770,10 +770,16 @@ def research_list(req):
     return {"jobs": req.app.research.list()}
 
 
-@route('GET', '/api/v1/research/snapshots', 'admin')
+@route('GET', '/api/v1/research/snapshots', 'research')
 def research_snapshots_list(req):
     from . import research_store
     return research_store.list_snapshots(req.app.store, req.arg('cursor'))
+
+
+@route('GET', '/api/v1/research/requests', 'research')
+def research_requests_list(req):
+    from . import research_queue
+    return research_queue.list_requests(req.app.store, req.arg('cursor'))
 
 
 @route("GET", "/api/v1/research/{jid}", "read")
@@ -1146,7 +1152,7 @@ def download_epo_publication(req):
         'Content-Disposition':'attachment; filename="'+name+'"', 'Cache-Control':'no-store', 'X-Content-Type-Options':'nosniff'})
 
 
-@route('POST', '/api/v1/research/snapshots', 'admin')
+@route('POST', '/api/v1/research/snapshots', 'research')
 def research_snapshot_create(req):
     from . import research_store
     body = req.json(limit=8 * 1024 * 1024)
@@ -1155,19 +1161,19 @@ def research_snapshot_create(req):
     return research_store.create(req.app.store, body['records'], req.actor)
 
 
-@route('GET', '/api/v1/research/snapshots/{sid}', 'admin')
+@route('GET', '/api/v1/research/snapshots/{sid}', 'research')
 def research_snapshot_get(req):
     from . import research_store
     return research_store.get(req.app.store, req.params['sid'])
 
 
-@route('POST', '/api/v1/research/snapshots/{sid}/selection', 'admin')
+@route('POST', '/api/v1/research/snapshots/{sid}/selection', 'research')
 def research_selection_save(req):
     from . import research_store
     return research_store.save_selection(req.app.store, req.params['sid'], req.json(), req.actor)
 
 
-@route('POST', '/api/v1/research/discover/epo', 'admin')
+@route('POST', '/api/v1/research/discover/epo', 'research')
 def research_discover_epo(req):
     from . import research_discovery, research_store
     body = req.json(limit=16384)
@@ -1188,3 +1194,28 @@ def research_discover_epo(req):
     records = found.pop('records')
     context = dict(found, query=body['query'], requested_limit=body['limit'])
     return dict(research_store.create(req.app.store, records, req.actor, discovery=context), discovery=found)
+
+
+@route('POST', '/api/v1/research/requests', 'research')
+def research_request_create(req):
+    from . import research_queue
+    result = research_queue.create(req.app.store, req.json(limit=16384), req.actor)
+    req.app.research_worker.kick()
+    return result
+
+
+@route('GET', '/api/v1/research/requests/{rid}', 'research')
+def research_request_get(req):
+    from . import research_queue
+    return research_queue.get(req.app.store, req.params['rid'])
+
+
+@route('POST', '/api/v1/research/requests/{rid}/transition', 'research')
+def research_request_transition(req):
+    from . import research_queue
+    value = req.json()
+    if not isinstance(value, dict) or set(value) != {'revision','action'}:
+        raise _err(400, 'invalid request transition')
+    result = research_queue.transition(req.app.store, req.params['rid'], value['revision'], value['action'], req.actor)
+    req.app.research_worker.kick()
+    return result

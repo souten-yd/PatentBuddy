@@ -26,7 +26,20 @@ def _request(path, headers, data=None):
     try:
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
         with opener.open(request, timeout=30) as response:
-            raw = response.read(MAX_BYTES + 1)
+            chunks = []
+            received = 0
+            deadline = time.monotonic() + 30
+            while True:
+                if time.monotonic() >= deadline:
+                    raise ConnectorError('OPS response deadline exceeded')
+                chunk = response.read1(min(65536, MAX_BYTES + 1 - received))
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                received += len(chunk)
+                if received > MAX_BYTES:
+                    raise ConnectorError('OPS response exceeds size limit')
+            raw = b''.join(chunks)
         if len(raw) > MAX_BYTES:
             raise ConnectorError('OPS response exceeds size limit')
         return json.loads(raw)
