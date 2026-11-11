@@ -267,3 +267,4 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - discovery4 testsとstore3 tests成功1.277秒。複数結果/重複/未分類/IPC/family保持、不正総数/応答/入力/redirect/サイズ、同意/キー未設定時外部call0、正本履歴保持/一般文献へ混入0を確認。全verify157 tests成功（/tmp/pb-discovery-verify.log）、JS構文/diff確認成功。
 - 実OPSキー未設定につき公式検索の実通信・関連性評価は未実施。PATENTSCOPE自動取得は未導入。次は専用scopeとPatentBuddy UI・再開可能な調査queueに接続する。現時点は管理Web側の途中成果、未配布。PR23/P2/性能/PR-Gと10件原本評価も未完。
 - 通信修正: PatentBuddy PR27 main d8d1ee6/v0.5.12はRelease43095445376がqueuedで未公開。Host PR354 main b8568a2は統合/live proxy反映済み、WebKitのconnect-src self拒否を再現してexact Host origin指定で解消。PB boot同梱の署名配布物は /data1tb/PatentBuddy-loading/dist に検証済み、通常更新は公開待ち。live PB0.5.11/RDH0.5.10。追跡watch exec28266、installed read-only fixture exec4595/PID675193は後続の3経路受入用に稼働中。
+- チェックポイントで一時installed user/session fixture675193を停止しcleaned確認。継続ポーリングだけのgh watch752502も停止（GitHub Release43095445376自体は取消していない）。以後はrun IDを直接照会する。
