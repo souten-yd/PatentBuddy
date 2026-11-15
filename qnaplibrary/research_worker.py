@@ -1,7 +1,10 @@
 """Single low-concurrency metadata worker. No LLM or PDF acquisition."""
+import logging
 import threading
 
 from . import research_discovery, research_queue
+
+LOG = logging.getLogger('qnaplibrary.research')
 
 
 class ResearchWorker:
@@ -49,14 +52,20 @@ class ResearchWorker:
                 return False
             try:
                 research_queue.finish(self.app.store, job, result=result, error=error)
-            except ValueError:
+            except research_queue.LeaseStale:
                 # Cancellation or lease reassignment fences this worker's result.
                 pass
         return True
 
     def _run(self):
         while not self.stopping.is_set():
-            while not self.stopping.is_set() and self.run_once():
-                pass
+            try:
+                while not self.stopping.is_set() and self.run_once():
+                    pass
+            except Exception:
+                # A queue or storage fault must not end the only drainer thread: the
+                # leased job would stay undispatched until a restart. The next lease
+                # expiry, wake-up or 10s pause retries it.
+                LOG.exception('research metadata iteration failed')
             self.wake.wait(10)
             self.wake.clear()

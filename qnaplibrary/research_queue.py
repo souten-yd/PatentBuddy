@@ -8,6 +8,10 @@ from . import research_store
 from .store import StoreError
 
 
+class LeaseStale(StoreError):
+    """The worker's lease was cancelled or reassigned, so its result must be dropped."""
+
+
 def _id(value):
     if not isinstance(value, str) or not re.fullmatch('[a-f0-9]{32}', value):
         raise StoreError('invalid research request id')
@@ -97,7 +101,7 @@ def finish(store, job, result=None, error=None):
         row = db.execute('SELECT state,lease,lease_until,revision FROM research_requests WHERE id=?', (_id(job['id']),)).fetchone()
         if (row is None or row['state'] != 'discovering' or row['lease'] != job['lease']
                 or row['revision'] != job['revision'] or row['lease_until'] <= time.time()):
-            raise StoreError('research worker lease is stale')
+            raise LeaseStale('research worker lease is stale')
         sid = None
         if error:
             state = 'waiting_credentials' if error == 'credentials_not_configured' else 'failed'

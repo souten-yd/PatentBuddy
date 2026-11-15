@@ -308,3 +308,10 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - v0.5.12候補: 起動固定JS/CSSを初回HTMLに同梱、SHA256 CSP hashで許可、iconはdata URI。API認証維持、unsafe-inlineなし。起動時1回読込/RAM保持、追加永続書込みなし。addon_client4 tests/CSP hash検証成功、全143 tests39.288秒成功（/tmp/pb-bootstrap-verify.log）。
 - その後WebKit HTTPでstatusのconnect-src self拒否を実再現（/tmp/pb-http-bootstrap-debug.log）。ControlDeck PR354で上流CSPのselfにブラウザ側exact originを追加、none/hash/sandbox維持。live proxy.pyだけ変更しdeck.sh再起動、既存dirty/untracked23files hash不変。修正後同じWebKit HTTPでstatus/文献表示成功（/tmp/pb-http-bootstrap-fixed.log）。他の親画面の遷移時中断ログは別件。Host全体テスト/mergeとPB公開更新は進行中。
 - v0.5.12最終verify143 tests成功39.753秒、Linux/署名Feature build成功。署名Feature SHA256 cea9a906cc343178ce677ef8b3d74e4f2c46377c949fe097efcf9e6810232351。公開/更新は次工程。
+
+## PR24 調査キューのworker/APIテスト（2026-11-15）
+
+- `tests/test_research_worker.py`（6件）と `tests/test_research_api.py`（10件）を追加。workerは資格情報なしを `credentials_not_configured` で待ち受けへ、provider例外は `provider_failed` のcodeだけ残し検索式も鍵もDB/監査/応答/debug bundleへ一切書かないことを実DBと実HTTPで確認。stopping中のfinish不去、cancel/lease切れのfenceでworkerスレッドが止まらない、停止workerの取りこぼしjobはlease期限内は誰もclaimできず期限切れ後に別workerが完了（leaseは180秒以内）まで全て `research_discovery.search` をmockして外部通信なしで検証。
+- API側は匿名401、research専用tokenがresearch以外のAPI（collections/settings/devices/debug/research旧job/patents/schema/documents/search/MCP/discover）で403、逆位（ro/rw/published/analysis/pdf_importがresearch APIを403）も確認。session書き込みはCSRFとOrigin一致が必須、Origin不一致は作成前に拒否。入力はid/query(1..2000)/limit(int 1..100)/confirm_public/余剰field/本文16KiB超を各400・413で確かめ、cursorのpageング50件と100件待ち受け上限まで固定。
+- 見つけた不具合: `ResearchWorker._run` に例外ガードがなく、claim/finishの想定外のストア例外で唯一のdrainerスレッドが静死し、jobが `discovering` のまま再起動まで止まる（tracebackはリングへ残らず `/api/debug/bundle` にも出ない）。`_run` をtryで守ってERRORをリングへ記録し、wakeかlease切れで再開するようにした。併せて `research_queue.LeaseStale(StoreError)` を導入し、workerは通常の取消/lease再割り当てだけを黙って捨て、それ以外のfinish例外は記録する（`except ValueError` の握りつぶしをやめた）。見直しテスト: 修正前は新規テストが失敗、修正後は5回連続成功。
+- 全 `bash scripts/verify.sh` 177 tests成功。addon_clientのresearch token選択とそのtest_local_authテストはユーザー作業として未コミットのまま保持（本コミットに含めない）。実EPO OPS・実QNAP・リリース公開は未実施。
