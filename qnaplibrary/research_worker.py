@@ -3,6 +3,7 @@ import logging
 import threading
 
 from . import research_discovery, research_queue
+from .store import StoreError
 
 LOG = logging.getLogger('qnaplibrary.research')
 
@@ -55,6 +56,16 @@ class ResearchWorker:
             except research_queue.LeaseStale:
                 # Cancellation or lease reassignment fences this worker's result.
                 pass
+            except StoreError:
+                # The provider answer cannot be stored as it stands. Settle the job as
+                # a bounded failure: leaving it 'discovering' would re-send the same
+                # expression to the provider on every lease expiry. Only the request
+                # id is logged, never the expression, the payload or the error text.
+                LOG.warning('research result rejected for request %s', job['id'])
+                try:
+                    research_queue.finish(self.app.store, job, error='provider_failed')
+                except research_queue.LeaseStale:
+                    pass
         return True
 
     def _run(self):

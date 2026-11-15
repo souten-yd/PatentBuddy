@@ -203,6 +203,39 @@ class WorkerTests(unittest.TestCase):
         self.assertTrue(completed, 'worker never served the next job')
         self.assertTrue(self.worker.thread.is_alive())
 
+    def test_unstorable_result_fails_once_instead_of_repeating_the_provider(self):
+        # A provider answer we cannot store must settle as a failure: leaving the job
+        # 'discovering' would send the same expression out again on every lease expiry.
+        identifier = self.create()
+        payload = dict(RESULT, records=[dict(bad='provider-payload-marker-88')])
+        with patch.object(self.config, 'secret', return_value='key'), \
+                patch('qnaplibrary.research_discovery.search', return_value=payload) as search, \
+                patch('qnaplibrary.research_worker.LOG.warning') as warn:
+            self.assertTrue(self.worker.run_once())
+        self.assertEqual(search.call_count, 1)
+        row = queue.get(self.store, identifier)
+        self.assertEqual((row['state'], row['error']), ('failed', 'provider_failed'))
+        self.assertIsNone(row['snapshot_id'])
+        self.assertEqual(self.store.one('SELECT count(*) FROM research_snapshots')[0], 0)
+        # The log line is fixed text plus the opaque request id.
+        message = warn.call_args.args[0] % warn.call_args.args[1:]
+        self.assertEqual(message, 'research result rejected for request ' + identifier)
+        audit = json.dumps([dict(r) for r in self.store.q('SELECT actor,action,detail FROM audit')])
+        self.store.db.execute('PRAGMA wal_checkpoint(TRUNCATE)')
+        on_disk = b''.join(p.read_bytes() for p in sorted(pathlib.Path(self.directory.name).rglob('*')) if p.is_file())
+        for surface in (json.dumps(row), audit, message, on_disk.decode('utf-8', 'replace')):
+            self.assertNotIn('provider-payload-marker-88', surface)
+        self.assertIn('research.failed', [dict(r)['action'] for r in
+                                         self.store.q("SELECT action FROM audit WHERE action LIKE 'research.%'")])
+        # An expired lease alone never re-sends the expression; only an explicit retry does.
+        self.store.db.execute('UPDATE research_requests SET lease_until=?', (time.time() - 1,))
+        with patch.object(self.config, 'secret', return_value='key'), \
+                patch('qnaplibrary.research_discovery.search') as again:
+            self.assertIsNone(queue.claim(self.store))
+            self.assertFalse(ResearchWorker(self.app).run_once())
+            again.assert_not_called()
+        self.assertEqual(queue.transition(self.store, identifier, row['revision'], 'retry', 'admin')['state'], 'queued')
+
 
 if __name__ == '__main__':
     unittest.main()
