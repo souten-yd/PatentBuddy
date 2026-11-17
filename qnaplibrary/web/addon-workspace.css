@@ -100,3 +100,34 @@ select,input {border-color:var(--pb-border);background:var(--pb-surface);color:v
   .map-controls select {font-size:16px}
 }
 @media(prefers-reduced-motion:reduce) {.map-point,.map-line {transition:none}}
+
+/* K3b: explicit manual link creation; ControlDeck Host palette/spacing only. */
+.knowledge-links {margin:16px 0;border:1px solid var(--pb-border);border-radius:14px;
+  background:var(--pb-surface);padding:12px;overflow-wrap:anywhere}
+.knowledge-links > details > summary {display:flex;align-items:center;min-height:44px;
+  cursor:pointer;font-weight:600}
+.knowledge-links label {display:block;font-size:14px;margin:12px 0 6px;color:var(--pb-text)}
+.knowledge-links select,.knowledge-links input {min-height:44px;max-width:100%;font-size:16px;
+  border:1px solid var(--pb-border);border-radius:10px;background:var(--pb-surface);color:var(--pb-text)}
+.knowledge-links select {width:100%;padding:9px}
+.knowledge-links input[type="checkbox"] {min-height:20px;min-width:20px;max-width:20px;
+  accent-color:var(--pb-accent);flex:none}
+.knowledge-links .map-toggle {display:flex;align-items:center;gap:9px;min-height:44px}
+#link-evidence,.knowledge-link-card blockquote {white-space:pre-wrap;overflow-wrap:anywhere;
+  line-height:1.6;padding:10px;border-left:3px solid var(--pb-accent);
+  background:var(--pb-bg);color:var(--pb-text)}
+#link-target-results {display:flex;flex-direction:column;gap:6px;margin:8px 0}
+#link-target-results button {text-align:left;white-space:normal;overflow-wrap:anywhere}
+#link-register {display:block;min-height:44px;width:100%;margin:10px 0}
+#link-list {margin-top:14px}
+.knowledge-link-card {padding:12px 0;border-top:1px solid var(--pb-border)}
+.knowledge-link-card > summary {min-height:44px;font-weight:500;display:flex;align-items:center}
+.knowledge-link-card > button,.knowledge-link-card > select,
+.knowledge-link-card > label {display:block;min-height:44px;width:100%;margin:8px 0}
+.knowledge-link-card > label.map-toggle {display:flex}
+.map-line-hypothesis {stroke:var(--pb-muted);stroke-width:2;stroke-dasharray:8 4;opacity:.85}
+@media(max-width:767px) {
+  .knowledge-links {padding:10px}
+  #link-target-form .row {display:flex;flex-direction:column}
+  #link-target-form input,#link-target-form button {width:100%;flex-basis:auto}
+}
