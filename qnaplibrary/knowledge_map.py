@@ -7,7 +7,7 @@ traversal remains exclusively approved, fresh and factual by default.
 import json
 
 from . import evidence_graph
-from .knowledge_reviews import latest
+from .knowledge_reviews import latest, document_epoch
 from .knowledge_essence import KnowledgeProposalError, validate
 from .store import StoreError
 
@@ -131,8 +131,10 @@ def read(store, doc_id, *, hops=1, include_unreviewed=False):
         if len(snapshots) > MAX_PROPOSALS:
             truncated = True
         snapshots = snapshots[:MAX_PROPOSALS]
+        epoch = document_epoch(store.db, doc_id)
         review_map = latest(store, [r['id'] for r in snapshots],
-                            {r['id']: current_revision for r in snapshots})
+                            {r['id']: current_revision for r in snapshots},
+                            {r['id']: epoch for r in snapshots})
         body = None  # load the source text only when current proposals exist
         for row in snapshots:
             stale = row['source_revision'] != current_revision
