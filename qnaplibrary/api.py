@@ -1070,6 +1070,13 @@ def knowledge_proposals_list(req):
     return knowledge_store.list_for_document(req.app.store, int(req.params["did"]))
 
 
+@route("GET", "/api/v1/documents/{did}/knowledge-proposals/{pid}/reviews", "read")
+def knowledge_reviews_history(req):
+    from . import knowledge_reviews
+    return knowledge_reviews.history(req.app.store, int(req.params["did"]),
+                                     req.params["pid"])
+
+
 @route("POST", "/api/v1/documents/{did}/knowledge-proposals/{pid}/reviews", "knowledge_review")
 def knowledge_review_submit(req):
     from . import knowledge_reviews, knowledge_store
