@@ -268,3 +268,12 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - 同一ソースを隔離環境 `/mnt/data/pb_k1b_test` に作り、実行元4ファイルのGit blob SHAがGitHub branchの各blob SHAと一致（validator: `1da57d8c...`, generator: `f3e8c78f...`, validation tests: `2d10086e...`, generation tests: `c0dfce1e...`）。`python3 -m unittest -v tests.test_knowledge_essence tests.test_knowledge_generation` で**21件すべて合格**、compileall成功。
 - **未検証**: `bash scripts/verify.sh`、Host実ジョブ/AI、ResearchDataHub認証/保存/API・UI、性能/I/O、Linux/QPKG本体build、iPhone/QNAP。本環境はgithub.comへDNS解決不可のためrepo checkoutができず、現main全体の検証は実施できていない。コードを完成済み製品と主張しない。
 - **次**: K1cでは `docs/knowledge-k1b-integration.md` の8工程に沿いPR #23のGraphRAG/Host provenanceと競合を解消。Host local-only Job→候補生成→保存transaction側のquote/revision二重検証→新scoped権限のimmutable proposal→レビュー→ControlDeck準拠UIを一段ずつ追加。旧認証の権限を暗黙拡張しない。大きな統合PRを避け、確認できない場合はK1a/K1bをDraftで保持。
+
+## 2026-11-17 K1c: immutable知識候補保存・分離した認証（Draft PR #31）
+
+- K1c branch `feat/knowledge-proposal-storage-k1c` をK1b PR #30から作り、[Draft PR #31](https://github.com/souten-yd/PatentBuddy/pull/31) を開始。既存正本SQLite `document_analyses` に `kind='knowledge'` を保持する `knowledge_store.py` を追加（**store.save_analysisの既存スコープは変更しない**）。DB変更なし、保存は引用の再照合・版照合の後、同一transaction。duplicate retryのwrite0、Conflictは409。
+- 新しい `knowledge_propose` token/Uds scopeをAuth/LocalAuthServer/Server/API/AddonClientへ限定追加。管理セッションだけはCSRF下で保存可能、それ以外は専用scopeを厳密要求。旧`rw`／`analysis`／`ro`／`pdf_import`／`published` の知識POSTは403、legacy POST analysesは既存kindだけ。リモートは`knowledge_server_token`が別途必要で通常tokenを流用しない。
+- `tests/test_knowledge_store.py` を追加。LiveServer権限行列、原文改訂stale、競合409、GETと冪等ゼロwrite、出典偽造・クラウド/承認偽装、実UNIX socket、AddonClient credential切替を含む（**本ファイル自体は未実行**）。
+- **実施済み**: GitHubブランチに登録されたK1c保存モジュールと同一Git blob SHA `2816a78a17e254e188fd1b2d7d0b063bd106fd8d` を隔離環境に復元。簡略化したK1a validatorとSQLite fake storeを使い、保存の代表シナリオ6件PASS＋py_compile PASS。ローカル検証は全Repoのテストではなく「保存関数の独立テスト」だけなので未検証範囲を誤認しない。
+- **未実施**: 実Store/HTTP/UDSを使った上記LiveServerテスト、`scripts/verify.sh` 全体、Host実local_only LLM + require_provenance/AI Job、QNAP/Linux配布、Browser/iPhone ControlDeck UX。モデル生成/保存ボタンは今は利用できない。GitHub checkoutはDNS不通で不可。
+- **次のK1d**: [docs/knowledge-k1c-storage.md](knowledge-k1c-storage.md) の詳細指示。Draft PR #23にあるHost require_provenance/GraphRAGをmain差分で検証し、衝突を整理してからHost Jobs→K1b generator→K1c immutable save→ControlDeck UXの最短経路を実装。全体verify合格までDraft維持。
