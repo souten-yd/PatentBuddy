@@ -330,3 +330,13 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - `tests/test_knowledge_cross_search.py`（LiveServer/SQLite/approval/revert/撤回/2〜3文献/ページング/スコープ/CSRF/zero-write）と`tests/test_knowledge_cross_workspace.py`（ControlDeck UX/static safety）の**テストコードを追加、未実行**。
 - **実施済み**: GitHubでPR #35とmainのAuth/API/Store/manifest実ファイルを直接照合、K4 JavaScriptをV8構文チェックPASS、HTML参照ID欠落/重複0。独立SQLite smokeでキーセットページング、承認→却下で旧行の除外、最新review seq判定を実行PASS。**未実施**: 新規K4 Python LiveServer/全`bash scripts/verify.sh`、`node --check` CLI、Linux/QNAPビルド、ControlDeck/iPhone実機/物理I/O。コンテナではgithub.comがDNS解決不可、PR #36のActions workflow runsは0。Draft/未マージ/未リリースを維持。
 - 次K5はIdea Canvas（比較選択からの人間明示保存、根拠の版追跡、局所LLM任意/証跡必須、出願の自動化はしない）。全stackの実テストと安全回帰を優先。細かい修正は次の計画へまとめる。
+
+## 2026-11-18 K5 Idea Canvas（Draft PR #37）
+
+- K4 PR #36をbaseにした[Draft PR #37](https://github.com/souten-yd/PatentBuddy/pull/37)。[K5全実装契約・K6 Codex指示](knowledge-k5-idea-canvas.md)を参照。現在のmain/正式版はK1a〜K5のstacked Draftを含まず、実際のユーザー操作・正式Releaseはまだ。
+- ResearchDataHub既存SQLiteに`idea_drafts`（idempotent create）、`idea_versions`（人間による版追記）、`idea_sources`（永続した出典ID/revision/epoch/K2 latest review seq/quote/codepoint範囲）を追加。元資料を削除してもquoteと過去案の履歴を保持。出典が改訂/撤回/削除されると`needs_revalidation`で旧承認は復活しない。
+- `idea_canvas.py`：K4 compareをsaveの同一transaction内で再実行し、現在のK1a quote/Host local-only provenance、K2人間承認、source revision/epoch/review seqがすべて一致する場合だけ初版を保存。手動editはexpected_versionとrequest_idで競合/重複を防止し、未変更editはwrite0。read-onlyの過去版本文GETあり。自律LLM/自動Graph/出願なし。
+- 新`idea_write`専用scope（`qlj_`同UID Linux UDS / 遠隔`idea_write_token`）、readとは独立。通常`rw`デバイスにもIdea書込権限を付与しない。ControlDeck iframeには書込可能かのboolだけ、secretなし。admin session CSRF/Originは従来どおり。Addon GET/POST/PUT proxyはURL正規表現限定。
+- UI：K4の文献2〜3件の比較結果→明示「Idea Canvasへ」→根拠カード→ユーザーが課題/解決/効果/条件/限界入力→明示確認→保存。最近20案、版履歴直近20件、過去版read-only閲覧、古い根拠の案は編集不可。PC/320px mobile単列とHost themeに準拠。
+- tests/test_idea_canvas.py, tests/test_idea_workspace.py を追加したが**実Python/LiveServerテストは未実行**。実施済みはJS V8 syntax PASS、DOM ID欠落/重複0、独立SQLiteのunicode引用/epoch revert/文献削除後history/GET write0 smoke PASS。現コンテナからgithub.com DNSが解決できず完全checkout・verify.sh/Linux build/ControlDeck-QNAP-iPhone実機テストなし。**マージ/リリースなし**。
+- K6では全stackの実E2E+安全差分/manifest/default UI/GraphRAG重複整理を優先し、必要ならIdeaページング・低書込/履歴比較を同PRにまとめる。
