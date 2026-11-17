@@ -39,6 +39,8 @@ class FakeClient:
         self.calls.append((method, path))
         if method == 'GET' and path == '/api/v1/documents/%d' % self.doc_id:
             return self.store.get_document(self.doc_id)
+        if method == 'POST' and path == '/api/v1/documents/%d/analyses' % self.doc_id:
+            return self.store.save_analysis(self.doc_id, body, actor='legacy-test')
         if method == 'POST' and path == '/api/v1/documents/%d/knowledge-proposals' % self.doc_id:
             if self.change_before_save:
                 self.store.add_documents('sample', [{'id': 'demo', 'body': '更新された文献'}])
@@ -184,10 +186,15 @@ class KnowledgeJobTests(unittest.TestCase):
             "SELECT COUNT(*) FROM document_analyses WHERE kind='knowledge'")[0], 0)
         self.assertNotIn(BODY, self.jobs.path.read_text())
 
-    def test_no_other_kind_gained_knowledge_privileges(self):
+    def test_legacy_summary_still_works_without_knowledge_scope(self):
         self.client.can_write = False
-        # This is still a valid legacy job kind and does not probe knowledge scope.
-        # The legacy FakeHost implements stream() with an optional keyword.
+        job = self.jobs.start({}, self.doc_id, 'summary')
+        result = self.wait(job['id'])
+        self.assertEqual(result['status'], 'succeeded', result)
+        self.assertIn(('stream', False), FakeHost.last.calls)
+        self.assertTrue(self.client.calls[-1][1].endswith('/analyses'))
+        self.assertIsNotNone(self.store.one(
+            "SELECT id FROM document_analyses WHERE kind='summary'"))
         with self.assertRaises(AddonError):
             self.jobs.start({}, self.doc_id, 'not-a-kind')
 
