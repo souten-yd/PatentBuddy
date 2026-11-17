@@ -1,6 +1,8 @@
 """K3b: real SQLite and HTTP tests for two explicit, scoped hypothesis actions."""
 import json
+import tempfile
 import unittest
+from pathlib import Path
 from unittest import mock
 
 from qnaplibrary.addon_client import AddonClient, AddonError
@@ -257,6 +259,20 @@ class KnowledgeLinksAPITests(unittest.TestCase):
         self.assertEqual(scoped.call('POST', self.register_path, self.payload)[0], 200)
         self.assertEqual(self.admin.call('POST', self.register_path, self.payload,
                           headers={'X-CSRF-Token': 'invalid'})[0], 403)
+
+    def test_same_uid_link_socket_uses_only_link_scope(self):
+        from qnaplibrary.local_auth import LocalAuthServer, connect
+        with tempfile.TemporaryDirectory() as folder:
+            with mock.patch('qnaplibrary.local_auth.socket_path',
+                            side_effect=lambda port, scope='read': Path(folder) / (scope + '.sock')):
+                listener = LocalAuthServer(self.live.app.auth, 17871, 'knowledge_link')
+                try:
+                    token = connect(17871, 'knowledge_link')['server_token']
+                    self.assertTrue(token.startswith('qle_'))
+                    self.assertEqual(token, self.live.app.auth.local_token('knowledge_link'))
+                    self.assertNotEqual(token, self.live.app.auth.local_token('knowledge_review'))
+                finally:
+                    listener.close()
 
     def test_same_user_local_token_restricted_to_loopback(self):
         auth = self.live.app.auth
