@@ -132,6 +132,23 @@ class KnowledgeLinksAPITests(unittest.TestCase):
             'SELECT review_status FROM graph_edges WHERE id=?', (link['id'],))[0],
             'unreviewed')
 
+    def test_revoked_k2_approval_invalidates_previously_approved_link(self):
+        self.approve_source()
+        link = self.create_link()
+        self.assertEqual(self.decide(link['id'], link['graph_revision'])[0], 200)
+        self.assertEqual(self.admin.call('GET', self.list_path)[1]['items'][0]
+                         ['review_status'], 'approved')
+        self.approve_source(status='rejected', request_id='b' * 32)
+        status, result = self.admin.call('GET', self.list_path)
+        self.assertEqual(status, 200, result)
+        row = result['items'][0]
+        self.assertTrue(row['stale'])
+        self.assertEqual(row['review_status'], 'unreviewed')
+        self.assertEqual(row['previous_review_status'], 'approved')
+        status, map_data = self.admin.call('GET', self.map_path + '?include_links=true')
+        self.assertEqual(status, 200, map_data)
+        self.assertFalse(any(edge['basis'] == 'inferred' for edge in map_data['edges']))
+
     def test_idempotent_registration_does_not_write_on_retry(self):
         self.approve_source()
         first = self.create_link()
