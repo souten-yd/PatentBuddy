@@ -128,7 +128,8 @@ class KnowledgeStoreApiTests(unittest.TestCase):
         for proposal in cases:
             with self.subTest(value=proposal['content'][:25]):
                 status, error = self.admin.call('POST', self.path, proposal)
-                self.assertEqual(status, 400, error)
+                expected = (409 if proposal['source_revision'] != self.doc['revision'] else 400)
+                self.assertEqual(status, expected, error)
         self.assertEqual(self.store.one(
             "SELECT COUNT(*) FROM document_analyses WHERE kind='knowledge'")[0], 0)
 
