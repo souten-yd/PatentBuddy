@@ -174,6 +174,24 @@ class HumanReviewAPITests(unittest.TestCase):
                                          self.decision('rejected', 'b'*32),
                                          headers={'X-CSRF-Token': 'bad'})[0], 403)
 
+    def test_deleting_source_document_cascades_review_history(self):
+        self.assertEqual(self.admin.call('POST', self.review_path,
+                                         self.decision())[0], 200)
+        self.assertEqual(self.count(), 1)
+        self.assertEqual(self.admin.call('DELETE',
+                         '/api/v1/documents/%d' % self.doc_id)[0], 200)
+        self.assertEqual(self.count(), 0)
+        self.assertEqual(self.admin.call('GET', self.review_path)[0], 400)
+
+    def test_cross_document_review_proposal_is_rejected(self):
+        self.assertEqual(self.admin.call('POST', '/api/v1/collections/reviews/documents',
+                                         {'documents': [{'id': 'another', 'body': BODY}]})[0], 200)
+        other = next(r['id'] for r in self.store.list_documents('reviews')['items']
+                     if r['id'] != self.doc_id)
+        path = '/api/v1/documents/%d/knowledge-proposals/human-sample/reviews' % other
+        self.assertEqual(self.admin.call('POST', path, self.decision())[0], 400)
+        self.assertEqual(self.count(), 0)
+
     def test_local_review_token_is_distinct_and_loopback_only(self):
         auth = self.live.app.auth
         token = auth.local_token('knowledge_review')
