@@ -217,6 +217,7 @@ el('cross-search-form').addEventListener('submit', async event => {
   };
   crossNextCursor = null;
   el('cross-next-button').hidden = true;
+  el('cross-next-button').disabled = false;
   el('cross-results').replaceChildren();
   el('cross-compare-results').replaceChildren();
   updateCrossSelection();
