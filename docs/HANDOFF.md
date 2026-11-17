@@ -260,3 +260,11 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - 同一ファイルを分離ディレクトリ `/tmp/pb-k1a` に作成、`PYTHONPATH=/tmp/pb-k1a python3 -m unittest -v tests.test_knowledge_essence`で**10件成功**。container側のGit blob SHAとGitHub branchのblob SHAが両ファイル一致。全リポジトリの`bash scripts/verify.sh`/Linux/QPKG buildはGitHub clone不能（DNS解決不可）で未実施。合格を装わずDraftのまま保持。
 - PR #23はGraphRAG/Host vector/relations等の多数の変更があるDraft。K1aのpure contractは**既存PR #23のrelation_proposals等と重複実装しないよう、K1b統合時にschema/Host provenanceを共通化**する。現在はK1aはruntime・APIから未参照。ControlDeck実機ブラウザ/iPhone/QNAPの受入なし。
 - 次: PR #29のdocs追加、全diff/manifest/安全確認、次のK1bでHost local-only LLM/Jobsから抽出→原文根拠照合→提案の限定保存・レビューへの連携を設計。PR #23完了後の実コードへ接続し、完成前に本番機能と主張しない。
+
+## 2026-11-17 K1b知識抽出ジェネレーター（Draft PR #30）
+
+- PR #30 [feat/knowledge-essence-generator-k1b](https://github.com/souten-yd/PatentBuddy/pull/30) は**PR #29をbaseとするDraft**。コードは `qnaplibrary/knowledge_generation.py`、テストは `tests/test_knowledge_generation.py`、次工程の規範は [knowledge-k1b-integration.md](knowledge-k1b-integration.md)。K1aとK1bは他のruntimeからは未参照。
+- 先行Draft PR #23 `qnaplibrary/addon_host.py` の `stream(messages, require_provenance=False)` とgeneration_provenanceを実コードで確認。現在の**main** `HostSession.stream(messages)` は非対応。K1bはrequire_provenance必須で旧Hostを原文送信前に拒否し、従来の無証跡推論へのfallbackなし。原文中の一意のquoteのみ位置を計算し、不存在/複数該当・モデルが指定したapproved/source_fact・無効JSON・クラウド証跡は拒否。
+- 同一ソースを隔離環境 `/mnt/data/pb_k1b_test` に作り、実行元4ファイルのGit blob SHAがGitHub branchの各blob SHAと一致（validator: `1da57d8c...`, generator: `f3e8c78f...`, validation tests: `2d10086e...`, generation tests: `c0dfce1e...`）。`python3 -m unittest -v tests.test_knowledge_essence tests.test_knowledge_generation` で**21件すべて合格**、compileall成功。
+- **未検証**: `bash scripts/verify.sh`、Host実ジョブ/AI、ResearchDataHub認証/保存/API・UI、性能/I/O、Linux/QPKG本体build、iPhone/QNAP。本環境はgithub.comへDNS解決不可のためrepo checkoutができず、現main全体の検証は実施できていない。コードを完成済み製品と主張しない。
+- **次**: K1cでは `docs/knowledge-k1b-integration.md` の8工程に沿いPR #23のGraphRAG/Host provenanceと競合を解消。Host local-only Job→候補生成→保存transaction側のquote/revision二重検証→新scoped権限のimmutable proposal→レビュー→ControlDeck準拠UIを一段ずつ追加。旧認証の権限を暗黙拡張しない。大きな統合PRを避け、確認できない場合はK1a/K1bをDraftで保持。
