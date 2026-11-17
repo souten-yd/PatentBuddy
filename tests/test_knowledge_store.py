@@ -1,7 +1,9 @@
 """K1c: authenticated, revision-checked immutable knowledge proposal storage."""
 import copy
 import json
+import tempfile
 import unittest
+from pathlib import Path
 from unittest import mock
 
 from qnaplibrary.addon_client import AddonClient, AddonError
@@ -99,6 +101,27 @@ class KnowledgeStoreApiTests(unittest.TestCase):
         client = Client(self.server.base)
         client.token = authorized
         self.assertEqual(client.call('POST', self.path, self.value)[0], 200)
+
+    def test_unix_socket_keeps_knowledge_credential_separate(self):
+        from qnaplibrary.local_auth import LocalAuthServer, connect
+        with tempfile.TemporaryDirectory() as tmp:
+            with mock.patch('qnaplibrary.local_auth.socket_path',
+                            side_effect=lambda port, scope='read': Path(tmp) / (scope + '.sock')):
+                listener = LocalAuthServer(self.server.app.auth, 17871, 'knowledge_propose')
+                self.addCleanup(listener.close)
+                token = connect(17871, 'knowledge_propose')['server_token']
+                self.assertEqual(self.server.app.auth.device_for_token(
+                    token, '127.0.0.1')['scopes'], 'knowledge_propose')
+                self.assertNotEqual(token, self.server.app.auth.local_token('analysis'))
+                self.assertEqual(self.server.app.auth.device_for_token(
+                    token, '192.168.1.10'), None)
+                listener.close()
+                self._drop_listener_cleanup(listener)
+
+    @staticmethod
+    def _drop_listener_cleanup(listener):
+        # A closed listener must not be closed again in addCleanup.
+        listener.close = lambda: None
 
     def test_forged_span_revision_basis_and_generation_rejected_atomically(self):
         cases = []
