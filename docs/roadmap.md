@@ -58,3 +58,9 @@ PR #16の設計はmainへ統合済み。PR #17でLinux別名入口・doctor/serv
 [ControlDeck UI/UX受入契約](controldeck-ux-contract.md)をK3のKnowledge Map/Knowledge Card/Idea Canvasに必須化。見た目と操作はControlDeckのHost shell、theme、共通PageHeader、Job状態/BottomSheet/モバイル規則を踏襲し、独自UI体系を新設しない。
 
 K1a Draft PR #29に原文範囲・source revision・Host local_only証跡形式・未承認推論固定を検証する純粋モジュールと10件の単体テストを追加。**モデルによる生成/保存/API/画面は未接続**。K1bは先行Draft PR #23のHost generation provenanceとrelation_proposalsの差分を確認して共通化する。
+
+## K1c — 根拠付き知識候補の保存API（2026-11-17 / Draft PR #31）
+
+- K1a validator (PR #29)・K1b local-only generator (PR #30)に続き、K1cは既存 `document_analyses` へのimmutable知識候補保存・原文版/引用のtransaction内再検証・新 `knowledge_propose`専用権限を実装。[詳細と次のK1d指示](knowledge-k1c-storage.md)。
+- K1cの新規テストを追加したが**LiveServer/実UDS/全体verifyは未実施**。隔離SQLite mock testの6件のみ成功。K1c APIはHost分析ジョブ・Knowledge Mapへは未接続。
+- 次のK1d: PR #23のHost provenance/GraphRAGのmain統合をレビューし、Host Jobs→generator→scoped DB保存→ControlDeck準拠カードと状態表示を接続。UI/UXは [ControlDeck準拠](controldeck-ux-contract.md)。すべてのDraft PRを無検証でmerge/releaseしない。
