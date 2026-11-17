@@ -307,6 +307,10 @@ def update(store, identifier, value, actor):
             raise KnowledgeConflictError('idea draft changed; reload before editing')
         if latest['stale']:
             raise KnowledgeConflictError('source review or document changed; create a new evidence-backed draft')
+        if latest['content'] == content:
+            # No redundant history row / WAL write for a human no-op edit.
+            return {'id': identifier, 'version': latest['version'],
+                    'retry': False, 'unchanged': True}
         db.execute(
             'INSERT INTO idea_versions(idea_id,version,request_id,expected_version,'
             'content,actor,created) VALUES(?,?,?,?,?,?,?)',
