@@ -82,15 +82,20 @@ def list_for_document(store, doc_id):
     """Read-only, bounded snapshots; a changed document is always stale."""
     if type(doc_id) is not int or not 1 <= doc_id <= 2**63 - 1:
         raise StoreError('invalid knowledge document')
-    doc = store.one('SELECT hash,source FROM documents WHERE id=?', (doc_id,))
-    if doc is None:
-        raise StoreError('knowledge document not found')
-    revision = store.document_revision(doc)
-    rows = store.q(
-        "SELECT id,doc_id,source_revision,content,created FROM document_analyses "
-        "WHERE doc_id=? AND kind='knowledge' ORDER BY created DESC,id DESC LIMIT 20",
-        (doc_id,),
-    )
+    # Keep the revision and proposals in one consistent read view.
+    # Do not open a write transaction for a GET (minimal disk I/O).
+    with store.lock:
+        doc = store.db.execute(
+            'SELECT hash,source FROM documents WHERE id=?', (doc_id,)
+        ).fetchone()
+        if doc is None:
+            raise StoreError('knowledge document not found')
+        revision = store.document_revision(doc)
+        rows = store.db.execute(
+            "SELECT id,doc_id,source_revision,content,created FROM document_analyses "
+            "WHERE doc_id=? AND kind='knowledge' ORDER BY created DESC,id DESC LIMIT 20",
+            (doc_id,),
+        ).fetchall()
     return {
         'items': [dict(dict(row), stale=row['source_revision'] != revision,
                        review_status='unreviewed') for row in rows],
