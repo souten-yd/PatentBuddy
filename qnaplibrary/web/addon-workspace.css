@@ -371,3 +371,8 @@ button:focus-visible,[role="tab"]:focus-visible,summary:focus-visible,textarea:f
 /* The K2-approved knowledge → K4 discovery action remains explicit. */
 .knowledge-search-cross {display:block;min-height:44px;width:100%;margin:10px 0 2px;
   text-align:center;font-size:13px;font-weight:600}
+
+/* Empty states always offer the next human-controlled step. */
+.workspace-empty-action {display:block;min-height:44px;margin:12px 0 2px;
+  text-align:center;font-size:13px;font-weight:600;white-space:normal}
+#idea-recent > .workspace-empty-action {min-width:220px}
