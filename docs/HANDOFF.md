@@ -319,3 +319,14 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - ControlDeck UIに「承認済み知識→引用→別文献検索→仮説種別→確認チェック→未承認登録→別の承認/却下」を実装。初期未選択/ボタン無効、44px/16px/mobile list、Host theme/アクセント、テキスト引用のみ。Knowledge Mapで`include_links=true`を**別checkboxで明示選択**すると、人が承認した現行仮説リンクだけを点線/Inspector「事実ではありません」で表示。既定factual探索へ混ぜない。
 - tests/test_knowledge_links.py, tests/test_knowledge_link_workspace.py を追加。実LiveServer/SQLiteでscope/rollback/idempotent/review版409/revert/2段階/inferred-only、検索とUIの静的契約を検証するコード。**未実行**。独立SQLite smokeではFK順序・latest-review join・review seq失効・Unicode substr・epoch revert・cascadeをPASS。JS V8構文PASS、HTML参照IDの欠落/重複0。**全repo verify・実LiveServer/ControlDeck/QNAP/iPhone/Linux buildは未実施**。github.com DNS解決不可でcloneできず、CIは勝手に追加していない。
 - 次はK3bの追加テストを実行して全依存stackを整合し、失敗修正をPR #35またはK4の範囲にまとめる。K4は承認済み解決エッセンスの条件/効果/原理に基づく横断検索＋比較仮説、K5 Idea Canvas。実機・releaseは全verifyと配布検証後だけ。
+
+## 2026-11-17 K4: 審査済みエッセンスの横断検索・並列比較（Draft PR #36）
+
+- [PR #36](https://github.com/souten-yd/PatentBuddy/pull/36)はK3b PR #35をbaseとするstacked Draft。[K4詳細設計とK5 Codex指示](knowledge-k4-cross-search.md)。独立SQLite正本や外部LLMは増設せず、K2`knowledge_reviews`、`knowledge_review_epochs`、`document_analyses`から人間が承認した現行版AI知識エッセンスを横断検索。
+- `knowledge_cross_search.py`新規：`search`は検索条件`q/kind/limit/cursor`を厳格検証し、**最新順のレビューイベントをSQLのサブクエリで先に最大241イベントに制限**してから承認と現行K2 decision・原文revision/epochを照合。1回最大240イベント・最大20表示、`next_cursor`で続きを人が明示取得可能。全文は絞り込んだitemのみ最大100001 code point、proposal最大131072 bytes、Unicode quote/Host local-only証跡はK1a validatorで再検証。既存DBへの読み取りのみ、GET/POSTで書込なし。
+- `compare`は2〜3件かつ**異なる文献**が必要。各refを実SQLiteから再取得し、最新の`approved`・source revision/epoch・K1a evidenceを再チェック。`conditions/limitations`の**文言完全一致**と各sourceのside-by-sideを返す。意味的同一性・特許性・法的結論を推測しない。
+- `api.py`に`POST /api/v1/knowledge/search`, `POST /api/v1/knowledge/compare`を**readスコープのread-only POST**として追加し、未公開検索語をURL queryに載せずJSON本文で受理（各4KiB上限）。`server.py`は既存ControlDeck Hostセッション認証経由でのみ`/addon/v1/knowledge/search/compare`をproxy。公開専用/knowledge_propose/review/linkの書込専用トークンには権限付与しない。admin CSRF/Origin保護を維持。
+- ControlDeck Embedded Workspaceの常設「技術知識を横断検索・比較」へ種類/キーワード、原文引用、条件/限界、2〜3件の比較選択/解除、文献引用へUnicode位置ジャンプ、並列比較、明示nextページ、最大60画面カードを追加。Host shell/nav/theme/アクセント、44pxボタン・16px入力・320px単列を継承。既定`ui.html`・Vue/read-only/default・Host execution runtimeに変更なし。
+- `tests/test_knowledge_cross_search.py`（LiveServer/SQLite/approval/revert/撤回/2〜3文献/ページング/スコープ/CSRF/zero-write）と`tests/test_knowledge_cross_workspace.py`（ControlDeck UX/static safety）の**テストコードを追加、未実行**。
+- **実施済み**: GitHubでPR #35とmainのAuth/API/Store/manifest実ファイルを直接照合、K4 JavaScriptをV8構文チェックPASS、HTML参照ID欠落/重複0。独立SQLite smokeでキーセットページング、承認→却下で旧行の除外、最新review seq判定を実行PASS。**未実施**: 新規K4 Python LiveServer/全`bash scripts/verify.sh`、`node --check` CLI、Linux/QNAPビルド、ControlDeck/iPhone実機/物理I/O。コンテナではgithub.comがDNS解決不可、PR #36のActions workflow runsは0。Draft/未マージ/未リリースを維持。
+- 次K5はIdea Canvas（比較選択からの人間明示保存、根拠の版追跡、局所LLM任意/証跡必須、出願の自動化はしない）。全stackの実テストと安全回帰を優先。細かい修正は次の計画へまとめる。
