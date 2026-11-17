@@ -103,6 +103,7 @@ el('search').addEventListener('submit', async event => {
 // K4: read-only reviewed-essence discovery and literal side-by-side comparison.
 // Search text is sent in a POST body, not embedded in a URL or local storage.
 let crossRequest = 0;
+let crossCompareRequest = 0;
 let crossItems = [];
 const crossSelected = new Map();
 const CROSS_LABELS = {
@@ -114,6 +115,7 @@ function crossKey(item) {
   return item.proposal_id + ':' + item.item_index;
 }
 function clearCrossSelection() {
+  ++crossCompareRequest;
   crossSelected.clear();
   for (const input of el('cross-results').querySelectorAll('input[type="checkbox"]'))
     input.checked = false;
@@ -180,6 +182,7 @@ function crossRenderSearch(items) {
     check.type = 'checkbox';
     check.setAttribute('aria-label', '比較対象に選択: ' + item.statement.slice(0, 90));
     check.onchange = () => {
+      ++crossCompareRequest;
       const key = crossKey(item);
       if (check.checked) {
         if (crossSelected.size >= 3) {
@@ -201,6 +204,7 @@ function crossRenderSearch(items) {
 el('cross-search-form').addEventListener('submit', async event => {
   event.preventDefault();
   const request = ++crossRequest;
+  ++crossCompareRequest;
   const button = el('cross-search-submit');
   button.disabled = true;
   crossSelected.clear();
@@ -236,6 +240,7 @@ el('cross-compare-button').onclick = async () => {
   if (selected.length < 2 || selected.length > 3 ||
       new Set(selected.map(x => x.doc_id)).size < 2) return;
   const button = el('cross-compare-button');
+  const request = ++crossCompareRequest;
   button.disabled = true;
   const out = el('cross-compare-results');
   out.textContent = '選択した根拠と現在の承認状態を再確認しています…';
@@ -245,8 +250,11 @@ el('cross-compare-button').onclick = async () => {
         proposal_id: item.proposal_id, item_index: item.item_index,
       })),
     });
+    if (request !== crossCompareRequest) return;
     out.replaceChildren();
-    if (!Array.isArray(result.items) || result.items.length < 2) throw new Error('不正な比較結果');
+    if (result.comparison_type !== 'side_by_side_literal' ||
+        !Array.isArray(result.items) || result.items.length !== selected.length)
+      throw new Error('不正な比較結果');
     const intro = document.createElement('p');
     intro.className = 'hint';
     intro.textContent = 'これは人が確認したAI推論の並列比較です。意味が同じこと、特許の新規性、実現性を保証しません。';
@@ -282,8 +290,9 @@ el('cross-compare-button').onclick = async () => {
     out.append(intro, grid, common, note);
     out.scrollIntoView({block: 'nearest', behavior: 'auto'});
   } catch (_) {
-    out.textContent = '比較を表示できません。承認や原文が更新された可能性があります。再検索して選び直してください。';
-  } finally { updateCrossSelection(); }
+    if (request === crossCompareRequest)
+      out.textContent = '比較を表示できません。承認や原文が更新された可能性があります。再検索して選び直してください。';
+  } finally { if (request === crossCompareRequest) updateCrossSelection(); }
 };
 
 const KNOWLEDGE_KINDS = {
