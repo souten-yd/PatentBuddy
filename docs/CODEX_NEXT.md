@@ -93,3 +93,21 @@ SMB/NFS経由で稼働中SQLite/WALを直接開かない。PCとNASで同じデ�
 
 ### 2026-11-10 PR-A進捗
 PR #16の設計はmainへ統合済み。PR #17でLinux別名入口・doctor/serve/test・health/Web表示・配布同梱を実装し、61 tests、Linux配布/非rootインストール、QPKGのLinux上smoke、ControlDeckローカルLLMの合成案件assistを検証。リリース/更新は検証待ち、PR-B〜GとQNAP実機は未完了。詳細はHANDOFF。上記の「未実装」は設計チェックポイント時点の記録。
+
+## 次期実装契約 — Knowledge Graph / Essence Reuse（2026-11-17）
+
+**正式な設計書**: [knowledge-graph-plan.md](knowledge-graph-plan.md)（K0〜K6の優先順位）および [knowledge-graph-design.md](knowledge-graph-design.md)（データ/保存/検索/API/UI/品質/安全の受入契約）。既存PR #23（GraphRAG根拠版・チャート）はDraft・未マージとみなし、最初に**最新mainとPR実diff/保存テーブル/Host API**の両方を確認する。先行のPR #24（公報取得）や旧PR #10（クレームチャート）と機能重複を調査する。
+
+**Scope:** Source/Evidence→Knowledge（課題・原因・原理・メカニズム・構成・効果・成立条件・限界）→Ideaの三層で、公報/論文/規格/社内PDFからエッセンスをローカルAIで抽出し、根拠付きカードへ保存、Obsidian様の型付き関連マップへ接続し、過去知識を別発明で検索・選択・再利用する。採用した派生案は先行技術と再比較する。
+
+**Allowed:** ResearchDataHubの既存単一正本とGraphRAGの最小後方互換拡張、限定scoped API、ControlDeck Host local-only AI/Jobs/lease、レビュー/版失効/検索/モバイルUI、必要なテスト/文書。Knowledgeの抽出案と承認済み事実、Ideaの仮説を分離。source hash+revision+span+引用完全一致を維持し、古い根拠をstaleにする。
+
+**Do NOT:** 別の知識グラフ正本・PC永続マスター、外部LLMに発明/Knowledge/検索履歴を送信、推論の事実化、類義語のみの自動merge、人手承認の自動上書き、無制限Graph全件描画、自由入力の公開検索APIへの無断送信、実案件の特許性/非侵害の自動確定、自動出願/公開、QPKG/認証/既存API互換変更、CIトリガー追加、Vue default化、runtime `level_0_manual_only`・`ui.html` default・backend authoritative・no executionの破壊、raw source serving/fallback/redirect/startup npm build。
+
+**Expected final state:** ①ある文献から引用/版に根拠づく構造化原理カードを採取できる、②同義・類似候補の差異と条件を見て人が統合・拒否できる、③ノードからPDF/段落に戻れるグラフを操作できる、④後続の別案件で知識を発見し、派生案の採用・版・由来・再評価を保存できる、⑤原文更新時の関連知識はstaleになり承認が自動復活しない。
+
+**PR分割:** K0はPR #23受入と整合レビュー。K1：抽出+根拠proposal → K2：正規化・review・stale → K3：カードと部分マップUI → K4：異分野探索/適用条件 → K5：Idea Canvas・発明案再調査 → K6：スケール/QNAP移行受入。各PRは一つのまとまった目的に限定し、少量の既存不整合は次のPRに同梱。**新設計をPR #23へ丸ごと追加しない**。
+
+**Verification:** main docs/manifest/tests/runtime実確認、各PRのscope/Do NOT/expected最終状態、根拠偽造・版不一致・private流出・出典の無い効果・誤統合・取消・重複/応答喪失・検索打切り・再起動の陰性テスト、batches/物理I/O/P50/P95/P99/RSS・15分idle、Host実local-only・320px画面。必ず bash scripts/verify.sh、ビルド/安全grepと実施できなかった工程をPR/HANDOFFに記録する。
+
+**この文書更新はdocs-only**。ここに書かれたroute/table/UI/自動実行機能はまだ存在せず、Releaseは不要。

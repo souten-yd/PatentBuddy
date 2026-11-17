@@ -44,3 +44,11 @@
 
 ### 2026-11-10 PR-A進捗
 PR #16の設計はmainへ統合済み。PR #17でLinux別名入口・doctor/serve/test・health/Web表示・配布同梱を実装し、61 tests、Linux配布/非rootインストール、QPKGのLinux上smoke、ControlDeckローカルLLMの合成案件assistを検証。リリース/更新は検証待ち、PR-B〜GとQNAP実機は未完了。詳細はHANDOFF。上記の「未実装」は設計チェックポイント時点の記録。
+
+## K0–K6: 知識エッセンスを蓄積・再利用する特許発明支援（2026-11-17計画追加）
+
+- **計画の正本**: [知識グラフ・エッセンス再利用計画](knowledge-graph-plan.md) / [詳細設計](knowledge-graph-design.md)。
+- 既存 [PR #23](https://github.com/souten-yd/PatentBuddy/pull/23) のDraft GraphRAG（文献/請求項の根拠・版・引用の追跡）が**先行依存**。PR #23の未配布機能をmainの実装済みと混同しない。
+- **K0** 既存GraphRAGと正本所有権/認証を実コード・diffで確認 → **K1** 文献からProblem/Principle/Mechanism/Implementation/Effect/Constraintの根拠付き知識提案抽出 → **K2** 同義語・上位概念、重複候補/人手review、版失効 → **K3** Obsidian型部分グラフ・知識カード・原文への逆引き。
+- **K4** 別案件・異分野の知識検索と応用条件の提示 → **K5** 選択知識の組合せからIdea案を作り、先行技術・請求項・FTOへ再照合 → **K6** 大量データ、NAS低I/O、実機と単一正本移行を受入。
+- **文書だけの計画**: 知識化・地図UI・発明案生成はこのPRで実装しない。既存検索/論文/PDF/特許性評価を壊さない。軽微な共有型はPR #23に同梱し得るが、K1以降の主要機能は後続PRへ分割する。

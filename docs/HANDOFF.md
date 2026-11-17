@@ -242,3 +242,12 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - v0.5.12候補: 起動固定JS/CSSを初回HTMLに同梱、SHA256 CSP hashで許可、iconはdata URI。API認証維持、unsafe-inlineなし。起動時1回読込/RAM保持、追加永続書込みなし。addon_client4 tests/CSP hash検証成功、全143 tests39.288秒成功（/tmp/pb-bootstrap-verify.log）。
 - その後WebKit HTTPでstatusのconnect-src self拒否を実再現（/tmp/pb-http-bootstrap-debug.log）。ControlDeck PR354で上流CSPのselfにブラウザ側exact originを追加、none/hash/sandbox維持。live proxy.pyだけ変更しdeck.sh再起動、既存dirty/untracked23files hash不変。修正後同じWebKit HTTPでstatus/文献表示成功（/tmp/pb-http-bootstrap-fixed.log）。他の親画面の遷移時中断ログは別件。Host全体テスト/mergeとPB公開更新は進行中。
 - v0.5.12最終verify143 tests成功39.753秒、Linux/署名Feature build成功。署名Feature SHA256 cea9a906cc343178ce677ef8b3d74e4f2c46377c949fe097efcf9e6810232351。公開/更新は次工程。
+
+## 2026-11-17 知識エッセンス再利用の計画・詳細設計（docs-only PR #28）
+
+- ユーザーの追加要求: 公報/論文/規格/PDFから技術課題・原因・解決原理・作用機構・構成・効果・適用条件・限界を**原文根拠付きで知識化**し、Obsidian様のつながりマップを表示。過去の知識を別特許調査で発見・異分野転用・組合せ案の発明・再検索へ利用する。
+- 新文書: [knowledge-graph-plan.md](knowledge-graph-plan.md) と [knowledge-graph-design.md](knowledge-graph-design.md)。roadmap/patent-feature-plan/controldeck-addon-plan/CODEX_NEXTも参照を追加。**実装ではなく文書設計のみ**。本PRでDB/API/manifest/Jobs/UIの意味論/リリース番号は変更しない。
+- 既存のGraphRAG候補はPR #23 Draftであり、mainに無いコードを完成済みと主張しない。PR #23のgraph_nodes/edges、根拠版、レビュー、検索パイプラインを優先再利用する。旧PR #10・公報取得PR #24の状況も再確認する。
+- 必須の設計判断: Source/Evidence → Knowledge → Ideaの三層、原文hash/revision/spanの検証、source_factとmodel_inference/user_authoredの分離、merge/splitは人手承認、原文改訂時は依存のstale・承認自動復活なし、限定graph UI、ローカルLLMのみ、単一ResearchDataHub正本。
+- 次の実装: **K0既存PR #23のmain/diff/安全境界レビュー → K1根拠付き抽出proposal → K2知識正規化・レビュー/失効 → K3 Obsidian型UI → K4横断再利用 → K5 Idea Canvas/再評価 → K6性能/移行受入**。少量の共通型以外はPR #23に詰め込まず後続PRとして分割。
+- この計画コミット自体の受入: 変更対象をdocsのみに限定、リンク・内容・PR差分を確認し、verify実行可否を明記。docs-onlyのためReleaseは不要。K1以降の動作/法的品質・iPhone/QNAP実機は未検証。
