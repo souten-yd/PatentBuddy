@@ -4,6 +4,7 @@ import json
 import math
 import re
 import time
+from contextlib import nullcontext
 from .store import StoreError
 
 NODE_KINDS = ('document', 'party', 'classification', 'claim', 'concept', 'family', 'priority')
@@ -98,7 +99,7 @@ def _node(db, value):
                       (kind, key, label, doc_id)).lastrowid
 
 
-def save(store, value, actor):
+def save(store, value, actor, *, _connection=None):
     if not isinstance(value, dict):
         raise StoreError('graph edge must be an object')
     identifier = _text(value.get('id'), 128, 'id')
@@ -138,7 +139,9 @@ def save(store, value, actor):
         raise StoreError('review requires a separate human action')
     canonical = {k: value.get(k) for k in ('id','source','target','relation','basis','evidence','model','confidence')}
     fingerprint = hashlib.sha256(json.dumps(canonical, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
-    with store.tx() as db:
+    if _connection is not None and (_connection is not store.db or not store.db.in_transaction):
+        raise StoreError('graph write requires the active store transaction')
+    with (store.tx() if _connection is None else nullcontext(_connection)) as db:
         doc = db.execute('SELECT body,hash,source FROM documents WHERE id=?', (doc_id,)).fetchone()
         if doc is None or store.document_revision(doc) != revision or end > len(doc['body']) or doc['body'][start:end] != quote:
             raise StoreError('evidence revision or exact quote does not match')
@@ -159,13 +162,17 @@ def save(store, value, actor):
         return dict(db.execute('SELECT * FROM graph_edges WHERE id=?', (identifier,)).fetchone())
 
 
-def review(store, identifier, status, actor):
+def review(store, identifier, status, actor, *, expected_graph_revision=None, _connection=None):
     if status not in ('approved', 'rejected', 'unreviewed'):
         raise StoreError('invalid review status')
-    with store.tx() as db:
+    if _connection is not None and (_connection is not store.db or not store.db.in_transaction):
+        raise StoreError('graph review requires the active store transaction')
+    with (store.tx() if _connection is None else nullcontext(_connection)) as db:
         row = db.execute('SELECT * FROM graph_edges WHERE id=?', (identifier,)).fetchone()
         if row is None or row['stale']:
             raise StoreError('edge missing or stale; extract a new version')
+        if expected_graph_revision is not None and row['graph_revision'] != expected_graph_revision:
+            raise StoreError('edge version changed; refresh before review')
         if row['review_status'] != status:
             db.execute('UPDATE graph_edges SET review_status=?,reviewer=?,reviewed_at=? WHERE id=?',
                        (status, actor, time.time(), identifier))
