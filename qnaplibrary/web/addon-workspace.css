@@ -5,3 +5,44 @@ select{max-width:100%;padding:10px;border:1px solid #99a9bd;border-radius:7px;fo
 #pdf-evidence{overflow-wrap:anywhere}#pdf-jobs button{margin-right:8px}#ocr-pages{max-width:100%}
 
 #pdf-image-viewer img{display:block;max-width:100%;max-height:75vh;object-fit:contain;margin:12px 0}#pdf-image-viewer img[hidden]{display:none}#pdf-image-viewer select{display:block;margin-top:8px}
+
+/* ControlDeck Host theme tokens (Bridge theme.changed / connected).
+ * Avoid a separate theme framework and keep Host shell/navigation authoritative. */
+:root {
+  --pb-accent:#3b82f6;--pb-bg:#fafafa;--pb-surface:#fff;
+  --pb-text:#18181b;--pb-border:#e4e4e7;--pb-muted:#71717a;
+}
+@media (prefers-color-scheme:dark) {
+  :root:not([data-host-theme]) {
+    --pb-bg:#09090b;--pb-surface:#18181b;--pb-text:#f4f4f5;
+    --pb-border:#3f3f46;--pb-muted:#a1a1aa;
+  }
+}
+body {background:var(--pb-bg);color:var(--pb-text);font-family:system-ui,-apple-system,"Segoe UI","Hiragino Sans",sans-serif}
+section {background:var(--pb-surface);border-color:var(--pb-border);border-radius:16px;box-shadow:none}
+.hint,footer,.workspace-context {color:var(--pb-muted)}
+.workspace-context {font-size:13px;line-height:1.6;margin:4px 0 12px}
+button {min-height:44px;border-radius:12px;background:var(--pb-accent);color:white;transition:opacity .15s ease}
+button.secondary {background:var(--pb-surface);color:var(--pb-text);border:1px solid var(--pb-border)}
+button:focus-visible,summary:focus-visible,select:focus-visible,input:focus-visible {
+  outline:2px solid var(--pb-accent);outline-offset:2px;
+}
+select,input {border-color:var(--pb-border);background:var(--pb-surface);color:var(--pb-text)}
+.result {background:var(--pb-surface);border:1px solid var(--pb-border);color:var(--pb-text)}
+.knowledge-group {border:1px solid var(--pb-border);padding:12px;border-radius:12px;margin-top:14px}
+.knowledge-group > summary {font-weight:600;min-height:44px;display:flex;align-items:center}
+.knowledge-card {border-top:1px solid var(--pb-border);padding:12px 0;overflow-wrap:anywhere}
+.knowledge-card h3 {font-size:15px;margin:0 0 6px}
+.knowledge-card p {margin:6px 0;line-height:1.6}
+.knowledge-card .knowledge-statement {font-weight:500}
+.knowledge-card blockquote {white-space:pre-wrap;overflow-wrap:anywhere;margin:10px 0;padding:10px 12px;border-left:3px solid var(--pb-accent);background:var(--pb-bg)}
+.knowledge-card details > summary {min-height:44px;display:flex;align-items:center}
+.knowledge-card .secondary {display:block;width:100%;text-align:center}
+#body mark {background:color-mix(in srgb,var(--pb-accent) 20%,var(--pb-surface));color:var(--pb-text);outline:2px solid var(--pb-accent)}
+@media(max-width:767px) {
+  input,select,textarea {font-size:16px}
+  .knowledge-group {padding:10px}
+  button {max-width:100%}
+}
+@media(prefers-reduced-motion:reduce) {button {transition:none}}
+:root.reduce-motion button {transition:none}
