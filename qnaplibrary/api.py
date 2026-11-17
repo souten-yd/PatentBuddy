@@ -1070,6 +1070,35 @@ def knowledge_proposals_list(req):
     return knowledge_store.list_for_document(req.app.store, int(req.params["did"]))
 
 
+@route("GET", "/api/v1/documents/{did}/knowledge-links", "read")
+def knowledge_links_list(req):
+    from .knowledge_links import list_for_document
+    return list_for_document(req.app.store, int(req.params['did']))
+
+
+@route("POST", "/api/v1/documents/{did}/knowledge-proposals/{pid}/links", "knowledge_link")
+def knowledge_link_register(req):
+    from .knowledge_links import register
+    from .knowledge_store import KnowledgeConflictError
+    actor = "admin" if req.actor == "admin" else "device:%d" % req.device["id"]
+    try:
+        return register(req.app.store, int(req.params['did']), req.params['pid'],
+                        req.json(), actor)
+    except KnowledgeConflictError as error:
+        raise _err(409, str(error)) from None
+
+
+@route("POST", "/api/v1/knowledge-links/{eid}/review", "knowledge_link")
+def knowledge_link_decision(req):
+    from .knowledge_links import decide
+    from .knowledge_store import KnowledgeConflictError
+    actor = "admin" if req.actor == "admin" else "device:%d" % req.device["id"]
+    try:
+        return decide(req.app.store, req.params['eid'], req.json(), actor)
+    except KnowledgeConflictError as error:
+        raise _err(409, str(error)) from None
+
+
 @route("GET", "/api/v1/documents/{did}/knowledge-map", "read")
 def knowledge_map_read(req):
     from .knowledge_map import read
