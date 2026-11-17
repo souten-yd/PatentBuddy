@@ -84,3 +84,10 @@ K1a Draft PR #29に原文範囲・source revision・Host local_only証跡形式�
 - K2にはhash/sourceの単調`review_epoch`と失効判定を追加し、旧文面への復帰でも過去の承認を自動復活させない。[K3設計と次のK3b/K4指示](knowledge-k3-map.md)。
 - **Draft/未検証**: GraphRAG/LiveServer/Pythonの実行は未実施。V8 JS構文/HTML IDと独立SQLite Unicode/epoch smokeのみ合格。旧PR #23の全体GraphRAG導入・手動関連リンク登録・発明キャンバス・リリースはまだ。
 - K3bで人間確認済みの根拠付き関係の明示登録、K4で蓄積知識の横断検索・異分野応用候補抽出、K5でIdea Canvas/新規性再調査、K6でNAS低I/O最適化/配布へ。
+
+## K3b 根拠付き技術仮説リンク登録（2026-11-17 / Draft PR #35）
+
+- [Draft PR #35](https://github.com/souten-yd/PatentBuddy/pull/35)はK2人間レビュー済みの知識→別文献の引用根拠付き技術仮説リンクを、専用権限で未承認登録・別の明示レビューできるようにする。PR #23 GraphRAGのsave/reviewを同一SQLite transactionで再利用し、**inferredのままでfactualへ自動昇格しない**。[詳細設計とK4手順](knowledge-k3b-links.md)。
+- K2 latest review seq / doc epoch / source/target revision / quoteを同時に照合。撤回・再承認を行っても旧リンク承認は失効し、新たな登録・レビューが必要。GraphRAGの既定検索はfactualのみ。仮説をK3 Mapに表示するには人が明示`include_links=true`にする。
+- ControlDeck埋込UIに文献検索選択・根拠選択・仮説種別・2段階確認・失効通知/履歴への入口、iOS単列対応を追加。独立SQLite smokeとV8構文/DOMチェック済みだが、**Python実LiveServer/全repo verify/配布・実機未検証、Draft未マージ未リリース**。
+- 次K4は承認済み技術エッセンスの複数文献横断検索と条件/手段/効果比較、K5はIdea Canvas/先行技術検証。PR #23の大型GraphRAGは重複を整理して必要部分だけ採用する。
