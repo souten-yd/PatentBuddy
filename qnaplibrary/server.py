@@ -479,6 +479,9 @@ class Handler(BaseHTTPRequestHandler):
                             result = client.data("GET", "/api/v1/documents/" + path.split('/')[-2] + "/analyses")
                         elif method == "GET" and re.fullmatch(r"/addon/v1/documents/[1-9][0-9]{0,17}/knowledge-proposals", path):
                             result = client.data("GET", "/api/v1/documents/" + path.split('/')[-2] + "/knowledge-proposals")
+                        elif method == "GET" and re.fullmatch(
+                                r"/addon/v1/documents/[1-9][0-9]{0,17}/knowledge-proposals/[A-Za-z0-9_-]{1,128}/reviews", path):
+                            result = client.data("GET", "/api" + path[len("/addon"):])
                         elif method == "POST" and re.fullmatch(
                                 r"/addon/v1/documents/[1-9][0-9]{0,17}/knowledge-proposals/[A-Za-z0-9_-]{1,128}/reviews", path):
                             body = Request(self, method, path, {}, {}).json()
