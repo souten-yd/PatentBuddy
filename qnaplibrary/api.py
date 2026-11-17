@@ -1070,6 +1070,44 @@ def knowledge_proposals_list(req):
     return knowledge_store.list_for_document(req.app.store, int(req.params["did"]))
 
 
+@route("GET", "/api/v1/ideas", "read")
+def ideas_list(req):
+    from .idea_canvas import list_recent
+    raw = req.arg('limit', '20')
+    if raw not in [str(i) for i in range(1, 21)]:
+        raise _err(400, 'アイデア一覧は1〜20件に制限されています')
+    return list_recent(req.app.store, limit=int(raw))
+
+
+@route("GET", "/api/v1/ideas/{iid}", "read")
+def idea_detail(req):
+    from .idea_canvas import get
+    return get(req.app.store, req.params['iid'])
+
+
+@route("POST", "/api/v1/ideas", "idea_write")
+def idea_create(req):
+    from .idea_canvas import create
+    from .knowledge_store import KnowledgeConflictError
+    actor = 'admin' if req.actor == 'admin' else 'device:%d' % req.device['id']
+    try:
+        return create(req.app.store, req.json(limit=16 * 1024), actor)
+    except KnowledgeConflictError as error:
+        raise _err(409, str(error)) from None
+
+
+@route("PUT", "/api/v1/ideas/{iid}", "idea_write")
+def idea_edit(req):
+    from .idea_canvas import update
+    from .knowledge_store import KnowledgeConflictError
+    actor = 'admin' if req.actor == 'admin' else 'device:%d' % req.device['id']
+    try:
+        return update(req.app.store, req.params['iid'],
+                      req.json(limit=12 * 1024), actor)
+    except KnowledgeConflictError as error:
+        raise _err(409, str(error)) from None
+
+
 @route("POST", "/api/v1/knowledge/search", "read")
 def knowledge_cross_search(req):
     """Read-only POST avoids putting unpublished search terms into URL logs."""
