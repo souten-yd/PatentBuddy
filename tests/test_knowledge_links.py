@@ -149,6 +149,27 @@ class KnowledgeLinksAPITests(unittest.TestCase):
         self.assertEqual(status, 200, map_data)
         self.assertFalse(any(edge['basis'] == 'inferred' for edge in map_data['edges']))
 
+    def test_k2_reapproval_does_not_reactivate_old_link_approval(self):
+        self.approve_source()
+        old_link = self.create_link()
+        self.assertEqual(self.decide(old_link['id'], old_link['graph_revision'])[0], 200)
+        self.approve_source(status='rejected', request_id='b' * 32)
+        self.approve_source(status='approved', request_id='c' * 32)
+        listed = self.admin.call('GET', self.list_path)[1]['items']
+        self.assertEqual(len(listed), 1)
+        self.assertTrue(listed[0]['stale'])
+        self.assertEqual(listed[0]['review_status'], 'unreviewed')
+        self.assertEqual(listed[0]['previous_review_status'], 'approved')
+        self.assertFalse(any(e['basis'] == 'inferred'
+                             for e in self.admin.call('GET',
+                                 self.map_path + '?include_links=true')[1]['edges']))
+        new_link = self.create_link()
+        self.assertNotEqual(new_link['id'], old_link['id'])
+        self.assertEqual(new_link['review_status'], 'unreviewed')
+        self.assertEqual(self.decide(new_link['id'], new_link['graph_revision'])[0], 200)
+        visible = self.admin.call('GET', self.map_path + '?include_links=true')[1]['edges']
+        self.assertEqual(sum(e['basis'] == 'inferred' for e in visible), 1)
+
     def test_idempotent_registration_does_not_write_on_retry(self):
         self.approve_source()
         first = self.create_link()
