@@ -52,6 +52,7 @@ async function load() {
     el('message').textContent = ready ? 'ResearchDataHubに接続しました。文献を検索できます。' :
       s.setup_required ? 'ResearchDataHubの管理Webで初期設定を完了してください。' : 'ResearchDataHubの接続トークン設定が必要です。';
     el('submit').disabled = !ready;
+    el('cross-search-submit').disabled = !ready;
     el('import-pdf').disabled = !ready;
     if (ready) await loadLibrary();
   } catch (error) { reviewAllowed = false; linkAllowed = false; el('message').textContent = '読み込みに失敗しました。接続を再確認できます。' + (error instanceof TypeError ? '' : ' ' + error.message); }
@@ -98,6 +99,192 @@ el('search').addEventListener('submit', async event => {
   } catch (error) { el('message').textContent = error.message; }
   finally { el('submit').disabled = false; }
 });
+
+// K4: read-only reviewed-essence discovery and literal side-by-side comparison.
+// Search text is sent in a POST body, not embedded in a URL or local storage.
+let crossRequest = 0;
+let crossItems = [];
+const crossSelected = new Map();
+const CROSS_LABELS = {
+  problem: '課題', cause: '原因', constraint: '制約', principle: '解決原理',
+  mechanism: '作用機構', implementation: '実装', effect: '効果',
+  observation: '観測', application: '応用',
+};
+function crossKey(item) {
+  return item.proposal_id + ':' + item.item_index;
+}
+function clearCrossSelection() {
+  crossSelected.clear();
+  for (const input of el('cross-results').querySelectorAll('input[type="checkbox"]'))
+    input.checked = false;
+  el('cross-compare-results').replaceChildren();
+  updateCrossSelection();
+}
+function updateCrossSelection() {
+  const items = Array.from(crossSelected.values());
+  const distinct = new Set(items.map(item => item.doc_id)).size;
+  el('cross-selection').textContent = items.length + '件選択中（異なる文献 ' +
+    distinct + '件）。別文献から2〜3件を選択してください。';
+  el('cross-compare-button').disabled =
+    !(items.length >= 2 && items.length <= 3 && distinct >= 2);
+}
+el('cross-clear-button').onclick = clearCrossSelection;
+function crossParagraph(title, contents) {
+  const p = document.createElement('p');
+  const strong = document.createElement('strong');
+  strong.textContent = title + '：';
+  p.append(strong, document.createTextNode(contents || '未記載'));
+  return p;
+}
+function crossOpenSource(item) {
+  return async () => {
+    try {
+      await openDocument(item.doc_id);
+      focusKnowledgeEvidence(item.evidence);
+    } catch (_) {
+      el('cross-search-status').textContent = '元文献を開けませんでした。接続と権限を確認してください。';
+    }
+  };
+}
+function crossRenderSearch(items) {
+  const container = el('cross-results');
+  container.replaceChildren();
+  if (!items.length) {
+    container.textContent = '現在の条件に一致する承認済みの知識はありません。検索語・種類を変更してください。';
+    return;
+  }
+  for (const item of items) {
+    const card = document.createElement('article');
+    card.className = 'cross-hit';
+    const title = document.createElement('h3');
+    title.textContent = (CROSS_LABELS[item.kind] || '知識') + ' · ' +
+      item.statement;
+    const info = document.createElement('p');
+    info.className = 'hint';
+    info.textContent = (item.title || '文献') + '（文献 ' + item.doc_id +
+      '） · 人間レビュー済みのAI推論（確定事実ではありません）';
+    const quote = document.createElement('blockquote');
+    quote.textContent = item.evidence.quote;
+    const conditions = crossParagraph('成立条件', item.conditions.join('、'));
+    const limitations = crossParagraph('限界・注意点', item.limitations.join('、'));
+    const actions = document.createElement('div');
+    actions.className = 'cross-hit-actions';
+    const source = document.createElement('button');
+    source.type = 'button';
+    source.className = 'secondary';
+    source.textContent = '根拠を原文で確認';
+    source.onclick = crossOpenSource(item);
+    const selection = document.createElement('label');
+    selection.className = 'cross-select';
+    const check = document.createElement('input');
+    check.type = 'checkbox';
+    check.setAttribute('aria-label', '比較対象に選択: ' + item.statement.slice(0, 90));
+    check.onchange = () => {
+      const key = crossKey(item);
+      if (check.checked) {
+        if (crossSelected.size >= 3) {
+          check.checked = false;
+          el('cross-search-status').textContent = '比較は最大3件です。選択を減らしてください。';
+          return;
+        }
+        crossSelected.set(key, item);
+      } else crossSelected.delete(key);
+      el('cross-compare-results').replaceChildren();
+      updateCrossSelection();
+    };
+    selection.append(check, document.createTextNode('比較対象に選ぶ'));
+    actions.append(source, selection);
+    card.append(title, info, quote, conditions, limitations, actions);
+    container.append(card);
+  }
+}
+el('cross-search-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const request = ++crossRequest;
+  const button = el('cross-search-submit');
+  button.disabled = true;
+  crossSelected.clear();
+  crossItems = [];
+  el('cross-results').replaceChildren();
+  el('cross-compare-results').replaceChildren();
+  updateCrossSelection();
+  el('cross-search-status').textContent = '確認済み技術知識を横断検索しています…';
+  try {
+    const result = await api('knowledge/search', {
+      q: el('cross-query').value,
+      kind: el('cross-kind').value,
+      limit: 20,
+    });
+    if (request !== crossRequest) return;
+    if (!Array.isArray(result.items)) throw new Error('結果の形式が不正です');
+    crossItems = result.items;
+    crossRenderSearch(crossItems);
+    el('cross-search-status').textContent =
+      result.items.length + '件表示 · 最近の承認記録から ' + result.scanned +
+      '件を検査（上限 ' + result.scan_limit + '件）' +
+      (result.truncated ? ' · 検索・表示上限のため結果は一部のみです。' :
+        ' · AI推論の人間レビュー結果であり、事実認定ではありません。');
+  } catch (_) {
+    if (request === crossRequest) {
+      el('cross-search-status').textContent =
+        '横断検索ができませんでした。ResearchDataHubの接続・版・読取権限を確認して再検索してください。';
+    }
+  } finally { if (request === crossRequest) button.disabled = false; }
+});
+el('cross-compare-button').onclick = async () => {
+  const selected = Array.from(crossSelected.values());
+  if (selected.length < 2 || selected.length > 3 ||
+      new Set(selected.map(x => x.doc_id)).size < 2) return;
+  const button = el('cross-compare-button');
+  button.disabled = true;
+  const out = el('cross-compare-results');
+  out.textContent = '選択した根拠と現在の承認状態を再確認しています…';
+  try {
+    const result = await api('knowledge/compare', {
+      items: selected.map(item => ({
+        proposal_id: item.proposal_id, item_index: item.item_index,
+      })),
+    });
+    out.replaceChildren();
+    if (!Array.isArray(result.items) || result.items.length < 2) throw new Error('不正な比較結果');
+    const intro = document.createElement('p');
+    intro.className = 'hint';
+    intro.textContent = 'これは人が確認したAI推論の並列比較です。意味が同じこと、特許の新規性、実現性を保証しません。';
+    const grid = document.createElement('div');
+    grid.className = 'cross-compare-grid';
+    for (const item of result.items) {
+      const card = document.createElement('article');
+      card.className = 'cross-compare-card';
+      const head = document.createElement('h3');
+      head.textContent = (CROSS_LABELS[item.kind] || item.kind) + ' · ' + item.title;
+      const statement = crossParagraph('技術的な主張', item.statement);
+      const conditions = crossParagraph('成立条件', item.conditions.join('、'));
+      const limitations = crossParagraph('限界・検証不足', item.limitations.join('、'));
+      const quote = document.createElement('blockquote');
+      quote.textContent = item.evidence.quote;
+      const source = document.createElement('button');
+      source.className = 'secondary';
+      source.type = 'button';
+      source.textContent = '元文献の引用へ移動';
+      source.onclick = crossOpenSource(item);
+      card.append(head, statement, conditions, limitations, quote, source);
+      grid.append(card);
+    }
+    const common = document.createElement('div');
+    common.className = 'cross-common';
+    common.append(
+      crossParagraph('文言が完全一致する成立条件', result.shared_conditions_exact.join('、')),
+      crossParagraph('文言が完全一致する限界', result.shared_limitations_exact.join('、')),
+    );
+    const note = document.createElement('p');
+    note.className = 'hint';
+    note.textContent = '表現が異なる項目の意味的な一致・差異は判断していません。異分野応用は検証前の仮説として扱ってください。';
+    out.append(intro, grid, common, note);
+    out.scrollIntoView({block: 'nearest', behavior: 'auto'});
+  } catch (_) {
+    out.textContent = '比較を表示できません。承認や原文が更新された可能性があります。再検索して選び直してください。';
+  } finally { updateCrossSelection(); }
+};
 
 const KNOWLEDGE_KINDS = {
   problem: '課題', cause: '原因', constraint: '制約', principle: '解決原理',
