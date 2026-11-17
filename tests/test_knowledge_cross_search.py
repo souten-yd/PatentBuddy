@@ -91,7 +91,7 @@ class CrossKnowledgeTests(unittest.TestCase):
         self.assertEqual(value['basis'], 'model_inference')
         self.assertEqual(value['review_status'], 'approved')
         self.assertEqual(value['evidence']['quote'], '温度上昇時に冷却を強め')
-        self.assertIn('recent_review_events', result['coverage'])
+        self.assertEqual(result['coverage'], 'paged_review_events')
         self.assertEqual(self._search(kind='effect')[1]['items'], [])
         self.assertEqual(self._search(q='温度検出器')[1]['items'][0]['doc_id'],
                          self.ids['cross-a'])
@@ -158,7 +158,8 @@ class CrossKnowledgeTests(unittest.TestCase):
             self.assertEqual(self._compare([one, two])[0], 200)
         self.assertEqual(self.store.db.total_changes, changes)
         for invalid in ({'q': 'a' * 121}, {'q': '\n'}, {'kind': 'illegal'},
-                        {'limit': True}, {'limit': 21}, {'extra': 'unexpected'}):
+                        {'limit': True}, {'limit': 21}, {'cursor': True},
+                        {'cursor': -1}, {'cursor': '0 OR 1=1'}, {'extra': 'unexpected'}):
             with self.subTest(invalid=invalid):
                 self.assertEqual(self.admin.call('POST', '/api/v1/knowledge/search',
                                                  invalid)[0], 400)
@@ -179,6 +180,15 @@ class CrossKnowledgeTests(unittest.TestCase):
         self.assertEqual(limited['scan_limit'], 2)
         self.assertEqual(limited['scanned'], 2)
         self.assertTrue(limited['truncated'])
+        self.assertIsInstance(limited['next_cursor'], int)
+        with mock.patch.object(knowledge_cross_search, 'MAX_SCAN', 2):
+            status, following = self._search(q='測定基準', cursor=limited['next_cursor'])
+        self.assertEqual(status, 200, following)
+        self.assertEqual(len(following['items']), 1)
+        first_ids = {(x['proposal_id'], x['item_index']) for x in limited['items']}
+        self.assertNotIn((following['items'][0]['proposal_id'],
+                          following['items'][0]['item_index']), first_ids)
+        self.assertIsNone(following['next_cursor'])
 
     def test_read_only_scopes_do_not_open_private_data_to_published_or_writers(self):
         self._create('cross-a', '温度制御A', '温度上昇時に冷却を強め')
