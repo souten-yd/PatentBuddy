@@ -51,3 +51,9 @@
 - K3 Graph Query: 探索は**1〜2hop、最大node/edge、truncated**をserverから明示、approvedかつstale=falseのリンクのみ既定検索で参照。単一正本DB、source引用のUnicode範囲→文献へ戻る、bidirectional deep link、更新時の辺/依存アイデアの失効伝播、人間の再承認は自動では行わない。
 - K3 UI: [ControlDeck UI/UX規範](controldeck-ux-contract.md)に準じ、PCは部分Graphと右Inspector、iPhone 320pxは知識一覧→Card→根拠。Host Shellとナビは二重化しない。大量nodeの全件描画/CDN/独自デザインシステムを禁止。Job状態、進捗、Offline/Reconnecting/Emptyの出口を実装。
 - K3のScope/Allowed/Do NOT/Expected final stateをPR本文に明記し、PR #23の既存レイアウト・データモデルを**移植する前に整合確認**。小修正は次予定PRへ同梱。バージョンは最終検証・正式Release直前に3点整合して更新。
+
+## 追補: 同じ原文への復元でも旧レビューを復活させない（2026-11-17）
+
+従来の`source_revision=sha256(hash,source)`のみで失効判定すると、本文変更後に同じ文面へ戻した際に旧approvalが自動復活しうる問題を修正。既存ResearchDataHub SQLiteに`knowledge_review_epochs(doc_id,epoch)`を置き、`documents.hash/source`が実際に変化するUPDATEだけでepochを単調増加させるDB triggerを追加。reviewイベント自体はappend-onlyで`source_epoch`を記録する。GETで現行epochとレビューepochを照合し、内容が元に戻った場合も旧承認は`status=unreviewed,stale=true`で再承認が必要。無変化の文書更新や読取はepochの追加writeなし。
+
+初期K2 Draftで作った古い`knowledge_reviews`テーブルには一回だけ`source_epoch DEFAULT -1`をALTER追加し、証跡がなかった旧イベントは安全側で失効。新イベントのepochは0以上。既存レビュー履歴は保持。テスト`test_reverting_document_text_does_not_reactivate_old_review`を追加したが**LiveServerテストは未実行**。K3 mapはこのepoch境界を利用する。
