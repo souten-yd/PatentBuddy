@@ -133,6 +133,9 @@ async function load() {
     reviewAllowed = false; linkAllowed = false; ideaWriteReady = false;
     el('connection-state').dataset.state = 'attention';
     el('connection-state').textContent = '接続を確認してください';
+    el('cross-search-submit').disabled = true;
+    el('submit').disabled = true;
+    updateIdeaSaveState();
     el('message').textContent = '読み込みに失敗しました。接続を再確認できます。' +
       (error instanceof TypeError ? '' : ' ' + error.message);
   }
@@ -537,7 +540,6 @@ function showIdeaHistory(detail) {
   box.append(disclosure);
 }
 function beginIdeaFromComparison(items) {
-  if (ideaDirty && !window.confirm('入力中のIdea案を破棄して、新しい比較から作成しますか？')) return;
   if (!Array.isArray(items) || items.length < 2 || items.length > 3 ||
       new Set(items.map(item => item.doc_id)).size < 2 ||
       !items.every(item => Number.isInteger(item.review_seq) &&
@@ -545,6 +547,7 @@ function beginIdeaFromComparison(items) {
     el('idea-status').textContent = '承認済み出典を再取得してください。新たに2〜3件を比較する必要があります。';
     return;
   }
+  if (ideaDirty && !window.confirm('入力中のIdea案を破棄して、新しい比較から作成しますか？')) return;
   lastComparedItems = items;
   currentIdea = null;
   ideaSources = items.map(item => ({...item}));
@@ -584,6 +587,7 @@ el('idea-confirm').onchange = () => {
   updateIdeaSaveState();
 };
 async function openIdea(id) {
+  if (ideaDirty && !window.confirm('保存していない変更を破棄して、別のIdea案を開きますか？')) return;
   const request = ++ideaReadRequest;
   el('idea-status').textContent = '保存済みの発明仮説を読み込んでいます…';
   try {
