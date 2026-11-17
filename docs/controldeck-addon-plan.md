@@ -93,3 +93,9 @@ PR #19 / v0.5.8候補でHost local-only AI、Jobs、キャンセル/再実行、
 [ControlDeck準拠UX契約](controldeck-ux-contract.md)を**次のUI実装PRの受入基準**に追加。Hostのtheme/route/Bridge、PageHeader・Primary Action・BottomSheet・SegmentedTabs・EmptyState・Jobs・状態チップの操作パターンに合わせ、グローバルナビを二重描画しない。320pxでは1カラムの知識一覧とカード・出典への遷移を優先。デスクトップではbounded Graphと右インスペクタを組み合わせる。未公開の知識/アイデアを通知・ログに含めない。
 
 K1aはpure Python検証関数のみでUI/manifest/Host runtimeは変更なし。ControlDeckのReact内部モジュールをPatentBuddyのopaque frameからimportしない。
+
+## Knowledge CardのControlDeck実装（K1d Draft PR #32）
+
+[ControlDeck主導のUX契約](controldeck-ux-contract.md)に沿い、Host EmbeddedAddonViewのtheme.changed/connectedのtoken_version 1.0、accent/bg/surface/text/border/muted/motion_reducedを使って色と操作感を揃えた。グローバルナビ/見出しを二重描画せず、文献の単一主操作を初期値「知識エッセンスを抽出」とし、job・根拠・stale/未確認を表示する。[実装設計](knowledge-k1d-implementation.md)。
+
+注意: 埋込Workspaceのカード表示までの段階で、ControlDeck共通Reactコンポーネントをopaque iframeから直接importすることはしない。Knowledge Map、right inspector/BottomSheet、全モバイルE2E、レビューUIは未実装・未検証。
