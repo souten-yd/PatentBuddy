@@ -91,3 +91,10 @@ K1a Draft PR #29に原文範囲・source revision・Host local_only証跡形式�
 - K2 latest review seq / doc epoch / source/target revision / quoteを同時に照合。撤回・再承認を行っても旧リンク承認は失効し、新たな登録・レビューが必要。GraphRAGの既定検索はfactualのみ。仮説をK3 Mapに表示するには人が明示`include_links=true`にする。
 - ControlDeck埋込UIに文献検索選択・根拠選択・仮説種別・2段階確認・失効通知/履歴への入口、iOS単列対応を追加。独立SQLite smokeとV8構文/DOMチェック済みだが、**Python実LiveServer/全repo verify/配布・実機未検証、Draft未マージ未リリース**。
 - 次K4は承認済み技術エッセンスの複数文献横断検索と条件/手段/効果比較、K5はIdea Canvas/先行技術検証。PR #23の大型GraphRAGは重複を整理して必要部分だけ採用する。
+
+## K4 解決エッセンスの横断検索・条件比較（2026-11-17 / Draft PR #36）
+
+- [PR #36](https://github.com/souten-yd/PatentBuddy/pull/36)はK3b PR #35の上で、K2人間承認済み/現行版の解決原理・作用機構・効果・条件・限界を**複数文献から読み取り専用検索**し、2〜3件で並列比較する初期K4を実装。検索語は認証付きPOST本文で取得、SQLite追加IndexやAI推論ジョブなし。[K4設計とK5実装手順](knowledge-k4-cross-search.md)。
+- 1回の検索は最大240 raw reviewイベント/20件結果、SQL内の先行LIMIT＋降順cursorで次ページを明示取得。画面60件上限、比較2〜3異文献、文言完全一致だけ共通点表示。文献revision+epoch/K1a Unicode quote+Host証跡を読取時再検証し、旧reviewは返さない。元の文献原文へジャンプ。
+- **Draft/未検証**: K4 JavaScript構文・HTML参照ID・独立SQLiteキーセットSQLはPASS。新規Python LiveServer/全`verify.sh`/Linux/QNAP/iPhone実機とディスクI/Oは未実施。#29〜#36 stacked Draftのまま、正式マージ/Releaseなし。
+- 次はK5: 2〜3件の比較から人が編集・保存するIdea Canvasと出典revision/epoch/seqの再検証。K6はNAS低書込・大量検索/配布品質。
