@@ -105,6 +105,9 @@ el('search').addEventListener('submit', async event => {
 let crossRequest = 0;
 let crossCompareRequest = 0;
 let crossItems = [];
+let crossFilters = null;
+let crossNextCursor = null;
+const CROSS_MAX_ON_SCREEN = 60;
 const crossSelected = new Map();
 const CROSS_LABELS = {
   problem: '課題', cause: '原因', constraint: '制約', principle: '解決原理',
@@ -148,10 +151,10 @@ function crossOpenSource(item) {
     }
   };
 }
-function crossRenderSearch(items) {
+function crossRenderSearch(items, append = false) {
   const container = el('cross-results');
-  container.replaceChildren();
-  if (!items.length) {
+  if (!append) container.replaceChildren();
+  if (!items.length && !append) {
     container.textContent = '現在の条件に一致する承認済みの知識はありません。検索語・種類を変更してください。';
     return;
   }
@@ -209,24 +212,28 @@ el('cross-search-form').addEventListener('submit', async event => {
   button.disabled = true;
   crossSelected.clear();
   crossItems = [];
+  crossFilters = {
+    q: el('cross-query').value, kind: el('cross-kind').value, limit: 20,
+  };
+  crossNextCursor = null;
+  el('cross-next-button').hidden = true;
   el('cross-results').replaceChildren();
   el('cross-compare-results').replaceChildren();
   updateCrossSelection();
   el('cross-search-status').textContent = '確認済み技術知識を横断検索しています…';
   try {
-    const result = await api('knowledge/search', {
-      q: el('cross-query').value,
-      kind: el('cross-kind').value,
-      limit: 20,
-    });
+    const result = await api('knowledge/search', {...crossFilters, cursor: 0});
     if (request !== crossRequest) return;
     if (!Array.isArray(result.items)) throw new Error('結果の形式が不正です');
     crossItems = result.items;
     crossRenderSearch(crossItems);
+    crossNextCursor = Number.isInteger(result.next_cursor) && result.next_cursor > 0
+      ? result.next_cursor : null;
+    el('cross-next-button').hidden = !crossNextCursor;
     el('cross-search-status').textContent =
       result.items.length + '件表示 · 最近の承認記録から ' + result.scanned +
-      '件を検査（上限 ' + result.scan_limit + '件）' +
-      (result.truncated ? ' · 検索・表示上限のため結果は一部のみです。' :
+      '件を検査（1回上限 ' + result.scan_limit + '件）' +
+      (crossNextCursor ? ' · 続きの候補を探せます。' :
         ' · AI推論の人間レビュー結果であり、事実認定ではありません。');
   } catch (_) {
     if (request === crossRequest) {
@@ -235,6 +242,39 @@ el('cross-search-form').addEventListener('submit', async event => {
     }
   } finally { if (request === crossRequest) button.disabled = false; }
 });
+el('cross-next-button').onclick = async () => {
+  const cursor = crossNextCursor, filters = crossFilters;
+  if (!filters || !Number.isInteger(cursor) || cursor <= 0) return;
+  const request = ++crossRequest;
+  const button = el('cross-next-button');
+  button.disabled = true;
+  el('cross-search-status').textContent = '古い承認済み知識を確認しています…';
+  try {
+    const result = await api('knowledge/search', {...filters, cursor});
+    if (request !== crossRequest) return;
+    if (!Array.isArray(result.items) ||
+        result.items.length > 20) throw new Error('不正な検索結果');
+    const left = CROSS_MAX_ON_SCREEN - crossItems.length;
+    const visible = result.items.slice(0, Math.max(left, 0));
+    crossItems.push(...visible);
+    crossRenderSearch(visible, true);
+    crossNextCursor = Number.isInteger(result.next_cursor) &&
+      result.next_cursor > 0 && result.next_cursor < cursor &&
+      crossItems.length < CROSS_MAX_ON_SCREEN ? result.next_cursor : null;
+    button.hidden = !crossNextCursor;
+    el('cross-search-status').textContent =
+      '現在' + crossItems.length + '件表示 · 今回' + result.scanned +
+      '件を検査（1回上限 ' + result.scan_limit + '件）' +
+      (crossItems.length >= CROSS_MAX_ON_SCREEN ?
+        ' · 画面表示は60件までです。検索語を絞ってください。' :
+        crossNextCursor ? ' · 続きの候補を探せます。' :
+        ' · これより古い候補はありません。');
+  } catch (_) {
+    if (request === crossRequest)
+      el('cross-search-status').textContent =
+        '次の候補を取得できませんでした。接続を確認して同じボタンで再試行してください。';
+  } finally { if (request === crossRequest) button.disabled = false; }
+};
 el('cross-compare-button').onclick = async () => {
   const selected = Array.from(crossSelected.values());
   if (selected.length < 2 || selected.length > 3 ||
