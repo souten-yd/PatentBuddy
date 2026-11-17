@@ -58,12 +58,21 @@ class HostSession:
 
     def provenance_available(self):
         """No source data is transferred in this feature/capabilities probe."""
-        caps = self.call('GET', '/ai/capabilities').get('text.generate', {})
-        options = caps.get('request_options', {})
+        info = self.call('GET', '/ai/capabilities')
+        if not isinstance(info, dict):
+            return False
+        caps = info.get('text.generate')
+        if not isinstance(caps, dict):
+            return False
+        options = caps.get('request_options')
+        if not isinstance(options, dict):
+            return False
+        local = options.get('local_only')
+        proof = options.get('require_provenance')
         return (caps.get('available') is True
                 and caps.get('local_only_available') is True
-                and options.get('local_only', {}).get('supported') is True
-                and options.get('require_provenance', {}).get('supported') is True)
+                and isinstance(local, dict) and local.get('supported') is True
+                and isinstance(proof, dict) and proof.get('supported') is True)
 
     def complete(self, messages):
         # An old Host must reject BEFORE any source text is sent to its AI API.
