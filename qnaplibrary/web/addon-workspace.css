@@ -376,3 +376,12 @@ button:focus-visible,[role="tab"]:focus-visible,summary:focus-visible,textarea:f
 .workspace-empty-action {display:block;min-height:44px;margin:12px 0 2px;
   text-align:center;font-size:13px;font-weight:600;white-space:normal}
 #idea-recent > .workspace-empty-action {min-width:220px}
+
+/* Idea evidence review remains full width; supporting observations share
+ * columns on desktop to avoid a long wall of forms. */
+.idea-support-fields {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 15px}
+.idea-support-fields .idea-field:first-child {grid-column:1/-1}
+.idea-support-fields .idea-field {min-width:0}
+@media(max-width:767px) {
+ .idea-support-fields {display:flex;flex-direction:column;gap:0}
+}
