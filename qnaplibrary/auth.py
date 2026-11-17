@@ -185,6 +185,7 @@ class Auth:
         self._local_knowledge_token = "qlk_" + secrets.token_urlsafe(32)
         self._local_review_token = "qlv_" + secrets.token_urlsafe(32)
         self._local_link_token = "qle_" + secrets.token_urlsafe(32)
+        self._local_idea_token = "qlj_" + secrets.token_urlsafe(32)
 
     # admin --------------------------------------------------------------
     def admin_configured(self):
@@ -220,7 +221,7 @@ class Auth:
     def create_device(self, name, scopes="rw"):
         token = "qlt_" + secrets.token_urlsafe(32)
         name = (name or "device").strip()[:80] or "device"
-        if scopes not in ("rw", "ro", "published", "analysis", "pdf_import", "pdf_analysis", "knowledge_propose", "knowledge_review", "knowledge_link"):
+        if scopes not in ("rw", "ro", "published", "analysis", "pdf_import", "pdf_analysis", "knowledge_propose", "knowledge_review", "knowledge_link", "idea_write"):
             raise ValueError("unsupported device token scope")
         with self.store.lock:
             cur = self.store.db.execute("INSERT INTO devices(name,token_hash,scopes,created) VALUES(?,?,?,?)",
@@ -233,17 +234,19 @@ class Auth:
                     "pdf_import": self._local_import_token,
                     "knowledge_propose": self._local_knowledge_token,
                     "knowledge_review": self._local_review_token,
-                    "knowledge_link": self._local_link_token}.get(scope)
+                    "knowledge_link": self._local_link_token,
+                    "idea_write": self._local_idea_token}.get(scope)
         return None
 
     def device_for_token(self, token, ip):
-        if token and token.startswith(("qll_", "qla_", "qli_", "qlk_", "qlv_", "qle_")):
+        if token and token.startswith(("qll_", "qla_", "qli_", "qlk_", "qlv_", "qle_", "qlj_")):
             import ipaddress
             try:
                 loopback = ipaddress.ip_address(ip).is_loopback
             except ValueError:
                 loopback = False
-            scope = ("knowledge_link" if token.startswith("qle_") else
+            scope = ("idea_write" if token.startswith("qlj_") else
+                     "knowledge_link" if token.startswith("qle_") else
                      "knowledge_review" if token.startswith("qlv_") else
                      "knowledge_propose" if token.startswith("qlk_") else
                      "pdf_import" if token.startswith("qli_") else
