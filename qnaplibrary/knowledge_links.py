@@ -63,14 +63,14 @@ def _reviewed_source(store, db, doc_id, proposal_id, item_index, source_revision
         raise StoreError('knowledge item not found')
     epoch = document_epoch(db, doc_id)
     review = db.execute(
-        'SELECT decision,source_revision,source_epoch FROM knowledge_reviews '
+        'SELECT seq,decision,source_revision,source_epoch FROM knowledge_reviews '
         'WHERE proposal_id=? AND item_index=? ORDER BY seq DESC LIMIT 1',
         (proposal_id, item_index),
     ).fetchone()
     if (review is None or review['decision'] != 'approved'
             or review['source_revision'] != revision or review['source_epoch'] != epoch):
         raise KnowledgeConflictError('knowledge item requires a current human approval')
-    return document, revision, epoch, parsed, parsed['items'][item_index], analysis
+    return document, revision, epoch, parsed, parsed['items'][item_index], analysis, review['seq']
 
 
 def register(store, doc_id, proposal_id, value, actor):
@@ -91,7 +91,7 @@ def register(store, doc_id, proposal_id, value, actor):
             or type(target_id) is not int):
         raise StoreError('explicit evidence and inferred relation required')
     with store.tx() as db:
-        src, rev, epoch, parsed, item, analysis = _reviewed_source(
+        src, rev, epoch, parsed, item, analysis, review_seq = _reviewed_source(
             store, db, doc_id, proposal_id, index, src_revision,
         )
         if target_id == doc_id:
@@ -101,7 +101,7 @@ def register(store, doc_id, proposal_id, value, actor):
             raise KnowledgeConflictError('target document changed; select it again')
         # A stable deterministic ID makes retry cheap without re-writing an edge.
         unique = json.dumps(
-            [proposal_id, index, doc_id, rev, epoch, target_id, dst_revision, relation],
+            [proposal_id, index, doc_id, rev, epoch, review_seq, target_id, dst_revision, relation],
             ensure_ascii=False, separators=(',', ':'),
         )
         edge_id = 'klink_' + hashlib.sha256(unique.encode('utf-8')).hexdigest()
@@ -142,15 +142,15 @@ def register(store, doc_id, proposal_id, value, actor):
             },
         }, actor, _connection=db)
         origin = db.execute(
-            'SELECT proposal_id,item_index,source_doc_id,source_epoch,target_doc_id '
+            'SELECT proposal_id,item_index,source_doc_id,source_epoch,source_review_seq,target_doc_id '
             'FROM knowledge_link_origins WHERE edge_id=?', (edge_id,)
         ).fetchone()
-        expected = (proposal_id, index, doc_id, epoch, target_id)
+        expected = (proposal_id, index, doc_id, epoch, review_seq, target_id)
         if origin is None:
             db.execute(
                 'INSERT INTO knowledge_link_origins('
-                'edge_id,proposal_id,item_index,source_doc_id,source_epoch,target_doc_id) '
-                'VALUES(?,?,?,?,?,?)', (edge_id,) + expected,
+                'edge_id,proposal_id,item_index,source_doc_id,source_epoch,source_review_seq,target_doc_id) '
+                'VALUES(?,?,?,?,?,?,?)', (edge_id,) + expected,
             )
         elif tuple(origin) != expected:
             raise KnowledgeConflictError('link identity conflicts with its origin')
@@ -181,7 +181,7 @@ def decide(store, identifier, value, actor):
         raise StoreError('explicit link review and graph version required')
     with store.tx() as db:
         row = db.execute(
-            'SELECT o.proposal_id,o.item_index,o.source_doc_id,o.source_epoch,o.target_doc_id,'
+            'SELECT o.proposal_id,o.item_index,o.source_doc_id,o.source_epoch,o.source_review_seq,o.target_doc_id,'
             'g.stale,g.basis,g.relation,g.source_node,g.target_node,g.graph_revision '
             'FROM knowledge_link_origins o JOIN graph_edges g ON g.id=o.edge_id '
             'WHERE o.edge_id=?', (identifier,),
@@ -191,9 +191,10 @@ def decide(store, identifier, value, actor):
         if row['graph_revision'] != expected_rev:
             raise KnowledgeConflictError('link review changed; refresh before confirming')
         # Source K2 human approval may have been revoked or its epoch changed.
-        _reviewed_source(store, db, row['source_doc_id'],
-                         row['proposal_id'], row['item_index'])
-        if document_epoch(db, row['source_doc_id']) != row['source_epoch']:
+        source = _reviewed_source(store, db, row['source_doc_id'],
+                                  row['proposal_id'], row['item_index'])
+        if (document_epoch(db, row['source_doc_id']) != row['source_epoch']
+                or source[-1] != row['source_review_seq']):
             raise KnowledgeConflictError('source review epoch has changed')
         _document(store, db, row['target_doc_id'])
         for node_id, did in ((row['source_node'], row['source_doc_id']),
@@ -227,9 +228,10 @@ def list_for_document(store, doc_id):
         revision = store.document_revision(doc)
         rows = store.db.execute(
             'SELECT o.edge_id,o.proposal_id,o.item_index,o.source_doc_id,o.source_epoch,'
+            'o.source_review_seq,'
             'o.target_doc_id,g.relation,g.basis,g.review_status,g.graph_revision,'
             'g.stale,g.quote,t.title AS target_title,'
-            'r.decision AS source_decision,r.source_revision AS review_revision,'
+            'r.seq AS latest_review_seq,r.decision AS source_decision,r.source_revision AS review_revision,'
             'r.source_epoch AS review_epoch '
             'FROM knowledge_link_origins o JOIN graph_edges g ON o.edge_id=g.id '
             'JOIN documents t ON o.target_doc_id=t.id '
@@ -244,6 +246,7 @@ def list_for_document(store, doc_id):
         for r in rows:
             stale = bool(
                 r['stale'] or r['source_epoch'] != epoch or
+                r['source_review_seq'] != r['latest_review_seq'] or
                 r['source_decision'] != 'approved' or
                 r['review_revision'] != revision or r['review_epoch'] != epoch
             )
