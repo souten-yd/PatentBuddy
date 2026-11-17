@@ -484,7 +484,7 @@ class Handler(BaseHTTPRequestHandler):
                             body = Request(self, method, path, {}, {}).json()
                             if not isinstance(body, dict):
                                 raise AddonError(400, 'レビュー内容が不正です')
-                            result = client.data("POST", path.removeprefix("/addon"), body)
+                            result = client.data("POST", "/api" + path[len("/addon"):], body)
                         elif method == "GET" and path == "/addon/v1/collections":
                             result = client.data("GET", "/api/v1/collections")
                         elif method == "POST" and path == "/addon/v1/library":
