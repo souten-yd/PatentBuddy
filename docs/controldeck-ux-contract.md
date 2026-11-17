@@ -55,3 +55,9 @@ K1aでは純粋な知識候補の厳格な検証モジュールと単体テス�
 [K3実装設計](knowledge-k3-map.md)に沿い、選択した文献からの出典・承認済み知識を1〜2hop/36 nodes/52 edgesに限定表示する。DesktopはSVG接続図＋右Inspector＋アクセシブルな一覧、320px〜767pxは大きなGraphを縮小せず一覧→詳細→引用へ遷移。ControlDeck theme・accent/Hostのグローバルshell/44pxとreduced-motionを維持。空・取得失敗・件数上限(truncated)・版失効は次の操作を表示。線の`proposal_evidence_source`は引用元とのリンクだけで技術的因果を主張しない。AI推論は人が承認してもsource_factではない。
 
 **重要:** 以前の「K1aの純粋validatorだけ、地図は未実装」という時点説明は歴史的記録。K1dにはカード、K2には人手レビュー、K3には今回のMap表示コードが追加済み。ただしいずれもstacked Draftであり、mainへマージ・全体テスト・リリースはしていない。
+
+## K3b 技術仮説リンクのControlDeck UX（2026-11-17）
+
+[K3b実装設計](knowledge-k3b-links.md)を参照。埋込Workspaceの文献詳細内で、K2承認済み原文カード→別文献検索→関係先選択（本文を取得せずid/title/revision）→仮説種別（problem/solution/effect/substitutionのみ）→引用確認チェック→**未確認リンク登録**の順。審査はリンクカードを別途展開して承認/却下＋確認チェック＋実行ボタン。未確認・失効や権限なしで操作を許可しない。リンクを承認しても技術的事実にしない。
+
+マップのリンク表示は別チェックボックスをオンにした場合のみ、点線/inferred/「仮説（事実ではありません）」で区別。K2レビュー変更後の旧関係は自動復活しない。ControlDeckのGlobal shell/認証/テーマ/Jobsを再実装せず、Bridge theme tokens、44px touch、16px input、320pxの1カラム、keyboard/focus、説明/再試行を維持。原文/引用はDOM textContentのみ。実機E2E未実施のためDraft。
