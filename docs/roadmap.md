@@ -104,3 +104,8 @@ K1a Draft PR #29に原文範囲・source revision・Host local_only証跡形式�
 - [Draft PR #37](https://github.com/souten-yd/PatentBuddy/pull/37)でK4の2〜3文献比較から、人が課題・仕組み・効果・条件・限界を入力して明示保存するIdea Canvasを追加。K2承認/source revision/epoch/review seq/quoteを同じSQLite transactionで再検証。出典固定・版追記・再送write0・旧原文復元でも`needs_revalidation`、過去版read-only参照を提供。[K5/K6設計](knowledge-k5-idea-canvas.md)。
 - 専用`idea_write`scopeと同UID token、ControlDeck Host認証代理。通常rw/ro/knowledge review・link・publishedには新権限なし。自律LLM/自動出願/Graph関係自動変更なし。PC/mobile画面/出典・履歴を追加。
 - 独立SQLite smokeとJS V8構文/DOM IDsの静的検証はPASS。**実Python/LiveServer/全verify/Ubuntu-QNAP build/iPhone実機は未実施、Draft・未マージ・未リリース**。次はK6の安定化/低I/Oと全stack実動作検証を優先する。
+
+## K6リリース統合ゲート（2026-11-18）
+
+- K6は新機能より先にPR #29〜#37の実検証と低I/O・安全の回帰。追加PRではなくPR #37へ埋込UIを検査する`verify.sh`更新、1コマンドの`scripts/verify-k6.sh`、K6 safety test、K4→K5の古い比較結果無効化をまとめる。依存主幹との違反を静的検査するだけでなく、実HTTP/SQLite全テストとUbuntu/QNAP/iPhone実機が必須。
+- 作業コンテナのgithub.com DNS制約のため**一括検証スクリプトは未実行**。JS構文のV8静的検査等は別検証であって`verify-k6.sh`合格ではない。全PR Draft・未マージ・未リリースを維持。正式ReleaseにはREADME/CHANGELOG/版/配布成果物・healthの一致を要する。
