@@ -99,6 +99,22 @@ class HumanReviewAPITests(unittest.TestCase):
         self.assertEqual(self.store.db.total_changes, count)
         self.assertEqual(self.count(), 1)
 
+    def test_review_history_is_authenticated_read_only_and_bounded(self):
+        for i in range(35):
+            self.assertEqual(self.admin.call('POST', self.review_path,
+                self.decision('approved' if i % 2 == 0 else 'rejected',
+                              '%032x' % (i + 1)))[0], 200)
+        total = self.store.db.total_changes
+        status, result = self.admin.call('GET', self.review_path)
+        self.assertEqual(status, 200, result)
+        self.assertEqual(len(result['items']), 30)
+        self.assertEqual(result['items'][0]['request_id'], '%032x' % 35)
+        self.assertFalse(result['stale'])
+        self.assertEqual(self.store.db.total_changes, total)
+        self.assertEqual(Client(self.live.base).call('GET', self.review_path)[0], 401)
+        self.assertEqual(self.token_client('knowledge_review').call(
+            'GET', self.review_path)[0], 403)
+
     def test_reused_request_id_for_different_decision_or_actor_is_conflict(self):
         item = self.decision()
         self.assertEqual(self.admin.call('POST', self.review_path, item)[0], 200)
