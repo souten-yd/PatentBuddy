@@ -48,7 +48,9 @@ def _provenance(value):
     for name in ('model_ref', 'runtime_ref'):
         if not isinstance(value[name], str) or not re.fullmatch(r'[a-f0-9]{64}', value[name]):
             raise KnowledgeProposalError('invalid generation provenance')
-    return {field: value[field] for field in _PROVENANCE_FIELDS}
+    return {field: value[field] for field in (
+        'execution_policy', 'revision_kind', 'model_ref', 'runtime_ref',
+    )}
 
 
 def validate(document, proposal):
