@@ -1,6 +1,6 @@
 # PatentBuddy 知識資産化・発明エッセンス再利用計画
 
-状態: **計画・設計のみ（2026-11-17）**。この文書を追加しただけでは機能は実装・配布されない。詳細な設計契約は [knowledge-graph-design.md](knowledge-graph-design.md) に置く（同じdocs-only PRで追加）。既存 [evidence-graph.md](evidence-graph.md) は **Draft PR #23 の作業ブランチにのみ存在**し、mainに反映されるまでは正式なruntime機能と扱わない。
+状態: **計画・設計のみ（2026-11-17）**。この文書を追加しただけでは機能は実装・配布されない。詳細な設計契約は [knowledge-graph-design.md](knowledge-graph-design.md) に置く（同じdocs-only PRで追加）。既存 [PR #23 / evidence-graph.md](https://github.com/souten-yd/PatentBuddy/blob/feat/evidence-graph/docs/evidence-graph.md) は **Draft PR #23 の作業ブランチにのみ存在**し、mainに反映されるまでは正式なruntime機能と扱わない。
 
 ## ビジョンと価値
 - 検索語・技術課題・特許案・請求項・PDFを起点に公式取得済み文献や登録文献を調査し、原文根拠に紐付いた「課題→原因/制約→解決原理→作用機構→実装→効果」を**再利用可能な知識**として蓄積する。
