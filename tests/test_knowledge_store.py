@@ -141,7 +141,7 @@ class KnowledgeStoreApiTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertTrue(found['items'][0]['stale'])
         self.assertEqual(found['items'][0]['review_status'], 'unreviewed')
-        self.assertEqual(self.admin.call('POST', self.path, self.value)[0], 400)
+        self.assertEqual(self.admin.call('POST', self.path, self.value)[0], 409)
 
     def test_conflicting_analysis_id_must_not_overwrite(self):
         self.assertEqual(self.admin.call('POST', self.path, self.value)[0], 200)
@@ -149,7 +149,7 @@ class KnowledgeStoreApiTests(unittest.TestCase):
         content = json.loads(conflict['content'])
         content['items'][0]['statement'] += '（改変）'
         conflict['content'] = serialize(content)
-        self.assertEqual(self.admin.call('POST', self.path, conflict)[0], 400)
+        self.assertEqual(self.admin.call('POST', self.path, conflict)[0], 409)
         found = self.store.one('SELECT content FROM document_analyses WHERE id=?',
                                ('knowledge-job-1',))['content']
         self.assertEqual(found, self.value['content'])
