@@ -190,6 +190,34 @@ class CrossKnowledgeTests(unittest.TestCase):
                           following['items'][0]['item_index']), first_ids)
         self.assertIsNone(following['next_cursor'])
 
+    def test_pages_continue_past_rejected_events_without_resurrecting_prior_approvals(self):
+        a = self._create('cross-a', '原理A', '温度上昇時に冷却を強め')
+        b = self._create('cross-b', '原理B', '低温時は緩やかに制御する')
+        c = self._create('cross-c', '原理C', '流量を変化させる')
+        for n, source in enumerate((a, b), start=201):
+            doc = self.docs['cross-a' if source is a else 'cross-b']
+            status, value = self.admin.call(
+                'POST', '/api/v1/documents/%d/knowledge-proposals/%s/reviews' %
+                (doc['id'], source['proposal_id']),
+                {'request_id': '%032x' % n, 'item_index': 0,
+                 'source_revision': doc['revision'], 'decision': 'rejected'},
+            )
+            self.assertEqual(status, 200, value)
+        with mock.patch.object(knowledge_cross_search, 'MAX_SCAN', 2):
+            status, first = self._search(q='原理')
+            self.assertEqual(status, 200, first)
+            self.assertEqual(first['items'], [])
+            self.assertTrue(first['truncated'])
+            self.assertIsInstance(first['next_cursor'], int)
+            status, second = self._search(q='原理', cursor=first['next_cursor'])
+            self.assertEqual(status, 200, second)
+            self.assertEqual([x['proposal_id'] for x in second['items']],
+                             [c['proposal_id']])
+            self.assertNotIn(a['proposal_id'],
+                             [x['proposal_id'] for x in second['items']])
+            self.assertNotIn(b['proposal_id'],
+                             [x['proposal_id'] for x in second['items']])
+
     def test_read_only_scopes_do_not_open_private_data_to_published_or_writers(self):
         self._create('cross-a', '温度制御A', '温度上昇時に冷却を強め')
         for scope in ('ro', 'rw', 'published', 'knowledge_propose',
