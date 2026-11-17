@@ -416,12 +416,38 @@ function showIdeaHistory(detail) {
   summary.textContent = '編集履歴（直近20版・上書きされません）';
   disclosure.append(summary);
   for (const record of detail.history) {
-    const p = document.createElement('p');
-    p.className = 'hint';
+    const row = document.createElement('div');
+    row.className = 'idea-history-version';
+    const show = document.createElement('button');
+    show.type = 'button';
+    show.className = 'secondary';
     const date = new Date(record.created * 1000);
-    p.textContent = '第' + record.version + '版 · ' +
+    show.textContent = '第' + record.version + '版を読み取る · ' +
       (Number.isFinite(date.getTime()) ? date.toLocaleString() : '日時不明');
-    disclosure.append(p);
+    const historical = document.createElement('div');
+    show.onclick = async () => {
+      show.disabled = true;
+      historical.textContent = '過去の案を読み込んでいます…';
+      try {
+        const old = await api('ideas/' + detail.id + '/versions/' + record.version);
+        if (currentIdea?.id !== detail.id) return;
+        if (!old.read_only || old.version !== record.version || old.id !== detail.id)
+          throw new Error('不正な履歴データ');
+        const labels = {
+          title: 'タイトル', problem: '課題', solution: '解決原理',
+          effect: '期待効果', conditions: '成立条件', limitations: '限界',
+        };
+        const pre = document.createElement('pre');
+        pre.textContent = IDEA_FIELDS.map(name =>
+          labels[name] + '：' + (old.content[name] || '未記載')).join('\n\n');
+        historical.replaceChildren(pre);
+      } catch (_) {
+        if (currentIdea?.id === detail.id)
+          historical.textContent = '過去版を読み込めません。再試行してください。';
+      } finally { show.disabled = false; }
+    };
+    row.append(show, historical);
+    disclosure.append(row);
   }
   box.append(disclosure);
 }
