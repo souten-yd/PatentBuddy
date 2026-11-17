@@ -1070,6 +1070,24 @@ def knowledge_proposals_list(req):
     return knowledge_store.list_for_document(req.app.store, int(req.params["did"]))
 
 
+@route("GET", "/api/v1/documents/{did}/link-target", "read")
+def knowledge_link_target_info(req):
+    """Minimal document identity/revision: never return the full patent body."""
+    did = int(req.params['did'])
+    if did < 1 or did > 2**63 - 1:
+        raise _err(400, '文献IDが不正です')
+    with req.app.store.lock:
+        row = req.app.store.db.execute(
+            'SELECT id,title,hash,source FROM documents WHERE id=?', (did,)
+        ).fetchone()
+        if row is None:
+            raise _err(404, 'リンク先の文献がありません')
+        return {
+            'id': did, 'title': row['title'] or '無題の文献',
+            'revision': req.app.store.document_revision(row),
+        }
+
+
 @route("GET", "/api/v1/documents/{did}/knowledge-links", "read")
 def knowledge_links_list(req):
     from .knowledge_links import list_for_document
