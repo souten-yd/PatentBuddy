@@ -18,6 +18,64 @@ const bridgeCalls = new Map();
 const knownJobs = new Map();
 const root = location.pathname.startsWith('/addon-frame/') ? '/' + location.pathname.split('/').filter(Boolean).slice(0, 2).join('/') : '';
 const el = id => document.getElementById(id);
+// Local, in-workspace step selector. ControlDeck owns the global shell, route,
+// history, theme, authentication and mobile navigation. These are content panels.
+const WORKSPACE_STEPS = ['research', 'knowledge', 'ideas'];
+let activeWorkspace = 'research';
+let sourceReturnWorkspace = null;
+let activeAnalysisJobs = 0;
+let activePDFJobs = 0;
+function switchWorkspace(next, {focusTab = false, scroll = true} = {}) {
+  if (!WORKSPACE_STEPS.includes(next)) return;
+  activeWorkspace = next;
+  for (const step of WORKSPACE_STEPS) {
+    const tab = el('workspace-tab-' + step);
+    const pane = el('workspace-panel-' + step);
+    const active = step === next;
+    tab.setAttribute('aria-selected', active ? 'true' : 'false');
+    tab.tabIndex = active ? 0 : -1;
+    pane.hidden = !active;
+  }
+  if (focusTab) el('workspace-tab-' + next).focus({preventScroll: true});
+  if (scroll) el('workspace-tabs').scrollIntoView({block: 'start', behavior: 'auto'});
+}
+WORKSPACE_STEPS.forEach((step, index) => {
+  const tab = el('workspace-tab-' + step);
+  tab.onclick = () => switchWorkspace(step, {focusTab: true});
+  tab.onkeydown = event => {
+    const last = WORKSPACE_STEPS.length - 1;
+    let target = index;
+    if (event.key === 'ArrowRight') target = (index + 1) % WORKSPACE_STEPS.length;
+    else if (event.key === 'ArrowLeft') target = (index + last) % WORKSPACE_STEPS.length;
+    else if (event.key === 'Home') target = 0;
+    else if (event.key === 'End') target = last;
+    else return;
+    event.preventDefault();
+    switchWorkspace(WORKSPACE_STEPS[target], {focusTab: true});
+  };
+});
+function updateActivitySummary() {
+  const count = activeAnalysisJobs + activePDFJobs;
+  const label = el('workspace-job-count');
+  label.textContent = count > 0 ? count + '件を処理中' : '処理履歴を確認';
+  label.dataset.active = count > 0 ? 'true' : 'false';
+}
+el('workspace-source-return').onclick = () => {
+  const previous = sourceReturnWorkspace;
+  if (!previous || !WORKSPACE_STEPS.includes(previous) || previous === 'research') return;
+  sourceReturnWorkspace = null;
+  el('workspace-source-return').hidden = true;
+  switchWorkspace(previous, {focusTab: true, scroll: false});
+  const destination = previous === 'ideas' ? el('idea-form') :
+    (el('cross-compare-results').hasChildNodes() ? el('cross-compare-results') :
+      el('knowledge-search-section'));
+  destination.scrollIntoView({block: 'start', behavior: 'auto'});
+};
+el('document-compare-action').onclick = () => {
+  switchWorkspace('knowledge', {focusTab: true});
+  el('cross-query').focus({preventScroll: true});
+};
+
 async function api(path, body, method) {
   if (!nonce) throw new Error('ControlDeckとの接続を待っています。画面を開き直してください。');
   let response;
@@ -47,6 +105,10 @@ async function load() {
     el('server').textContent = `${s.name}（${s.role}） — ${s.url} / ${s.version ? 'v' + s.version : '未接続'}`;
     el('version').textContent = `PatentBuddy v${state.addon.version} · ControlDeck管理`;
     const ready = s.reachable && !s.setup_required && s.token_configured;
+    const indicator = el('connection-state');
+    indicator.dataset.state = ready ? 'ready' : 'attention';
+    indicator.textContent = ready ? '接続済み' :
+      (s.setup_required ? '初期設定が必要' : '再接続が必要');
     reviewAllowed = ready && s.knowledge_review_available === true;
     linkAllowed = ready && s.knowledge_link_available === true;
     ideaWriteReady = ready && s.idea_write_available === true;
@@ -61,7 +123,13 @@ async function load() {
       await loadLibrary();
       await loadIdeas();
     }
-  } catch (error) { reviewAllowed = false; linkAllowed = false; ideaWriteReady = false; el('message').textContent = '読み込みに失敗しました。接続を再確認できます。' + (error instanceof TypeError ? '' : ' ' + error.message); }
+  } catch (error) {
+    reviewAllowed = false; linkAllowed = false; ideaWriteReady = false;
+    el('connection-state').dataset.state = 'attention';
+    el('connection-state').textContent = '接続を確認してください';
+    el('message').textContent = '読み込みに失敗しました。接続を再確認できます。' +
+      (error instanceof TypeError ? '' : ' ' + error.message);
+  }
 }
 el('reconnect').onclick = () => load();
 window.addEventListener('message', event => {
@@ -150,11 +218,18 @@ function crossParagraph(title, contents) {
 }
 function crossOpenSource(item) {
   return async () => {
+    const previous = activeWorkspace;
     try {
       await openDocument(item.doc_id);
+      sourceReturnWorkspace = previous === 'research' ? null : previous;
+      const back = el('workspace-source-return');
+      back.hidden = !sourceReturnWorkspace;
+      back.textContent = previous === 'ideas' ? 'Idea Canvasへ戻る' : '比較画面へ戻る';
       focusKnowledgeEvidence(item.evidence);
     } catch (_) {
-      el('cross-search-status').textContent = '元文献を開けませんでした。接続と権限を確認してください。';
+      switchWorkspace(previous, {scroll: false});
+      const status = previous === 'ideas' ? el('idea-status') : el('cross-search-status');
+      status.textContent = '元文献を開けませんでした。接続・権限・原文の版を確認してください。';
     }
   };
 }
@@ -359,6 +434,7 @@ let currentIdea = null;
 let ideaPending = null;
 let ideaSaving = false;
 let ideaReadRequest = 0;
+let ideaDirty = false;
 function ideaContent() {
   return Object.fromEntries(IDEA_FIELDS.map(field =>
     [field, el('idea-' + field).value.trim()]));
@@ -455,6 +531,7 @@ function showIdeaHistory(detail) {
   box.append(disclosure);
 }
 function beginIdeaFromComparison(items) {
+  if (ideaDirty && !window.confirm('入力中のIdea案を破棄して、新しい比較から作成しますか？')) return;
   if (!Array.isArray(items) || items.length < 2 || items.length > 3 ||
       new Set(items.map(item => item.doc_id)).size < 2 ||
       !items.every(item => Number.isInteger(item.review_seq) &&
@@ -466,6 +543,7 @@ function beginIdeaFromComparison(items) {
   currentIdea = null;
   ideaSources = items.map(item => ({...item}));
   ideaPending = null;
+  ideaDirty = false;
   for (const field of IDEA_FIELDS) el('idea-' + field).value = '';
   el('idea-confirm').checked = false;
   el('idea-heading').textContent = '未保存の新しい発明仮説';
@@ -476,6 +554,7 @@ function beginIdeaFromComparison(items) {
     '引用元' + ideaSources.length + '件を固定する準備ができました。自分の言葉で課題・仕組みを記述してください。';
   el('idea-save-status').textContent = '記入だけでは保存されません。確認チェックと保存ボタンが必要です。';
   updateIdeaSaveState();
+  switchWorkspace('ideas', {scroll: false});
   el('idea-canvas').scrollIntoView({block: 'start', behavior: 'auto'});
   el('idea-title').focus({preventScroll: true});
 }
@@ -490,6 +569,7 @@ el('idea-new').onclick = () => {
 for (const field of IDEA_FIELDS) {
   el('idea-' + field).addEventListener('input', () => {
     ideaPending = null;
+    ideaDirty = true;
     updateIdeaSaveState();
   });
 }
@@ -507,6 +587,7 @@ async function openIdea(id) {
     currentIdea = detail;
     ideaSources = detail.sources;
     ideaPending = null;
+    ideaDirty = false;
     el('idea-form').hidden = false;
     for (const field of IDEA_FIELDS) el('idea-' + field).value = detail.content[field] || '';
     el('idea-confirm').checked = false;
@@ -585,6 +666,7 @@ el('idea-form').addEventListener('submit', async event => {
     el('idea-save-status').textContent =
       '人の操作によって案を保存しました。出典・編集履歴は保持されます。';
     ideaPending = null;
+    ideaDirty = false;
     await openIdea(response.id);
     await loadIdeas();
   } catch (_) {
@@ -1329,6 +1411,9 @@ async function loadJobs() {
   polling = true;
   try {
     const data = await api('jobs');
+    activeAnalysisJobs = data.items.filter(item =>
+      ['queued', 'running'].includes(item.status)).length;
+    updateActivitySummary();
     el('jobs').replaceChildren();
     if (!data.items.length) el('jobs').textContent = '実行中の分析はありません。';
     for (const job of data.items) {
@@ -1416,6 +1501,9 @@ el('import-pdf').onclick = async () => {
   finally { el('import-pdf').disabled = false; try { await loadPDFJobs(); } catch (_) {} }
 };
 async function openDocument(id) {
+  switchWorkspace('research', {scroll: false});
+  sourceReturnWorkspace = null;
+  el('workspace-source-return').hidden = true;
   const doc = await api('documents/' + id);
   currentDoc = id; currentDocBody = doc.body || ''; imageRequest++;
   linkTarget = null;
@@ -1490,6 +1578,8 @@ async function openDocument(id) {
 }
 async function loadPDFJobs() {
   const data = await api('pdf-jobs'); const box = el('pdf-jobs'); box.replaceChildren();
+  activePDFJobs = data.items.filter(item => ['queued', 'running'].includes(item.status)).length;
+  updateActivitySummary();
   el('import-pdf').disabled = data.items.some(job => ['queued', 'running'].includes(job.status));
   for (const job of data.items) {
     const row = document.createElement('div'); row.className = 'job'; row.dataset.status = job.status;
