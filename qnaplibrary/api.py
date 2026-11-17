@@ -1070,6 +1070,17 @@ def knowledge_proposals_list(req):
     return knowledge_store.list_for_document(req.app.store, int(req.params["did"]))
 
 
+@route("GET", "/api/v1/documents/{did}/knowledge-map", "read")
+def knowledge_map_read(req):
+    from .knowledge_map import read
+    raw_hops = req.arg('hops', '1')
+    visibility = req.arg('include_unreviewed', 'false')
+    if raw_hops not in ('1', '2') or visibility not in ('true', 'false'):
+        raise _err(400, '知識マップの範囲は1〜2段階、未確認表示はtrue/falseのみです')
+    return read(req.app.store, int(req.params["did"]), hops=int(raw_hops),
+                include_unreviewed=visibility == 'true')
+
+
 @route("GET", "/api/v1/documents/{did}/knowledge-proposals/{pid}/reviews", "read")
 def knowledge_reviews_history(req):
     from . import knowledge_reviews
