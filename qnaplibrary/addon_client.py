@@ -2,6 +2,7 @@
 import ipaddress
 import json
 import os
+import re
 from pathlib import Path
 import time
 import urllib.error
@@ -105,13 +106,23 @@ class AddonClient:
 
     def data(self, method, path, body=None):
         config = self.settings()
-        if config.get('auth_method') == 'local_peer' and method == 'POST' and (path.endswith('/analyses') or path == '/api/v1/pdf-imports'):
+        knowledge_write = (method == 'POST' and re.fullmatch(
+            r'/api/v1/documents/[1-9][0-9]{0,17}/knowledge-proposals', path) is not None)
+        if config.get('auth_method') == 'local_peer' and method == 'POST' and (
+                path.endswith('/analyses') or path == '/api/v1/pdf-imports' or knowledge_write):
             from .local_auth import connect
             try:
-                config = connect(17871, 'pdf_import' if path == '/api/v1/pdf-imports' else 'analysis')
+                scope = ('knowledge_propose' if knowledge_write else
+                         'pdf_import' if path == '/api/v1/pdf-imports' else 'analysis')
+                config = connect(17871, scope)
             except (OSError, ValueError):
                 raise AddonError(503, 'ResearchDataHubの保存用認証を利用できません') from None
-        token = config.get('server_token')
+        if knowledge_write and self.settings().get('auth_method') != 'local_peer':
+            token = config.get('knowledge_server_token')
+            if not token:
+                raise AddonError(503, '専用の知識保存権限を設定してください')
+        else:
+            token = config.get('server_token')
         if not isinstance(token, str) or not token or '\n' in token or '\r' in token:
             raise AddonError(503, 'ResearchDataHubの接続トークンを設定してください')
         return request_json(validate_url(config['server_url']), method, path, body,
