@@ -1104,10 +1104,12 @@ def knowledge_map_read(req):
     from .knowledge_map import read
     raw_hops = req.arg('hops', '1')
     visibility = req.arg('include_unreviewed', 'false')
-    if raw_hops not in ('1', '2') or visibility not in ('true', 'false'):
-        raise _err(400, '知識マップの範囲は1〜2段階、未確認表示はtrue/falseのみです')
+    links = req.arg('include_links', 'false')
+    if (raw_hops not in ('1', '2') or visibility not in ('true', 'false')
+            or links not in ('true', 'false')):
+        raise _err(400, '知識マップは1〜2段階、未確認と仮説関係の表示はtrue/falseのみです')
     return read(req.app.store, int(req.params["did"]), hops=int(raw_hops),
-                include_unreviewed=visibility == 'true')
+                include_unreviewed=visibility == 'true', include_links=links == 'true')
 
 
 @route("GET", "/api/v1/documents/{did}/knowledge-proposals/{pid}/reviews", "read")
