@@ -144,3 +144,15 @@ PR #16の設計はmainへ統合済み。PR #17でLinux別名入口・doctor/serv
 - 事前停止（旧Host/保存資格なし）、prompt injection、原文引用偽造、Host model/version drift、cancel/timeout、文献改訂race→409、zero write再送、writer tokenのGET403、old rw/analysisのPOST403、No raw-source/redirect、新旧UI default、ControlDeck theme/Job実動作、iPhone 320pxを必ず検証。少量の修正は本PRまたは次のK2に同梱し、不要な追加PRを作らない。
 - K2: 人間のレビュー権限と不変バージョン記録・stale propagation・approve/reject/差戻し。AI推論は承認後も事実へ自動昇格しない。K3: 既存GraphRAGを使う1〜2hopのKnowledge Map＋出典ドロワー＋320px代替一覧。先行PR #23のGraph/証跡を二重実装しない。
 - マージ/リリースは必須verifyとbuild成功後、PR依存順にmerge、その後Version/QPKG/CHANGELOG3点整合で正式Release、QNAP/Linuxの起動/health/更新確認まで行う。
+
+## K2実装とK3のGraphRAG/Knowledge Map指示（2026-11-17）
+
+- 現在の最新stackは[Draft PR #33](https://github.com/souten-yd/PatentBuddy/pull/33)（base PR #32→#31→#30→#29）。[K2詳細設計・テストと次のK3](knowledge-k2-human-review.md)を優先。**Python全体テスト未実施、実モデル/実ブラウザ未検証、公開リリースなし**。
+- 実装済（未マージ）: 同一SQLiteのappend-only`knowledge_reviews`、専用`knowledge_review`認証・同UIDソケット、`POST knowledge-proposals/{pid}/reviews`、read-only bounded履歴、`knowledge_store.list_for_document`の項目別最新判断/失効overlay、ControlDeck準拠の明示レビューUI/最新状態表示。レビューの承認はAIの`model_inference`を`source_fact`に昇格させない。旧approvalは文献版変更で必ず失効し、自動再承認しない。
+- **Scope/Allowed**: `qnaplibrary/knowledge_reviews.py`新規、`store.py`への加算DDL、認証/api/server/addon_client/knowledge_storeとweb/workspace UIの限定変更、K2専用テスト、docs更新。**Do NOT**: 新DB、GraphRAG自動エッジ、モデルのクラウドfallback、raw source/redirect/実行capability/自主mutation、自動承認/出願、Vue default化、ui.html default変更、npm build at startup、HostのAI runtime semantics変更。
+- **今回実施した確認**: K2 JSのV8構文PASS、HTML ID参照欠落/重複0、reviewのSQLite最新seqクエリは独立環境で正動作。**未実施のため合格と主張不可**: 実LiveServerを含む`tests.test_knowledge_reviews`/`tests.test_knowledge_review_workspace`、K1a〜K1d回帰、`bash scripts/verify.sh`、`bash scripts/build-linux.sh dist`、iOS/実Host/RDH/API E2E。
+- PR #33の完全checkout後、認証境界（admin CSRF/Origin、review POST以外のwriter token全403、pairingはscope rw/roのみ、local peer creds別）、モデル生成後の人間review（原文改訂タイミング、Unicode quote、旧判断失効）、同一request idのzero writes、誤タップ防止、レビュー履歴最大30件、DB CASCADE削除・復元、非公開文書漏洩0を検証。性能は物理read/write bytes、SQLite WALとidle readsで比較。修正少量なら同一PRにまとめる。
+- **K3実装**: 先行Draft PR #23の`evidence_graph.py`と`chart_storage.py`およびHost証跡との実差分/機能境界を最新mainと照合してから再利用し、独自の重複graph API/DBを作らない。RDHはauthoritative、ControlDeck Hostは表示とローカル推論。人間が承認したモデル推論をsource factと誤認せず、GraphRAG既定検索へunreviewed/stale/単純AI推論を流さない。必要な独立認定ステップが未実装なら探索デモはread-onlyに留める。
+- **K3 UI/UX**: 既存ControlDeck design/theme/Bridge/Host nav/PageHeader/Job、44px、320px single-paneを踏襲。PCでは選択ノードから1〜2hop上限付きmap＋右Inspector＋出典PDF/段落へ移動、モバイルでは一覧→Card→Evidence。可視range/reason、status、truncated上限、offline/error/retry、keyboard/ScreenReaderをテスト。全件描画や外部CDN/Graph engine追加なし。
+- **Expected final state K2**: 人が判断を明示し、その署名されていない装置単位の審査記録が永続し、原文版で失効・復活しない。**Expected final state K3**: 出典つき技術エッセンスとレビュー結果を、ControlDeck内部で安全・制限付きに探索できる。完全な個人認証署名は今後専用Host contractが必要。
+- Merge/release: 実コード/PR diff/manifest/docs/tests/runtime/全verify/安全grepを確認→依存順PR merge→3か所のversion整合を持つrelease PRとActions成功→Linux/QNAP更新後health/実機確認。途中のDraftを勝手に完成済みと扱わない。
