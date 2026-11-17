@@ -12,7 +12,7 @@ PROOF = {
     'revision_kind': 'host_process_file_metadata_v1',
     'model_ref': 'a' * 64, 'runtime_ref': 'b' * 64,
 }
-BODY = '温度上昇で高速に加速し、低温側は緩やかに減速する。' + ' '.join(
+BODY = '🧪温度上昇で高速に加速し、低温側は緩やかに減速する。' + ' '.join(
     '引用%02d' % i for i in range(12))
 QUOTE = '低温側は緩やかに減速する。'
 
@@ -153,6 +153,20 @@ class KnowledgeMapTests(unittest.TestCase):
         self.assertEqual(self.store.one(
             "SELECT review_status FROM graph_edges WHERE id='factual-before-edit'")[0],
             'unreviewed')
+
+    def test_reverting_source_does_not_resurrect_approved_essence(self):
+        self.add_essence()
+        self.approve('map-1')
+        self.assertIn('k:map-1:0', {node['id'] for node in self.get()['nodes']})
+        for text in ('一時的に変更された文献', BODY):
+            self.assertEqual(self.admin.call('POST', '/api/v1/collections/map-tests/documents', {
+                'documents': [{'id': 'a', 'title': '温度制御文献A', 'body': text}]})[0], 200)
+        self.assertNotIn('k:map-1:0', {node['id'] for node in self.get()['nodes']})
+        explicit = self.get('?include_unreviewed=true')
+        item = next(n for n in explicit['nodes'] if n['id'] == 'k:map-1:0')
+        self.assertTrue(item['stale'])
+        self.assertEqual(item['review_status'], 'unreviewed')
+        self.assertEqual(item['previous_decision'], 'approved')
 
     def test_read_is_bounded_and_never_writes(self):
         self.add_graph_relation(self.a, self.b, 'factual-1')
