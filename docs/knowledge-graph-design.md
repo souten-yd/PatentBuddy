@@ -176,3 +176,9 @@ Host principal認証とResearchDataHub scoped token/ローカルUnix peer契約�
 - Concept正規化の粒度と類似度閾値: K2で誤統合評価の実測後に決定。スコアだけでmergeしない。
 - Cytoscape.jsの採用・ライセンス/配布サイズ・依存追加: K3のADRで比較し、既存Vanilla UI+静的描画を先に評価する。
 - ANNや外部GraphDBの導入: K4/K6で10万件等の実測が必要になった場合のみ別ADR。正本SQLite以外の常時サービスを増やす前に効果/書込み費用を示す。
+
+## ControlDeck UI/UX規範とK1a実装契約（2026-11-17追加）
+
+UI/UXは独自デザインではなく、[ControlDeck準拠UI/UX契約](controldeck-ux-contract.md)を**Normative**とする。ControlDeck mainのUIガイド/Addonガイド/PageHeader/共通UI部品/テーマ/モバイル対応を調べてから実装する。Hostのグローバルナビとアドオン内ナビを二重化しない。320pxはグラフ全体の縮小版を強制せず知識リスト→カード→出典の1ペイン。空/エラー/待機中には原因と実行可能な次アクションを示す。
+
+K1aでは `qnaplibrary/knowledge_essence.py` の独立した`validate(document, proposal)`を先行追加。doc_id/source_revisionとUnicode文字位置/原文quoteを完全一致確認し、モデル候補は常に model_inference/unreviewed として保持。model_ref/runtime_refがHost local_onlyの形式に一致しない場合は拒否。1文献最大100000文字・12カード、quote1200文字。**このモジュールはAI生成・DB保存・API/UIの呼出経路に未接続**。Hostの推論先が実際にlocal-onlyかという安全性は、連携時に既存Host出口で別途検証する。PR #23のrelation_proposals/generation_contractを呼び出す際に、同等機構を二重化せず共通化すること。
