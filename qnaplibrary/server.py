@@ -479,6 +479,24 @@ class Handler(BaseHTTPRequestHandler):
                             result = client.data("GET", "/api/v1/documents/" + path.split('/')[-2] + "/analyses")
                         elif method == "GET" and re.fullmatch(r"/addon/v1/documents/[1-9][0-9]{0,17}/knowledge-proposals", path):
                             result = client.data("GET", "/api/v1/documents/" + path.split('/')[-2] + "/knowledge-proposals")
+                        elif method == "GET" and re.fullmatch(
+                                r"/addon/v1/documents/[1-9][0-9]{0,17}/knowledge-links", path):
+                            result = client.data(
+                                "GET", "/api/v1/documents/" + path.split('/')[-2] +
+                                "/knowledge-links")
+                        elif method == "POST" and re.fullmatch(
+                                r"/addon/v1/documents/[1-9][0-9]{0,17}/knowledge-proposals/"
+                                r"[A-Za-z0-9_-]{1,128}/links", path):
+                            body = Request(self, method, path, {}, {}).json()
+                            if not isinstance(body, dict):
+                                raise AddonError(400, '技術仮説リンクの確認内容が不正です')
+                            result = client.data("POST", "/api" + path[len("/addon"):], body)
+                        elif method == "POST" and re.fullmatch(
+                                r"/addon/v1/knowledge-links/klink_[a-f0-9]{64}/review", path):
+                            body = Request(self, method, path, {}, {}).json()
+                            if not isinstance(body, dict):
+                                raise AddonError(400, '技術仮説リンクの審査内容が不正です')
+                            result = client.data("POST", "/api" + path[len("/addon"):], body)
                         elif method == "GET" and re.fullmatch(r"/addon/v1/documents/[1-9][0-9]{0,17}/knowledge-map", path):
                             query = parse_qs(parts.query, keep_blank_values=True)
                             if (set(query) - {'hops', 'include_unreviewed'}
