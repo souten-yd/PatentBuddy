@@ -109,3 +109,8 @@ K1a Draft PR #29に原文範囲・source revision・Host local_only証跡形式�
 
 - K6は新機能より先にPR #29〜#37の実検証と低I/O・安全の回帰。追加PRではなくPR #37へ埋込UIを検査する`verify.sh`更新、1コマンドの`scripts/verify-k6.sh`、K6 safety test、K4→K5の古い比較結果無効化をまとめる。依存主幹との違反を静的検査するだけでなく、実HTTP/SQLite全テストとUbuntu/QNAP/iPhone実機が必須。
 - 作業コンテナのgithub.com DNS制約のため**一括検証スクリプトは未実行**。JS構文のV8静的検査等は別検証であって`verify-k6.sh`合格ではない。全PR Draft・未マージ・未リリースを維持。正式ReleaseにはREADME/CHANGELOG/版/配布成果物・healthの一致を要する。
+
+## K6b：作業フロー中心のControlDeck埋込UX（2026-11-18）
+
+- [Draft PR #38](https://github.com/souten-yd/PatentBuddy/pull/38)で、縦長一画面を「資料 / 知識 / アイデア」の3ステップに再編。K2承認知識の成立条件→K4横断検索（人が手動実行）→2〜3件比較→K5 Idea手動作成、証拠引用確認と戻る/編集中のフォーム保持を直接結合する。PC資料検索・一覧2カラム、iPhone単列、PDF任意開示、接続・Jobs件数、ARIAタブとHostテーマ。新API/DB/LLM/Autonomous/UI default変更なし。[UI/UX詳細](workspace-ux-k6b.md)。
+- JavaScript V8静的構文、DOM ID/HTML tag構造はPASS。Python静的テストコードは追加済みだが**未実行**、本体API/Ubuntu-QNAP/iPhone E2Eも未実施。次は全stack `verify-k6.sh`＋実ブラウザーで実利用シナリオを通してから正式マージ/リリース。
