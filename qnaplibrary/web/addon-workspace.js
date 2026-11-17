@@ -209,7 +209,8 @@ async function loadAnalyses(id) {
     if (item.kind === 'knowledge') continue;
     const box = document.createElement('div'); box.className = 'analysis';
     const title = document.createElement('h3');
-    title.textContent = (item.kind === 'claims' ? '請求項の確認' : '要約') + (item.stale ? ' — 原文が更新されています' : ' — 未確認');
+    const analysisNames = {summary: '要約', claims: '請求項の確認', chart: 'クレームチャート', relations: '関係の提案'};
+    title.textContent = (analysisNames[item.kind] || '分析結果') + (item.stale ? ' — 原文が更新されています' : ' — 未確認');
     const text = document.createElement('pre'); text.textContent = item.content;
     box.append(title, text); el('analyses').append(box);
   }
@@ -222,7 +223,7 @@ el('analyze').onclick = async () => {
   el('analyze').disabled = true;
   try {
     await api('jobs', {doc_id: currentDoc, kind: el('analysis-kind').value});
-    el('message').textContent = 'ローカルAIの分析を開始しました。';
+    el('message').textContent = el('analysis-kind').value === 'knowledge' ? '知識候補の抽出を開始しました。結果は未確認のまま保存されます。' : 'ローカルAIの分析を開始しました。';
     await loadJobs();
   } catch (error) { el('message').textContent = error.message; }
   finally { el('analyze').disabled = false; }
