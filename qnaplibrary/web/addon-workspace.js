@@ -1670,7 +1670,7 @@ async function showLibrary() {
   for (const row of data.items) {
     const button = document.createElement('button'); button.className = 'result';
     button.textContent = `${row.ext_id || ''} ${row.title || '無題'} — 原文・保存済み分析を開く`;
-    button.onclick = async () => { try { await openDocument(row.id); el('detail').scrollIntoView({behavior:'smooth'}); } catch(error) { el('message').textContent = error.message; } };
+    button.onclick = async () => { try { await openDocument(row.id); el('detail').scrollIntoView({behavior:'auto'}); } catch(error) { el('message').textContent = error.message; } };
     el('library-items').append(button);
   }
   if (!data.items.length) el('library-items').textContent = 'この保存先には資料がありません。';
