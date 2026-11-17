@@ -200,3 +200,9 @@ HTTP POSTは新`knowledge_review` scope（既存`knowledge_propose` writerから
 [K3bの詳細設計](knowledge-k3b-links.md)では、既存K2の「人が採用したAI推論」を元に、別文献に対する**仮説**だけをPR #23 GraphRAGの`basis=inferred`へ登録する。利用者は元のquoteと対象文献の版を選び、明示チェック→リンク未承認登録→別の明示的承認/却下操作を行う。K2のsource revision/単調epoch/latest review seq、ターゲット版、Graph graph_revisionを検証し、旧承認が復活しない。
 
 Graphの`factual` edgeはK3b APIから生成できない。GraphRAGの`relation_proposals.py`は古い`kind=relations`前提なので、K1a〜K2 `knowledge`候補とは重複生成せず既存`evidence_graph.save/review`だけ再利用する。新しい`knowledge_link_origins`はグラフ正本ではなく、既存edgeとK2元証拠のFKメタデータ。K3 mapの仮説表示は明示opt-inで人間がreviewした現在の関係だけ、既定factual検索へ混ぜない。
+
+## K4審査済みエッセンスの横断検索とK5手動Ideaの分離（2026-11-17）
+
+[K4実装・受入設計](knowledge-k4-cross-search.md)では、K2 `knowledge_reviews`の**最新approved**とsource revision/epoch、K1a`validate`を読み取り時に再検証し、SQLiteの既存正本だけから直近イベントをbounded keyset scanする。AIの`basis=model_inference`は承認後も変えず、K4は`side_by_side_literal`比較・出典・条件/限界の完全一致だけを表示。意味的関連・新規性/侵害の判断、無断のGraph/Idea mutationは禁止する。
+
+K5ではK4比較結果の受け渡しから始め、human-controlled Idea Canvas/明示保存と各出典のsource_revision/epoch/review_seqを追跡する。既存PR #23 GraphRAGの自動エッジ作成機能と混同せず、Ideaへの採用には別認証/人間のチェックを必要とする。
