@@ -181,6 +181,16 @@ class IdeaCanvasHTTPTests(unittest.TestCase):
         self.assertEqual(self.store.db.total_changes, changes)
         self.assertEqual(self._edit(first['id'], 1, dict(CONTENT), request=21)[0], 409)
 
+    def test_no_op_edit_is_zero_write_and_does_not_create_a_new_version(self):
+        created = self._create()
+        before = self.store.db.total_changes
+        status, unchanged = self._edit(created['id'], 1, dict(CONTENT), request=25)
+        self.assertEqual(status, 200, unchanged)
+        self.assertTrue(unchanged['unchanged'])
+        self.assertEqual(unchanged['version'], 1)
+        self.assertEqual(self.store.db.total_changes, before)
+        self.assertEqual(len(self._detail(created['id'])['history']), 1)
+
     def test_source_changed_then_reverted_stays_invalid_and_blocks_edit(self):
         created = self._create()
         for body in ('一時的に変更された別の原文', DOCUMENT_A):
