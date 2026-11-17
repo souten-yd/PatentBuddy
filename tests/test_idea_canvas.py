@@ -151,6 +151,12 @@ class IdeaCanvasHTTPTests(unittest.TestCase):
         self.assertEqual(result['version'], 2)
         current = self._detail(created['id'])
         self.assertEqual(current['content']['title'], revised['title'])
+        code, previous = self.admin.call(
+            'GET', '/api/v1/ideas/' + created['id'] + '/versions/1')
+        self.assertEqual(code, 200, previous)
+        self.assertTrue(previous['read_only'])
+        self.assertEqual(previous['current_version'], 2)
+        self.assertEqual(previous['content'], CONTENT)
         self.assertEqual([h['version'] for h in current['history']], [2, 1])
         stored = self.store.q(
             'SELECT version,content FROM idea_versions WHERE idea_id=? ORDER BY version',
