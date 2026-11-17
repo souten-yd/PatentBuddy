@@ -594,6 +594,9 @@ class Handler(BaseHTTPRequestHandler):
             if req.device and req.device["scopes"] == "knowledge_link" and not (
                     method == "POST" and access == "knowledge_link"):
                 raise HTTPError(403, "このトークンは根拠付き仮説リンク操作専用です")
+            if req.device and req.device["scopes"] == "idea_write" and not (
+                    method in ("POST", "PUT") and access == "idea_write"):
+                raise HTTPError(403, "このトークンは明示的なIdea保存・編集専用です")
             if access != "public":
                 if req.actor is None:
                     raise HTTPError(401, "認証が必要です")
@@ -608,10 +611,14 @@ class Handler(BaseHTTPRequestHandler):
                 if access == "knowledge_link" and req.actor != "admin" and (
                         not req.device or req.device["scopes"] != "knowledge_link"):
                     raise HTTPError(403, "根拠付き仮説リンク専用権限がありません")
+                if access == "idea_write" and req.actor != "admin" and (
+                        not req.device or req.device["scopes"] != "idea_write"):
+                    raise HTTPError(403, "Idea保存・編集専用権限がありません")
                 if req.device and method != "GET" and req.device["scopes"] != "rw" and access not in ("read", "published") and not ((access in ("analysis", "pdf_import") and req.device["scopes"] in (access, "pdf_analysis"))
                         or (access == "knowledge_propose" and req.device["scopes"] == "knowledge_propose")
                         or (access == "knowledge_review" and req.device["scopes"] == "knowledge_review")
-                        or (access == "knowledge_link" and req.device["scopes"] == "knowledge_link")):
+                        or (access == "knowledge_link" and req.device["scopes"] == "knowledge_link")
+                        or (access == "idea_write" and req.device["scopes"] == "idea_write")):
                     raise HTTPError(403, "読み取り専用デバイスです")
             if req.session and access != "public" and method not in ("GET", "HEAD"):
                 origin = self.headers.get("Origin")
@@ -750,6 +757,7 @@ def main(argv=None):
             local_auth.append(LocalAuthServer(app.auth, httpd.server_port, "knowledge_propose"))
             local_auth.append(LocalAuthServer(app.auth, httpd.server_port, "knowledge_review"))
             local_auth.append(LocalAuthServer(app.auth, httpd.server_port, "knowledge_link"))
+            local_auth.append(LocalAuthServer(app.auth, httpd.server_port, "idea_write"))
         except OSError:
             LOG.warning("Local automatic authentication unavailable; explicit device authentication remains available")
 
