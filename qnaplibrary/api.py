@@ -1101,7 +1101,7 @@ def idea_create(req):
     from .knowledge_store import KnowledgeConflictError
     actor = 'admin' if req.actor == 'admin' else 'device:%d' % req.device['id']
     try:
-        return create(req.app.store, req.json(limit=16 * 1024), actor)
+        return create(req.app.store, req.json(limit=48 * 1024), actor)
     except KnowledgeConflictError as error:
         raise _err(409, str(error)) from None
 
@@ -1113,7 +1113,7 @@ def idea_edit(req):
     actor = 'admin' if req.actor == 'admin' else 'device:%d' % req.device['id']
     try:
         return update(req.app.store, req.params['iid'],
-                      req.json(limit=12 * 1024), actor)
+                      req.json(limit=48 * 1024), actor)
     except KnowledgeConflictError as error:
         raise _err(409, str(error)) from None
 
