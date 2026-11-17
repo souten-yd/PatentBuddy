@@ -75,6 +75,12 @@ el('document-compare-action').onclick = () => {
   switchWorkspace('knowledge', {focusTab: true});
   el('cross-query').focus({preventScroll: true});
 };
+el('research-pdf-quick').onclick = () => {
+  switchWorkspace('research', {scroll: false});
+  el('workspace-pdf-import').open = true;
+  el('workspace-pdf-import').scrollIntoView({block: 'start', behavior: 'auto'});
+  el('import-pdf').focus({preventScroll: true});
+};
 
 async function api(path, body, method) {
   if (!nonce) throw new Error('ControlDeckとの接続を待っています。画面を開き直してください。');
