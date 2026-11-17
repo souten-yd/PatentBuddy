@@ -526,6 +526,22 @@ class Handler(BaseHTTPRequestHandler):
                             if not isinstance(body, dict):
                                 raise AddonError(400, 'レビュー内容が不正です')
                             result = client.data("POST", "/api" + path[len("/addon"):], body)
+                        elif method == "GET" and path == "/addon/v1/ideas":
+                            result = client.data("GET", "/api/v1/ideas")
+                        elif method == "GET" and re.fullmatch(
+                                r"/addon/v1/ideas/idea_[a-f0-9]{32}", path):
+                            result = client.data("GET", "/api" + path[len("/addon"):])
+                        elif method == "POST" and path == "/addon/v1/ideas":
+                            body = Request(self, method, path, {}, {}).json(limit=16 * 1024)
+                            if not isinstance(body, dict):
+                                raise AddonError(400, "アイデア案の入力が不正です")
+                            result = client.data("POST", "/api/v1/ideas", body)
+                        elif method == "PUT" and re.fullmatch(
+                                r"/addon/v1/ideas/idea_[a-f0-9]{32}", path):
+                            body = Request(self, method, path, {}, {}).json(limit=12 * 1024)
+                            if not isinstance(body, dict):
+                                raise AddonError(400, "アイデア案の編集内容が不正です")
+                            result = client.data("PUT", "/api" + path[len("/addon"):], body)
                         elif method == "POST" and path == "/addon/v1/knowledge/search":
                             body = Request(self, method, path, {}, {}).json(limit=4 * 1024)
                             if not isinstance(body, dict):
