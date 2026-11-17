@@ -37,6 +37,19 @@ CREATE TABLE IF NOT EXISTS document_analyses(
   id TEXT PRIMARY KEY, doc_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
   source_revision TEXT NOT NULL, kind TEXT NOT NULL, content TEXT NOT NULL, created REAL NOT NULL);
 CREATE INDEX IF NOT EXISTS document_analyses_doc ON document_analyses(doc_id, created DESC);
+-- Review is append-only. AI proposals remain immutable and unreviewed facts.
+-- Each event references one item in a versioned knowledge snapshot.
+CREATE TABLE IF NOT EXISTS knowledge_reviews(
+  seq INTEGER PRIMARY KEY,
+  request_id TEXT NOT NULL UNIQUE,
+  proposal_id TEXT NOT NULL REFERENCES document_analyses(id) ON DELETE CASCADE,
+  item_index INTEGER NOT NULL CHECK(item_index BETWEEN 0 AND 11),
+  decision TEXT NOT NULL CHECK(decision IN ('approved','rejected','changes_requested')),
+  source_revision TEXT NOT NULL,
+  reviewer TEXT NOT NULL,
+  created REAL NOT NULL);
+CREATE INDEX IF NOT EXISTS knowledge_reviews_latest
+  ON knowledge_reviews(proposal_id,item_index,seq DESC);
 CREATE TABLE IF NOT EXISTS source_pdfs(
   sha256 TEXT PRIMARY KEY, content BLOB NOT NULL, created REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS document_pdfs(
