@@ -100,7 +100,12 @@ def list_for_document(store, doc_id):
             "WHERE doc_id=? AND kind='knowledge' ORDER BY created DESC,id DESC LIMIT 20",
             (doc_id,),
         ).fetchall()
-    return {
-        'items': [dict(dict(row), stale=row['source_revision'] != revision,
-                       review_status='unreviewed') for row in rows],
-    }
+        from .knowledge_reviews import latest
+        reviews = latest(store, [row['id'] for row in rows],
+                         {row['id']: revision for row in rows})
+        # Do not transform the immutable model proposal into factual content.
+        return {
+            'items': [dict(dict(row), stale=row['source_revision'] != revision,
+                           review_status='unreviewed', reviews=reviews.get(row['id'], {}))
+                      for row in rows],
+        }
