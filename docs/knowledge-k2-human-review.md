@@ -51,3 +51,7 @@
 - K3 Graph Query: 探索は**1〜2hop、最大node/edge、truncated**をserverから明示、approvedかつstale=falseのリンクのみ既定検索で参照。単一正本DB、source引用のUnicode範囲→文献へ戻る、bidirectional deep link、更新時の辺/依存アイデアの失効伝播、人間の再承認は自動では行わない。
 - K3 UI: [ControlDeck UI/UX規範](controldeck-ux-contract.md)に準じ、PCは部分Graphと右Inspector、iPhone 320pxは知識一覧→Card→根拠。Host Shellとナビは二重化しない。大量nodeの全件描画/CDN/独自デザインシステムを禁止。Job状態、進捗、Offline/Reconnecting/Emptyの出口を実装。
 - K3のScope/Allowed/Do NOT/Expected final stateをPR本文に明記し、PR #23の既存レイアウト・データモデルを**移植する前に整合確認**。小修正は次予定PRへ同梱。バージョンは最終検証・正式Release直前に3点整合して更新。
+
+## 追補: 同じ原文への復元でも旧レビューを復活させない（2026-11-17）
+
+K2では文献のsource_revision一致だけでなく、knowledge_review_epochsに記録された単調増加epochも判定する。本文変更後に同じ文面へ戻しても、以前のreview eventのsource_epochは現行epochと一致せずstaleとなる。知識候補のモデル推論自体は保持するが、旧承認の自動復活は禁止。旧K2 schema由来のイベントはsource_epoch=-1へ安全側移行して再確認を要求する。LiveServerでの全体検証は未実施。
