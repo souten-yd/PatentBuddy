@@ -1085,6 +1085,16 @@ def idea_detail(req):
     return get(req.app.store, req.params['iid'])
 
 
+@route("GET", "/api/v1/ideas/{iid}/versions/{ver}", "read")
+def idea_version_detail(req):
+    from .idea_canvas import get_version
+    raw_version = req.params['ver']
+    if (not raw_version.isascii() or not raw_version.isdecimal()
+            or raw_version.startswith('0') or len(raw_version) > 10):
+        raise _err(400, 'Idea履歴の版指定が不正です')
+    return get_version(req.app.store, req.params['iid'], int(raw_version))
+
+
 @route("POST", "/api/v1/ideas", "idea_write")
 def idea_create(req):
     from .idea_canvas import create
