@@ -236,8 +236,13 @@ async function loadKnowledge(id) {
               el('message').textContent = 'レビュー判断を記録しました。AIによる推論は事実と確定していません。';
               await loadKnowledge(id);
             } catch (error) {
-              el('message').textContent = 'レビューを記録できませんでした。' + error.message;
-              submit.disabled = false;
+              if (String(error.message).includes('409')) {
+                el('message').textContent = '原文またはレビュー版が更新されています。最新の候補を確認してください。';
+                await loadKnowledge(id);
+              } else {
+                el('message').textContent = 'レビューを記録できませんでした。' + error.message;
+                submit.disabled = false;
+              }
             }
           };
           reviewPanel.append(choice, submit);
