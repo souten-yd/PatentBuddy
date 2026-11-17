@@ -68,6 +68,7 @@ CREATE TABLE IF NOT EXISTS knowledge_link_origins(
   item_index INTEGER NOT NULL CHECK(item_index BETWEEN 0 AND 11),
   source_doc_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
   source_epoch INTEGER NOT NULL,
+  source_review_seq INTEGER NOT NULL DEFAULT -1,
   target_doc_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE);
 CREATE INDEX IF NOT EXISTS knowledge_link_origin_source
   ON knowledge_link_origins(source_doc_id,edge_id);
@@ -188,6 +189,12 @@ class Store:
         # Reuse PR23's GraphRAG schema within this same SQLite authority.
         from .evidence_graph import install as install_graph
         install_graph(self.db)
+        # One-time fail-closed migration for the initial K3b Draft schema.
+        # Links created without a source review sequence remain stale.
+        if 'source_review_seq' not in {row[1] for row in self.db.execute(
+                'PRAGMA table_info(knowledge_link_origins)')}:
+            self.db.execute('ALTER TABLE knowledge_link_origins '
+                            'ADD COLUMN source_review_seq INTEGER NOT NULL DEFAULT -1')
         self.fts = self._init_fts()
         self.vector_version = 0  # bumped on vector change; vector cache invalidation
         self.on_change = None    # callback after documents were added/updated (auto-embedding)
