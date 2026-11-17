@@ -2,6 +2,7 @@
 let nonce = '';
 let currentDoc = null;
 let currentDocBody = '';
+let reviewAllowed = false;
 let polling = false;
 let bridgePort = null;
 let imageURL = null;
@@ -39,6 +40,7 @@ async function load() {
     el('server').textContent = `${s.name}（${s.role}） — ${s.url} / ${s.version ? 'v' + s.version : '未接続'}`;
     el('version').textContent = `PatentBuddy v${state.addon.version} · ControlDeck管理`;
     const ready = s.reachable && !s.setup_required && s.token_configured;
+    reviewAllowed = ready && s.knowledge_review_available === true;
     el('message').textContent = ready ? 'ResearchDataHubに接続しました。文献を検索できます。' :
       s.setup_required ? 'ResearchDataHubの管理Webで初期設定を完了してください。' : 'ResearchDataHubの接続トークン設定が必要です。';
     el('submit').disabled = !ready;
@@ -153,15 +155,22 @@ async function loadKnowledge(id) {
         empty.textContent = '根拠に合致する知識候補はありませんでした。';
         group.append(empty);
       }
-      for (const item of parsed.items) {
+      for (const [itemIndex, item] of parsed.items.entries()) {
+        const review = snapshot.reviews?.[String(itemIndex)];
         const card = document.createElement('article');
         card.className = 'knowledge-card';
         const title = document.createElement('h3');
         title.textContent = KNOWLEDGE_KINDS[item.kind] || '知識候補';
         const status = document.createElement('p');
         status.className = 'hint';
-        status.textContent = (snapshot.stale ? '原文変更・失効 · ' : '') +
-          'AI推論 · 未確認（人による採用前）';
+        const currentDecision = snapshot.stale ? 'unreviewed' : (review?.status || 'unreviewed');
+        const reviewNames = {
+          approved: '人間が確認済み', rejected: '人間が却下', changes_requested: '差戻し',
+          unreviewed: '未確認',
+        };
+        status.textContent = (snapshot.stale ? '原文変更・以前のレビューは失効 · ' : '') +
+          'AI推論 · ' + (reviewNames[currentDecision] || '未確認') +
+          '（技術的事実の確定ではありません）';
         const statement = document.createElement('p');
         statement.className = 'knowledge-statement';
         statement.textContent = item.statement;
@@ -181,7 +190,59 @@ async function loadKnowledge(id) {
         source.disabled = Boolean(snapshot.stale);
         source.onclick = () => focusKnowledgeEvidence(item.evidence);
         details.append(heading, quote, context, source);
-        card.append(title, status, statement, details);
+        const reviewPanel = document.createElement('details');
+        reviewPanel.className = 'knowledge-review';
+        const reviewHeading = document.createElement('summary');
+        reviewHeading.textContent = 'レビューする（承認・却下・差戻し）';
+        reviewPanel.append(reviewHeading);
+        if (!reviewAllowed || snapshot.stale) {
+          const note = document.createElement('p');
+          note.className = 'hint';
+          note.textContent = snapshot.stale
+            ? '原文の版が更新されています。再抽出した候補を確認してください。'
+            : 'レビュー専用の権限が未設定です。ResearchDataHubの管理者に設定を依頼してください。';
+          reviewPanel.append(note);
+        } else {
+          const choice = document.createElement('select');
+          choice.setAttribute('aria-label', '知識候補の判断');
+          for (const [code, label] of [
+            ['', '判断を選択してください'], ['approved', '根拠を確認して承認'],
+            ['rejected', '却下'], ['changes_requested', '差戻し'],
+          ]) {
+            const option = document.createElement('option');
+            option.value = code;
+            option.textContent = label;
+            choice.append(option);
+          }
+          const submit = document.createElement('button');
+          submit.type = 'button';
+          submit.textContent = 'レビュー判断を記録';
+          submit.disabled = true;
+          let pending = null;
+          choice.onchange = () => { pending = null; submit.disabled = !choice.value; };
+          submit.onclick = async () => {
+            if (!choice.value || currentDoc !== id) return;
+            submit.disabled = true;
+            try {
+              // Keep a request ID across transient retries of the same decision.
+              if (!pending || pending.decision !== choice.value) {
+                pending = {id: crypto.randomUUID().replaceAll('-', ''), decision: choice.value};
+              }
+              await api('documents/' + id + '/knowledge-proposals/' +
+                encodeURIComponent(snapshot.id) + '/reviews', {
+                  request_id: pending.id, item_index: itemIndex,
+                  source_revision: snapshot.source_revision, decision: pending.decision,
+                });
+              el('message').textContent = 'レビュー判断を記録しました。AIによる推論は事実と確定していません。';
+              await loadKnowledge(id);
+            } catch (error) {
+              el('message').textContent = 'レビューを記録できませんでした。' + error.message;
+              submit.disabled = false;
+            }
+          };
+          reviewPanel.append(choice, submit);
+        }
+        card.append(title, status, statement, details, reviewPanel);
         group.append(card);
       }
       holder.append(group);
