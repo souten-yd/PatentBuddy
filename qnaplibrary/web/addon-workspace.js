@@ -1327,6 +1327,24 @@ async function loadKnowledge(id) {
           reviewPanel.append(choice, submit);
         }
         card.append(title, status, statement, details, reviewPanel);
+        if (!snapshot.stale && review?.status === 'approved' && review.stale !== true) {
+          // Explicit discovery handoff only: prefill a visible input without
+          // sending any source text, triggering a search, or creating an Idea.
+          const compareAction = document.createElement('button');
+          compareAction.type = 'button';
+          compareAction.className = 'secondary knowledge-search-cross';
+          compareAction.textContent = 'この条件から関連知識を探す';
+          compareAction.onclick = () => {
+            const condition = item.conditions.find(value => value.trim()) || item.statement;
+            el('cross-query').value = Array.from(condition).slice(0, 120).join('');
+            el('cross-kind').value = '';
+            switchWorkspace('knowledge', {scroll: true});
+            el('cross-search-status').textContent =
+              '確認済みの知識から検索語を入力しました。必要なら修正し「知識を検索」を押してください。';
+            el('cross-query').focus({preventScroll: true});
+          };
+          card.append(compareAction);
+        }
         group.append(card);
       }
       const historyDetails = document.createElement('details');
