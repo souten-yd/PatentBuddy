@@ -206,3 +206,7 @@ Graphの`factual` edgeはK3b APIから生成できない。GraphRAGの`relation_
 [K4実装・受入設計](knowledge-k4-cross-search.md)では、K2 `knowledge_reviews`の**最新approved**とsource revision/epoch、K1a`validate`を読み取り時に再検証し、SQLiteの既存正本だけから直近イベントをbounded keyset scanする。AIの`basis=model_inference`は承認後も変えず、K4は`side_by_side_literal`比較・出典・条件/限界の完全一致だけを表示。意味的関連・新規性/侵害の判断、無断のGraph/Idea mutationは禁止する。
 
 K5ではK4比較結果の受け渡しから始め、human-controlled Idea Canvas/明示保存と各出典のsource_revision/epoch/review_seqを追跡する。既存PR #23 GraphRAGの自動エッジ作成機能と混同せず、Ideaへの採用には別認証/人間のチェックを必要とする。
+
+## K5 manual Idea Canvasの証跡・Graphとの分離（2026-11-18）
+
+[K5詳細設計](knowledge-k5-idea-canvas.md)。PR #37ではK4で比較した2〜3件のK2承認済みAIエッセンスを**ユーザーの明示操作だけで**新しいIdea仮説に採用する。Ideaにはsource doc/proposal/item/revision/epoch/latest review seq/quote/start/endを固定保存し、後の出典削除/改訂/レビュー撤回/再承認で`needs_revalidation`。手動editはappend-only version。GraphRAGの`graph_edges`とは別の**手書き仮説の履歴**であり、Idea保存によってGraph relationやfactual nodeを自動作成しない。K1a〜K4の`model_inference`を事実認定に変換しない。
