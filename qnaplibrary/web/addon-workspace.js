@@ -46,7 +46,7 @@ async function load() {
     el('submit').disabled = !ready;
     el('import-pdf').disabled = !ready;
     if (ready) await loadLibrary();
-  } catch (error) { el('message').textContent = '読み込みに失敗しました。接続を再確認できます。' + (error instanceof TypeError ? '' : ' ' + error.message); }
+  } catch (error) { reviewAllowed = false; el('message').textContent = '読み込みに失敗しました。接続を再確認できます。' + (error instanceof TypeError ? '' : ' ' + error.message); }
 }
 el('reconnect').onclick = () => load();
 window.addEventListener('message', event => {
