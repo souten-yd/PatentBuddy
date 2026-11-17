@@ -367,3 +367,7 @@ button:focus-visible,[role="tab"]:focus-visible,summary:focus-visible,textarea:f
 @media (prefers-reduced-motion:reduce) {.workspace-panel{animation:none}
  .workspace-tab,button {transition:none}}
 :root.reduce-motion .workspace-panel {animation:none}
+
+/* The K2-approved knowledge → K4 discovery action remains explicit. */
+.knowledge-search-cross {display:block;min-height:44px;width:100%;margin:10px 0 2px;
+  text-align:center;font-size:13px;font-weight:600}
