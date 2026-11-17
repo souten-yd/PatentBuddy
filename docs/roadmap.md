@@ -98,3 +98,9 @@ K1a Draft PR #29に原文範囲・source revision・Host local_only証跡形式�
 - 1回の検索は最大240 raw reviewイベント/20件結果、SQL内の先行LIMIT＋降順cursorで次ページを明示取得。画面60件上限、比較2〜3異文献、文言完全一致だけ共通点表示。文献revision+epoch/K1a Unicode quote+Host証跡を読取時再検証し、旧reviewは返さない。元の文献原文へジャンプ。
 - **Draft/未検証**: K4 JavaScript構文・HTML参照ID・独立SQLiteキーセットSQLはPASS。新規Python LiveServer/全`verify.sh`/Linux/QNAP/iPhone実機とディスクI/Oは未実施。#29〜#36 stacked Draftのまま、正式マージ/Releaseなし。
 - 次はK5: 2〜3件の比較から人が編集・保存するIdea Canvasと出典revision/epoch/seqの再検証。K6はNAS低書込・大量検索/配布品質。
+
+## K5 人手Idea Canvas（2026-11-18 / Draft PR #37）
+
+- [Draft PR #37](https://github.com/souten-yd/PatentBuddy/pull/37)でK4の2〜3文献比較から、人が課題・仕組み・効果・条件・限界を入力して明示保存するIdea Canvasを追加。K2承認/source revision/epoch/review seq/quoteを同じSQLite transactionで再検証。出典固定・版追記・再送write0・旧原文復元でも`needs_revalidation`、過去版read-only参照を提供。[K5/K6設計](knowledge-k5-idea-canvas.md)。
+- 専用`idea_write`scopeと同UID token、ControlDeck Host認証代理。通常rw/ro/knowledge review・link・publishedには新権限なし。自律LLM/自動出願/Graph関係自動変更なし。PC/mobile画面/出典・履歴を追加。
+- 独立SQLite smokeとJS V8構文/DOM IDsの静的検証はPASS。**実Python/LiveServer/全verify/Ubuntu-QNAP build/iPhone実機は未実施、Draft・未マージ・未リリース**。次はK6の安定化/低I/Oと全stack実動作検証を優先する。
