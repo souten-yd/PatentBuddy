@@ -191,3 +191,13 @@ PR #16の設計はmainへ統合済み。PR #17でLinux別名入口・doctor/serv
 - **K5 Do NOT**: ユーザー操作なしにAIがアイデア作成/保存/実行、自動出願、特許性/進歩性/侵害の法的結論、未公開発明の外部LLM/クラウド流出、raw source serving/redirect/fallback、Vue default化/`ui.html` default変更、ControlDeck Host runtime `level_0_manual_only`/no execution変更、server startup npm build・別ベクトルDB/新GraphEngine/CDNは禁止。OpenRouterは未公開請求項には使わず、任意の補助推論も**ControlDeck local-only/provenance**必須。
 - **Expected K4**: RDHを読み取り専用で横断検索し、承認済み知識を根拠付きで2〜3文献並列比較し、元文献へ戻れる。完全一致以上の意味判断なし。**Expected K5**: 根拠が後から再検証できる、人間主導のIdea Canvas draft。検索・比較・Ideaは権限と書込を分離。
 - PR運用: PR #23の旧GraphRAGは実mainと再diff照合し二重schema/Host証跡を避ける。PR #29→#36全stackを実checkout/Allowed/Do NOT/manifest/docs/tests/runtime/safety grepで確認後、依存順にreview/merge。マイルストーン達成時だけVERSION/QPKG/addon manifestを一致させLinux/QNAP正式Release、実機healthとiPhone Safariを確認。小修正は極力次1PRに同梱する。
+
+## K5実装とK6統合検証・低I/O指示（2026-11-18）
+
+- 最新は[Draft PR #37](https://github.com/souten-yd/PatentBuddy/pull/37)（K4 #36上にstack）。[K5実装・テスト表・K6指示全文](knowledge-k5-idea-canvas.md)を正とする。K4 compareに`review_seq/source_epoch`を追加し、K5ではK2人間承認済み原文2〜3件を同一DB transaction内で再検証して**人間が明示確認した場合だけIdeaを保存**。本番mainはまだ未導入。
+- K5: `idea_drafts/idea_versions/idea_sources`のみ既存SQLiteに追加。source doc/proposal/item/revision/epoch/latest review seq/quote/offsetを永続証跡。源文献を変更後元へ戻す・レビュー撤回→再承認・元文献削除後も`needs_revalidation`、歴史保持、自動復活/自動採用なし。初期版・編集履歴はappend-only。same request retry・unchanged textはwrite0、版競合やstaleをHTTP409。
+- Idea専用scope`idea_write`（`qlj_` UDS/遠隔idea_write_token）でPOST/PUTのみ、書込tokenでGETなし。既存read/ro/rw/review/link等へ権限拡張しない。Host Bridgeの認証済みproxy、CSRF/Origin/default UI/level_0_manual_only/no executionを維持。過去版GETはread-only。
+- ControlDeck K4比較→K5の出典カード・ユーザー入力・明示チェック/保存→最近の案と版履歴。失効は再抽出・再比較まで編集不可。Mobile 320px、44px touch/16px入力/テキスト引用のXSS安全/Hostテーマ。AI自動アイデア・クラウド・Graph自動link/出願は禁止。
+- **次Codex最優先**：実リポジトリcheckoutで`python3 -m unittest -v tests.test_idea_canvas tests.test_idea_workspace tests.test_knowledge_cross_search tests.test_knowledge_cross_workspace tests.test_knowledge_links tests.test_knowledge_map tests.test_knowledge_reviews`＋全K1a〜K4の回帰、`node --check qnaplibrary/web/addon-workspace.js`, `bash scripts/verify.sh`, `bash scripts/build-linux.sh dist`。SQLite FK/transaction rollback/creation idempotency/409/CSRF/source revert/reapproval/deletion/history保持/total_changesとWAL、GraphRAG・UI/manifest/デフォルト、QNAP/Ubuntu/iOSを検証。不足は**本PR #37へまとめて修正**し、無駄な追加PRは避ける。
+- PR #23の古いGraphRAG一式との重複`evidence_graph.py`/`generation_contract.py`を実差分で確認。#29→#30→#31→#32→#33→#34→#35→#36→#37依存順にmain実ファイル/docs/manifest/tests/runtime/Allowed/Do NOT/expected stateを検査し、全合格後に順次merge。正式Releaseはversion/QPKG/addon manifestを3点整合・Actions build・Linux/QNAP更新とhealth・iPhone再生/表示を確認してから。テストを行っていないPRを「合格」と主張しない。
+- K6を新規開発する場合は現行K5の安定化・低I/O/Ideaページング・出典再比較支援へ限定し、実行権限/自律保存/新DBを追加しない。
