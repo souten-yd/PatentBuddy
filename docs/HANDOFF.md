@@ -299,3 +299,13 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - **実施済み**：GitHub主ブランチ・PR #23/#29〜#32実ファイルとのコード照合、K2 JavaScriptをV8で構文検証PASS、HTMLのJS参照ID欠落/重複ゼロ、レビューhistory SQLをSQLiteに同形テーブルで単独実行して最新行を期待通り確認。**未実施**：新規Python LiveServer/UDS/全repo verify、Linux/QPKG build、ControlDeck/ResearchDataHub実機/iPhone E2E、低I/O計測。GitHub DNS不通でフルcheckout不能。新規テストを実行済みとは言わない。
 - **制約**：`reviewer`はサーバーが確認したadminまたはdevice_idであり、ControlDeckの各エンドユーザー個人についての独立署名ではない。リモートRDHではreview専用tokenの明示設定が必要。K2はhuman review記録まで、PR #23 GraphRAGへのエッジ・Knowledge Mapは自動登録しない。
 - 次：PR #33 stackを実checkoutして追加テスト・全`bash scripts/verify.sh`・`node --check`・`bash scripts/build-linux.sh dist`とHost/RDH実ブラウザを検証。失敗/スタイルずれはPR #33に同梱。K3ではPR #23 GraphRAGの実main差分を確認してbounded 1〜2hop Knowledge Map、出典ドロワー、320px代替リストをControlDeck準拠で実装。無検証merge/release不可。
+
+## 2026-11-17 K3 Knowledge Map（Draft PR #34）
+
+- [PR #34](https://github.com/souten-yd/PatentBuddy/pull/34) はK2 PR #33をbaseとするstacked Draft。K3の詳細なscope/expected final state/コード表/Do NOT/次工程は [knowledge-k3-map.md](knowledge-k3-map.md)。PR #23の大型GraphRAGは別Draftのままで、`evidence_graph.py`を同じ内容として選択的に導入した（全PRをマージしたわけではない）。
+- K3実装: ResearchDataHubの既存SQLiteにPR #23`graph_nodes/graph_edges`とrevision stale triggerをインストールし、`knowledge_map.read`を新設。1〜2hop/最大36 nodes/52 edges（うちGraphRAG24/36）、最新20 snapshots、現在版で人間承認されたAI知識＋証拠があるapproved/factual graph関係だけを既定出力。未確認/却下/staleはinclude_unreviewed=trueに限る。モデル推論はapproval後もmodel_inferenceのまま。source→knowledgeのedgeは`provenance_only`で、技術的リンクではない。GraphRAGのinfer edgesはこの段階では表示しない。
+- 出典のUnicode引用・revisionをK3 read時に再照合。GraphRAGはSQLite`substr(body,start+1,end-start)`の短いquote読取、知識候補は本文を必要時だけ取得。新DB、新LLM/実行/自律登録、background task/外部CDNは追加しない。
+- ControlDeck workspaceにKnowledge Map、PCのSVG map＋右詳細/接続方向・根拠、iPhone 320px一覧→詳細、44px、テーマ追従/キーボード用一覧を追加。文献・レビュー/ジョブ成功時に再読み込み、出典へ原文codepoint位置を検証して遷移。レビュー済みAI仮説は事実扱いせず、空状態・権限/取得失敗・上限truncatedの出口を設けた。
+- K2の修正: K2 PR #33で本文を変更して**元の文章へ戻した際の旧承認自動復活**を防ぐ`knowledge_review_epochs`とsource_epochを追加し、K3でも参照。新しいK2イベントだけが現行epochと一致した時に承認と表示される。旧K2 schemaのイベントはsource_epoch=-1に安全側移行。これはAPI/監査・元本文再復元で重要な回帰ケース。
+- `tests/test_knowledge_map.py`と`tests/test_knowledge_map_workspace.py`にLiveServer/SQLite/2hop/Unicode/stale/revert/no-write/権限・モバイルUI契約の**テストコード**追加。**実施済み**: GitHubの実コード比較、K3のJSをV8で構文検査PASS、HTML参照ID欠落0・重複0、ControlDeckテーマ/Quote textContent/44px/320pxの静的チェック。別の独立SQLite smokeでUnicode substr・単調epoch・hash revertの失効とGET zero-writeを検証PASS。**未実施**: 新規Python本体/LiveServer、全`scripts/verify.sh`、Linux build、実ControlDeck+RDH/iPhone/QNAP、性能物理I/O。repo checkoutがgithub.com DNS不通でできない。
+- 現在K3はread-only投影なので**手動の異文献間関連リンクの登録UIは未実装**。GraphRAGテーブルに根拠付きレビュー済みの関係が存在すれば可視化できる。K3b/K4ではPR #23のrelation提案・明示レビュー登録機能と整合し、ユーザーの確認後にだけ異分野リンクを記録する。PR #34を完了/merge/release済みとしない。
