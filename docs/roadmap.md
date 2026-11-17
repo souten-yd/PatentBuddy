@@ -64,3 +64,10 @@ K1a Draft PR #29に原文範囲・source revision・Host local_only証跡形式�
 - K1a validator (PR #29)・K1b local-only generator (PR #30)に続き、K1cは既存 `document_analyses` へのimmutable知識候補保存・原文版/引用のtransaction内再検証・新 `knowledge_propose`専用権限を実装。[詳細と次のK1d指示](knowledge-k1c-storage.md)。
 - K1cの新規テストを追加したが**LiveServer/実UDS/全体verifyは未実施**。隔離SQLite mock testの6件のみ成功。K1c APIはHost分析ジョブ・Knowledge Mapへは未接続。
 - 次のK1d: PR #23のHost provenance/GraphRAGのmain統合をレビューし、Host Jobs→generator→scoped DB保存→ControlDeck準拠カードと状態表示を接続。UI/UXは [ControlDeck準拠](controldeck-ux-contract.md)。すべてのDraft PRを無検証でmerge/releaseしない。
+
+## K1d Hostジョブ・ControlDeck知識カード（2026-11-17）
+
+- [Draft PR #32](https://github.com/souten-yd/PatentBuddy/pull/32)でControlDeck現行local_only/require_provenance Hostと既存AnalysisJobsを接続、知識抽出→専用K1c保存→ControlDeckテーマ追従の知識カード・出典ジャンプを追加。詳細は [knowledge-k1d-implementation.md](knowledge-k1d-implementation.md)。
+- K1c writer scopeは専用POST以外の一般private GETを禁止するよう強化。AI結果はunreviewed/model_inferenceのみ、stale/引用一致を表示。原文にないquote、モデル証跡未検証、権限不足はfail closed。
+- **実装コードはDraftのみ**。JS構文・HTML ID・ControlDeck実コード契約は静的確認したが、Python/実API/実ControlDeck/iPhone/QNAP、全verify、build未実施。正式リリース不可。
+- K2ではversioned human review、K3ではPR #23 GraphRAGを再利用したbounded Knowledge Map、K4では異分野再利用検索、K5ではIdea Canvasと出典付き先行技術再照合、K6ではQNAP移行と低I/O検証へ進める。
