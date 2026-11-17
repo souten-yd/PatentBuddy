@@ -95,7 +95,7 @@ def _project(row, item):
 
 
 def search(store, value):
-    """Search bounded batches of approved review events with keyset pagination.
+    """Search bounded batches of raw review events with keyset pagination.
 
     No persistent FTS/index is created. Pages are ordered by descending
     *review event sequence*. Each response scans at most MAX_SCAN events,
@@ -109,17 +109,19 @@ def search(store, value):
             'r.source_epoch,r.created AS reviewed_at,a.doc_id,a.source_revision,'
             'CASE WHEN length(CAST(a.content AS BLOB))<=? '
             'THEN a.content ELSE NULL END AS content,'
-            'd.title,d.hash,d.source,coalesce(ep.epoch,0) AS current_epoch '
-            'FROM knowledge_reviews r '
-            'JOIN document_analyses a ON a.id=r.proposal_id AND a.kind=? '
-            'JOIN documents d ON d.id=a.doc_id '
+            'd.title,d.hash,d.source,coalesce(ep.epoch,0) AS current_epoch,'
+            'a.kind AS proposal_kind,r.decision,'
+            '(r.seq=(SELECT MAX(q.seq) FROM knowledge_reviews q '
+            'WHERE q.proposal_id=r.proposal_id AND q.item_index=r.item_index)) '
+            'AS is_latest '
+            'FROM (SELECT seq,proposal_id,item_index,source_revision,source_epoch,created,decision '
+            'FROM knowledge_reviews WHERE (?=0 OR seq<?) '
+            'ORDER BY seq DESC LIMIT ?) r '
+            'LEFT JOIN document_analyses a ON a.id=r.proposal_id '
+            'LEFT JOIN documents d ON d.id=a.doc_id '
             'LEFT JOIN knowledge_review_epochs ep ON ep.doc_id=d.id '
-            "WHERE r.decision='approved' AND r.seq=("
-            'SELECT MAX(q.seq) FROM knowledge_reviews q '
-            'WHERE q.proposal_id=r.proposal_id AND q.item_index=r.item_index) '
-            'AND (?=0 OR r.seq<?) '
-            'ORDER BY r.seq DESC LIMIT ?',
-            (MAX_SNAPSHOT_BYTES, 'knowledge', cursor, cursor, MAX_SCAN + 1),
+            'ORDER BY r.seq DESC',
+            (MAX_SNAPSHOT_BYTES, cursor, cursor, MAX_SCAN + 1),
         ).fetchall()
         truncated = len(rows) > MAX_SCAN
         items = []
@@ -134,6 +136,9 @@ def search(store, value):
             examined += 1
             last_scanned_seq = raw['seq']
             row = dict(raw)
+            if (row['decision'] != 'approved' or row['is_latest'] != 1 or
+                    row['proposal_kind'] != 'knowledge' or row['doc_id'] is None):
+                continue
             row['current_revision'] = store.document_revision(row)
             row = _current_row(store.db, row)
             if row is None:
