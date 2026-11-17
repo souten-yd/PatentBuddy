@@ -251,3 +251,12 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - 必須の設計判断: Source/Evidence → Knowledge → Ideaの三層、原文hash/revision/spanの検証、source_factとmodel_inference/user_authoredの分離、merge/splitは人手承認、原文改訂時は依存のstale・承認自動復活なし、限定graph UI、ローカルLLMのみ、単一ResearchDataHub正本。
 - 次の実装: **K0既存PR #23のmain/diff/安全境界レビュー → K1根拠付き抽出proposal → K2知識正規化・レビュー/失効 → K3 Obsidian型UI → K4横断再利用 → K5 Idea Canvas/再評価 → K6性能/移行受入**。少量の共通型以外はPR #23に詰め込まず後続PRとして分割。
 - この計画コミット自体の受入: 変更対象をdocsのみに限定、リンク・内容・PR差分を確認し、verify実行可否を明記。docs-onlyのためReleaseは不要。K1以降の動作/法的品質・iPhone/QNAP実機は未検証。
+
+## 2026-11-17 K1a開発着手・ControlDeck UI準拠（Draft PR #29）
+
+- ユーザー追加指定: **PatentBuddyのUI/UXはControlDeckのものを踏襲**。ControlDeck mainの `docs/ui-ux-guidelines.md`、`docs/addon-ux-guidelines.md`、`docs/mobile-layout.md`、`frontend/src/components/ui.tsx`・`PageHeader.tsx`・`styles/index.css`をGitHub上の実ファイルで確認。[controldeck-ux-contract.md](controldeck-ux-contract.md)にHostシェル優先、1画面1主操作、mobile、状態表示、カード/地図/キャンバスを規範化した。UIそのものはまだ実装しない。
+- PR #28 docs-onlyはmain `f653b908647372bb209aab6c4d7452a5171d1c9b`へsquash統合。アプリ変更なしのためリリース不要。新K1aブランチ `feat/knowledge-essence-contract-k1a` / Draft PR #29を作成。
+- K1aコード `qnaplibrary/knowledge_essence.py` はネットワーク/LLM/DB呼出なしの検証関数。document ID/revision、原文のUnicode範囲とquote完全一致、Host local_onlyのmodel/runtime証跡形式、最大件数/文字数、unreviewed/model_inference固定を検証し、引用偽造/承認偽装を拒否。`tests/test_knowledge_essence.py`を追加。
+- 同一ファイルを分離ディレクトリ `/tmp/pb-k1a` に作成、`PYTHONPATH=/tmp/pb-k1a python3 -m unittest -v tests.test_knowledge_essence`で**10件成功**。container側のGit blob SHAとGitHub branchのblob SHAが両ファイル一致。全リポジトリの`bash scripts/verify.sh`/Linux/QPKG buildはGitHub clone不能（DNS解決不可）で未実施。合格を装わずDraftのまま保持。
+- PR #23はGraphRAG/Host vector/relations等の多数の変更があるDraft。K1aのpure contractは**既存PR #23のrelation_proposals等と重複実装しないよう、K1b統合時にschema/Host provenanceを共通化**する。現在はK1aはruntime・APIから未参照。ControlDeck実機ブラウザ/iPhone/QNAPの受入なし。
+- 次: PR #29のdocs追加、全diff/manifest/安全確認、次のK1bでHost local-only LLM/Jobsから抽出→原文根拠照合→提案の限定保存・レビューへの連携を設計。PR #23完了後の実コードへ接続し、完成前に本番機能と主張しない。
