@@ -54,7 +54,8 @@ def _read_validated(db, row):
         if not isinstance(preitem, dict):
             return None
         document = db.execute(
-            'SELECT body FROM documents WHERE id=?', (row['doc_id'],)
+            'SELECT substr(body,1,?) AS body FROM documents WHERE id=?',
+            (MAX_BODY + 1, row['doc_id']),
         ).fetchone()
         if (document is None or not isinstance(document['body'], str) or
                 len(document['body']) > MAX_BODY):
@@ -102,7 +103,9 @@ def search(store, value):
         rows = store.db.execute(
             'SELECT r.seq,r.proposal_id,r.item_index,r.source_revision AS review_revision,'
             'r.source_epoch,r.created AS reviewed_at,a.doc_id,a.source_revision,'
-            'a.content,d.title,d.hash,d.source,coalesce(ep.epoch,0) AS current_epoch '
+            'CASE WHEN length(CAST(a.content AS BLOB))<=? '
+            'THEN a.content ELSE NULL END AS content,'
+            'd.title,d.hash,d.source,coalesce(ep.epoch,0) AS current_epoch '
             'FROM knowledge_reviews r '
             'JOIN document_analyses a ON a.id=r.proposal_id AND a.kind=? '
             'JOIN documents d ON d.id=a.doc_id '
@@ -111,7 +114,7 @@ def search(store, value):
             'SELECT MAX(q.seq) FROM knowledge_reviews q '
             'WHERE q.proposal_id=r.proposal_id AND q.item_index=r.item_index) '
             'ORDER BY r.seq DESC LIMIT ?',
-            ('knowledge', MAX_SCAN + 1),
+            (MAX_SNAPSHOT_BYTES, 'knowledge', MAX_SCAN + 1),
         ).fetchall()
         truncated = len(rows) > MAX_SCAN
         items = []
@@ -188,7 +191,9 @@ def compare(store, value):
         items = []
         for proposal_id, index in keys:
             row = store.db.execute(
-                'SELECT a.id AS proposal_id,a.doc_id,a.content,a.source_revision,'
+                'SELECT a.id AS proposal_id,a.doc_id,'
+                'CASE WHEN length(CAST(a.content AS BLOB))<=? '
+                'THEN a.content ELSE NULL END AS content,a.source_revision,'
                 'd.title,d.hash,d.source,r.seq,r.item_index,r.source_revision AS review_revision,'
                 'r.source_epoch,r.created AS reviewed_at,'
                 'coalesce(ep.epoch,0) AS current_epoch '
@@ -198,7 +203,7 @@ def compare(store, value):
                 "WHERE a.id=? AND a.kind='knowledge' AND r.decision='approved' "
                 'AND r.seq=(SELECT MAX(q.seq) FROM knowledge_reviews q '
                 'WHERE q.proposal_id=a.id AND q.item_index=?) LIMIT 1',
-                (index, proposal_id, index),
+                (MAX_SNAPSHOT_BYTES, index, proposal_id, index),
             ).fetchone()
             if row is None:
                 raise StoreError('knowledge comparison requires current human approvals')
