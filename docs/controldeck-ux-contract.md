@@ -61,3 +61,9 @@ K1aでは純粋な知識候補の厳格な検証モジュールと単体テス�
 [K3b実装設計](knowledge-k3b-links.md)を参照。埋込Workspaceの文献詳細内で、K2承認済み原文カード→別文献検索→関係先選択（本文を取得せずid/title/revision）→仮説種別（problem/solution/effect/substitutionのみ）→引用確認チェック→**未確認リンク登録**の順。審査はリンクカードを別途展開して承認/却下＋確認チェック＋実行ボタン。未確認・失効や権限なしで操作を許可しない。リンクを承認しても技術的事実にしない。
 
 マップのリンク表示は別チェックボックスをオンにした場合のみ、点線/inferred/「仮説（事実ではありません）」で区別。K2レビュー変更後の旧関係は自動復活しない。ControlDeckのGlobal shell/認証/テーマ/Jobsを再実装せず、Bridge theme tokens、44px touch、16px input、320pxの1カラム、keyboard/focus、説明/再試行を維持。原文/引用はDOM textContentのみ。実機E2E未実施のためDraft。
+
+## K4横断検索・比較のControlDeck UX追加契約（2026-11-17）
+
+[K4詳細設計](knowledge-k4-cross-search.md)に準拠。既存PatentBuddy Embedded Workspaceで、文献詳細とは独立した「技術知識を横断検索・比較」を表示する。検索テキスト/種類→本文引用・成立条件・限界のカード→別の文献から最大3件選ぶ→明示ボタンで並列比較。PCは2〜3列、iPhone 320pxからは縦1列。根拠へ戻る際は既存`openDocument`→`focusKnowledgeEvidence`でUnicode位置を確認する。
+
+SQL/APIのbounded cursorを「次の候補を探す」で人が操作し、1回最大240 reviewイベント/20結果、画面60カードまで。Loading/Empty/Truncated/ApprovalChanged/NetworkError/Retryの出口を示す。共有条件/限界は完全一致のみで、類似性・発明の新規性・進歩性・安全性を断言しない。Host shell/nav/theme/accent/44px/16px/reduced-motion/CSPを継承し、raw model/quoteはDOM textContent、独立CDN/Graph UI frameworkを増設しない。
