@@ -30,6 +30,7 @@ class ReviewedKnowledgeWorkspaceTests(unittest.TestCase):
             'cross-kind', 'cross-search-submit', 'cross-search-status',
             'cross-results', 'cross-selection', 'cross-compare-button',
             'cross-clear-button', 'cross-compare-results',
+            'cross-next-button',
         ):
             self.assertIn(name, parser.ids)
         self.assertIn('role="status"', self.html)
@@ -44,10 +45,14 @@ class ReviewedKnowledgeWorkspaceTests(unittest.TestCase):
         self.assertIn('new Map()', self.js)
         self.assertIn('crossSelected.size >= 3', self.js)
         self.assertIn('distinct >= 2', self.js)
-        self.assertIn('comparison_type', self.js if 'comparison_type' in self.js else 'comparison_type')  # response contract
+        self.assertIn("result.comparison_type !== 'side_by_side_literal'", self.js)
         self.assertIn('人間レビュー済みのAI推論', self.js)
         self.assertIn('AI推論の人間レビュー結果', self.js)
-        self.assertIn('結果は一部のみです', self.js)
+        self.assertIn("'cross-next-button').onclick = async", self.js)
+        self.assertIn('cursor: 0', self.js)
+        self.assertIn('cursor}', self.js)
+        self.assertIn('CROSS_MAX_ON_SCREEN = 60', self.js)
+        self.assertIn('続きの候補を探せます', self.js)
         self.assertIn('異分野応用は検証前の仮説', self.js)
         self.assertNotIn('autoApprove', self.js)
         self.assertNotIn('autoLink', self.js)
