@@ -267,7 +267,8 @@ class IdeaCanvasHTTPTests(unittest.TestCase):
                 self.assertEqual(user.call('POST', '/api/v1/ideas', self.payload)[0], 403)
         special = self._token('idea_write')
         self.assertEqual(special.call('GET', '/api/v1/ideas')[0], 403)
-        self.assertEqual(special.call('GET', '/api/v1/knowledge/search')[0], 403)
+        self.assertEqual(special.call('POST', '/api/v1/knowledge/search',
+                                      {'q': '温度'})[0], 403)
         self.assertEqual(special.call('POST', '/api/v1/ideas', self.payload)[0], 200)
         self.assertEqual(special.call('POST', '/api/v1/knowledge/compare',
                                       {'items': self.sources})[0], 403)
