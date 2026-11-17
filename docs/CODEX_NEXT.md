@@ -167,3 +167,15 @@ PR #16の設計はmainへ統合済み。PR #17でLinux別名入口・doctor/serv
 - **Do NOT**: 実行capability、クラウドへの未公開文献送信、推論/採用の無断mutation、モデル候補の自動Graph登録、独立DB・raw source endpoint・redirect/fallback・Vue default化・ui.html default変更・サーバー起動npm build・新CDN。backend authoritativeとHost level_0_manual_only/no executionを維持。
 - **Next K3b**: PR #23 relation_proposals/evidence_graph.save/chart_storage/Graph APIを最新mainと比較・重複除去して、安全な明示レビュー＋根拠照合の技術関係登録UI/権限を追加（AI inferをfactualに昇格しない）。**Next K4**: 承認済みエッセンスを条件/機構/効果で再利用検索し、関連特許の差異と新しい仮説を出典付きで比較。Ideaは明示採用/後続検証、Graphは1〜2hop制限。
 - **Expected final state K3**: 文献から出発し、承認済みAIエッセンス/根拠付きfactual GraphRAG辺の関係と引用/失効を閲覧できる。未確認は参考表示のみ。現在はDraftで、merge/releaseなし。
+
+## K3b実装・次K4に向けたCodex指示（2026-11-17）
+
+- 最新は[Draft PR #35](https://github.com/souten-yd/PatentBuddy/pull/35)、base PR #34→#33→#32→#31→#30→#29。詳細仕様と必須テストは [K3b明示関係登録設計](knowledge-k3b-links.md)。PR #23 GraphRAG全体は未マージ。**現在のmain/正式版にはK1a〜K3bは未導入**。
+- 今回: `knowledge_links.py`、既存graph_edgesの内部transaction連携、同一SQLiteのknowledge_link_origins（source revision/epoch/K2 latest review seq）、K2人間承認済みの引用と対象文献版を確認する狭い登録POSTと別のreview POST。既定はbasis=inferred、review_status=unreviewed。承認後もinferred。K2 latestレビューが変わった場合は以前の仮説リンクの承認が復活しない。K3 Mapでinclude_links=trueの場合だけ、人がレビューした仮説を表示する。
+- 明示認証: 独立`knowledge_link` scope（qle_ UDS / 遠隔knowledge_link_token）の2POSTだけ許可。他のread/rw/analysis/knowledge_propose/knowledge_review/publishedに権限追加しない。Target pickerは`GET /link-target`で本文なしのid/title/revisionのみ。ControlDeck iframeにはauth tokenを渡さずpermission boolだけ。
+- UI: 元K2根拠カードからの選択、別文献検索・対象版チェック、仮説種別、2個の明示確認（未承認登録と別の人間承認/却下）、ステータス文字と取消・エラーの出口。モバイル320px単列/44pxタップ/16px入力、Host theme/ナビ/Jobsを再利用。SVGは既存K3だけ、仮説は点線で既定非表示。
+- テストコードはtests/test_knowledge_links.pyとtest_knowledge_link_workspace.py。**Python実行していないのでPASSとしない**。独立SQLite smokeのFK/revert/review seq/Unicode/cascadeとV8 JS構文/DOM IDはPASS。
+- **必須の次アクション**：PR #35を正規のrepo checkoutで`python3 -m unittest -v tests.test_knowledge_links tests.test_knowledge_link_workspace tests.test_knowledge_map tests.test_knowledge_reviews`とK1a〜K3の全回帰、`node --check qnaplibrary/web/addon-workspace.js`、`bash scripts/verify.sh`、`bash scripts/build-linux.sh dist`。各routeのauth scope/CSRF/Origin、K2承認→撤回→再承認、原文rev revert/target edit/Graph edge stale、link id retry zero write、同一transaction rollback、graph_revision 409、quote一致、source/target指紋、Graph inferred/factual filter、80/320px画面、ControlDeck Host bridge、iPhone Safari、QNAP Linux運用とSQL WAL/I/Oを実測。失敗や小修正は同PR・次K4 PRへまとめる。
+- **Do NOT**: PR #23と重複する別graph正本、AI自動登録・無断mutation、自動承認/factual認定/特許性確定、未公開文献のcloud leak、Host runtime/execution capability変更、Vue default化、ui.html default変更、raw source/redirect/fallback、新CDN、server startup npm build禁止。許可されたmutationはこのK3bで人が明示確認した2つの狭いGraphRAG操作だけ。
+- **K4実装**: K2承認済み・現行source revision+epochの知識候補を、機構・課題・条件・効果から複数文献横断で探す。まずRDH既存SQLite FTS/read APIを再利用、read-only bounded結果、secretのクラウド送信なし。比較はAI/human hypothesisと事実を分け、出典quote/限界と根拠トレースを持たせる。2〜3件の解決原理比較→K5 Idea Canvasで明示採用。ControlDeck UX統一。
+- **Expected K3b**: 人が引用と関係先を確認した仮説だけ未承認登録→別操作で審査でき、GraphRAG全体/既定事実探索を汚染しない。リンクは現行K2承認/版/seqと結合し、失効・撤回・再承認で古い判断を復活させない。Draftのため正式機能完了ではない。
