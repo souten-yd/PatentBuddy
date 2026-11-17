@@ -288,3 +288,14 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - tests/test_knowledge_host_jobs.py (既存real Store/SQLiteとfake local Host)、tests/test_knowledge_host_provenance.py (Host SSE/done/proofなし/順序不正/旧stream)、tests/test_knowledge_workspace.py (UI/quote/theme/安全)を追加。
 - **実施済み**: GitHubの実ファイル/PR diff確認、ControlDeck現行contract照合、K1d JSをV8で構文検証PASS、HTML ID欠落0/重複0、テーマ・Unicode引用・textContent・レスポンシブ確認。**未実施**: 上記Pythonテスト実行、bash scripts/verify.sh、実Host/RDH/API/iPhone/QNAP、Linux/QPKG build。github.comにDNS到達不可でrepo checkout不能。全体検証前に「テスト合格/完成/merge済み」としない。
 - **次の一手**: PR #32の完全チェックアウトでPython単体＋LiveServer＋node --check＋verify.shとbuild-linuxを実施し、失敗を同PRで修正。PR #29→#30→#31→#32の依存を整合・検証したうえでPR #23との重複を整理して統合。次工程K2 human reviewとK3 bounded Knowledge Mapは根拠付き正本・Host安全が完成後。コードPRはDraftのまま、リリースしていない。
+
+## 2026-11-17 K2知識の人間レビューと版失効（Draft PR #33）
+
+- [PR #33](https://github.com/souten-yd/PatentBuddy/pull/33) はK1d Draft PR #32をbaseとするstacked Draft。技術知識抽出の確認を人が明示する「承認・却下・差戻し」と不変履歴を実装。全仕様/検証/次工程は [knowledge-k2-human-review.md](knowledge-k2-human-review.md)。
+- `knowledge_reviews.py`を追加し、既存ResearchDataHub SQLiteへ`knowledge_reviews` append-only table（`store.py` SCHEMAの冪等DDL）を追加。`request_id`が同じ再送は追加write0、違う決定/actorへの再使用は409。文献原文の版と正確なquote/Host provenanceを同一transactionで検査。旧版になった過去のapprovalはGETで`status=unreviewed,stale=true`、過去の判断は`previous_decision`で履歴に残す。reviewしてもAI推論をsource factに昇格しない。
+- `api.py`にPOST専用`knowledge_review`＋GET bounded履歴（最大30件）、`auth.py`/`local_auth.py`/`server.py`/`addon_client.py`に専用token・同UID local socket・リモート別tokenを追加。propose/analysis/rw/published等の古いtokenではreview POST不可、review tokenはreview POST以外すべて403。`/api/v1/pair`の許可scopeは従来rw/roのみ（新reviewは管理者発行か同UID経由）。
+- ControlDeck Embedded Workspaceのカードにprogressive disclosureのレビュー操作（selectで判断を選ぶ→明示ボタン、初期は無効）、権限未設定・旧版・409再取得、履歴のオンデマンド閲覧を追加。旧カードに根拠が無い/失効した場合はレビュー不可。Host shellを二重描画しない。
+- `tests/test_knowledge_reviews.py`：実LiveServer/SQLiteでscope行列、CSRF、同UID UDS、単発/複数レビュー、不変履歴、GET/再送zero write、改訂stale/409、AddonClient credential routingをテストするコードを追加。`tests/test_knowledge_review_workspace.py`：ControlDeckテーマ/カード/明示操作/失効・権限のUI契約テストを追加。
+- **実施済み**：GitHub主ブランチ・PR #23/#29〜#32実ファイルとのコード照合、K2 JavaScriptをV8で構文検証PASS、HTMLのJS参照ID欠落/重複ゼロ、レビューhistory SQLをSQLiteに同形テーブルで単独実行して最新行を期待通り確認。**未実施**：新規Python LiveServer/UDS/全repo verify、Linux/QPKG build、ControlDeck/ResearchDataHub実機/iPhone E2E、低I/O計測。GitHub DNS不通でフルcheckout不能。新規テストを実行済みとは言わない。
+- **制約**：`reviewer`はサーバーが確認したadminまたはdevice_idであり、ControlDeckの各エンドユーザー個人についての独立署名ではない。リモートRDHではreview専用tokenの明示設定が必要。K2はhuman review記録まで、PR #23 GraphRAGへのエッジ・Knowledge Mapは自動登録しない。
+- 次：PR #33 stackを実checkoutして追加テスト・全`bash scripts/verify.sh`・`node --check`・`bash scripts/build-linux.sh dist`とHost/RDH実ブラウザを検証。失敗/スタイルずれはPR #33に同梱。K3ではPR #23 GraphRAGの実main差分を確認してbounded 1〜2hop Knowledge Map、出典ドロワー、320px代替リストをControlDeck準拠で実装。無検証merge/release不可。
