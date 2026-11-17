@@ -49,3 +49,9 @@ K1aでは純粋な知識候補の厳格な検証モジュールと単体テス�
 ## K2レビューのControlDeck操作規範（2026-11-17）
 
 [K2詳細設計](knowledge-k2-human-review.md)を追加。知識カードのレビューは**折りたたみ詳細にあるselectで承認/却下/差戻しを選び、独立した明示ボタンで保存**。無選択ではボタン無効。文献旧版・権限不足では決して自動的に採用せず原因と次の操作を表示。レビューステータスは色だけではなく「未確認」「人間確認済み」「却下」「差戻し」「旧版・失効」を文字で示す。最大30件の履歴は展開された時にのみ取得。Host theme/accent, 44px hit area, iPhone 1カラム、キーボード、reduced motion、元文献へ戻る導線を維持し、Hostシェルを二重描画しない。
+
+## K3 Knowledge Map実装の追加UX契約（2026-11-17）
+
+[K3実装設計](knowledge-k3-map.md)に沿い、選択した文献からの出典・承認済み知識を1〜2hop/36 nodes/52 edgesに限定表示する。DesktopはSVG接続図＋右Inspector＋アクセシブルな一覧、320px〜767pxは大きなGraphを縮小せず一覧→詳細→引用へ遷移。ControlDeck theme・accent/Hostのグローバルshell/44pxとreduced-motionを維持。空・取得失敗・件数上限(truncated)・版失効は次の操作を表示。線の`proposal_evidence_source`は引用元とのリンクだけで技術的因果を主張しない。AI推論は人が承認してもsource_factではない。
+
+**重要:** 以前の「K1aの純粋validatorだけ、地図は未実装」という時点説明は歴史的記録。K1dにはカード、K2には人手レビュー、K3には今回のMap表示コードが追加済み。ただしいずれもstacked Draftであり、mainへマージ・全体テスト・リリースはしていない。
