@@ -1,6 +1,8 @@
 """K5 real ResearchDataHub HTTP/SQLite tests: explicit human Idea save/edit."""
 import json
+import tempfile
 import unittest
+from pathlib import Path
 from unittest import mock
 
 from qnaplibrary.addon_client import AddonClient, AddonError
@@ -295,6 +297,24 @@ class IdeaCanvasHTTPTests(unittest.TestCase):
                                      self.ids['a'], {})[0], 403)
         self.assertEqual(self.admin.call('POST', '/api/v1/ideas',
             self.payload, headers={'X-CSRF-Token': 'not-the-real-token'})[0], 403)
+
+    def test_same_uid_socket_is_idea_only_and_returns_no_read_credential(self):
+        from qnaplibrary.local_auth import LocalAuthServer, connect
+        auth = self.live.app.auth
+        with tempfile.TemporaryDirectory() as directory:
+            with mock.patch(
+                    'qnaplibrary.local_auth.socket_path',
+                    side_effect=lambda port, scope='read':
+                        Path(directory) / (scope + '.sock')):
+                server = LocalAuthServer(auth, 17871, 'idea_write')
+                try:
+                    proof = connect(17871, 'idea_write')
+                    self.assertEqual(proof['server_token'],
+                                     auth.local_token('idea_write'))
+                    self.assertTrue(proof['server_token'].startswith('qlj_'))
+                    self.assertNotEqual(proof['server_token'], auth.local_token('read'))
+                finally:
+                    server.close()
 
     def test_local_idea_token_is_loopback_only(self):
         token = self.live.app.auth.local_token('idea_write')
