@@ -526,6 +526,11 @@ class Handler(BaseHTTPRequestHandler):
             if access == "published" and req.actor != "admin" and (
                     not req.device or req.device["scopes"] != "published"):
                 raise HTTPError(403, "公開資料専用の認証が必要です")
+            # A knowledge proposal writer cannot read the private corpus or invoke
+            # unrelated API endpoints. The add-on uses its separate read credential.
+            if req.device and req.device["scopes"] == "knowledge_propose" and not (
+                    method == "POST" and access == "knowledge_propose"):
+                raise HTTPError(403, "このトークンは知識候補の保存専用です")
             if access != "public":
                 if req.actor is None:
                     raise HTTPError(401, "認証が必要です")
