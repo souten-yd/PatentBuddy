@@ -427,6 +427,10 @@ el('link-target-form').addEventListener('submit', async event => {
   const text = el('link-target-query').value.trim();
   if (!text || !currentDoc) return;
   const hostDocument = currentDoc;
+  linkTarget = null;
+  el('link-confirm').checked = false;
+  el('link-target-choice').textContent = '検索結果から関係先を選択してください。';
+  updateLinkPreview();
   el('link-target-search').disabled = true;
   const targetResults = el('link-target-results');
   targetResults.textContent = '関係先の文献を検索しています…';
@@ -481,7 +485,9 @@ el('link-register').onclick = async () => {
       });
     if (currentDoc !== docId) return;
     el('link-confirm').checked = false;
-    el('link-feedback').textContent = '仮説リンクを未確認で登録しました。別の明示的なレビューが必要です。';
+    el('link-feedback').textContent = saved.review_status === 'unreviewed'
+      ? '仮説リンクを未確認で登録しました。別の明示的なレビューが必要です。'
+      : '以前登録した仮説リンクを確認しました。審査状態は変更していません。';
     await loadKnowledgeLinks(docId);
     await loadKnowledgeMap(docId);
   } catch (error) {
@@ -916,6 +922,9 @@ async function openDocument(id) {
   const doc = await api('documents/' + id);
   currentDoc = id; currentDocBody = doc.body || ''; imageRequest++;
   linkTarget = null;
+  linkSources = [];
+  el('link-source').replaceChildren();
+  el('link-evidence').textContent = '確認済みの知識を読み込んでいます…';
   el('link-target-choice').textContent = '関係先は未選択です。';
   el('link-target-results').replaceChildren();
   el('link-confirm').checked = false;
