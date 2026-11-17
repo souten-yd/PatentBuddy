@@ -529,6 +529,9 @@ class Handler(BaseHTTPRequestHandler):
                         elif method == "GET" and path == "/addon/v1/ideas":
                             result = client.data("GET", "/api/v1/ideas")
                         elif method == "GET" and re.fullmatch(
+                                r"/addon/v1/ideas/idea_[a-f0-9]{32}/versions/[1-9][0-9]{0,9}", path):
+                            result = client.data("GET", "/api" + path[len("/addon"):])
+                        elif method == "GET" and re.fullmatch(
                                 r"/addon/v1/ideas/idea_[a-f0-9]{32}", path):
                             result = client.data("GET", "/api" + path[len("/addon"):])
                         elif method == "POST" and path == "/addon/v1/ideas":
