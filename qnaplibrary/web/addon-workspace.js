@@ -20,6 +20,18 @@ async function api(path, body, method) {
   if (!response.ok) throw new Error(data.error || '接続を確認してください');
   return data;
 }
+function applyHostTheme(theme) {
+  if (!theme || theme.token_version !== '1.0') return;
+  const rootEl = document.documentElement;
+  rootEl.style.colorScheme = theme.color_scheme === 'dark' ? 'dark' : 'light';
+  rootEl.dataset.hostTheme = theme.color_scheme === 'dark' ? 'dark' : 'light';
+  for (const name of ['accent', 'bg', 'surface', 'text', 'border', 'muted']) {
+    const value = theme[name];
+    if (typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value))
+      rootEl.style.setProperty('--pb-' + name, value);
+  }
+  rootEl.classList.toggle('reduce-motion', theme.motion_reduced === true);
+}
 async function load() {
   try {
     const state = await api('status');
@@ -76,6 +88,118 @@ el('search').addEventListener('submit', async event => {
   } catch (error) { el('message').textContent = error.message; }
   finally { el('submit').disabled = false; }
 });
+
+const KNOWLEDGE_KINDS = {
+  problem: '課題', cause: '原因', constraint: '制約', principle: '解決原理',
+  mechanism: '作用機構', implementation: '実装', effect: '効果',
+  observation: '観測', application: '応用可能性',
+};
+
+function focusKnowledgeEvidence(evidence) {
+  if (!evidence || !Number.isInteger(evidence.start) || !Number.isInteger(evidence.end)) return;
+  // Python stores Unicode code-point offsets; JS slice uses UTF-16 offsets.
+  const codepoints = Array.from(currentDocBody);
+  if (evidence.start < 0 || evidence.end > codepoints.length || evidence.start >= evidence.end
+      || codepoints.slice(evidence.start, evidence.end).join('') !== evidence.quote) {
+    el('message').textContent = '原文が更新されています。知識を再抽出して引用を確認してください。';
+    return;
+  }
+  const original = el('body');
+  const mark = document.createElement('mark');
+  mark.textContent = evidence.quote;
+  mark.tabIndex = -1;
+  original.replaceChildren(
+    document.createTextNode(codepoints.slice(0, evidence.start).join('')),
+    mark,
+    document.createTextNode(codepoints.slice(evidence.end).join(''))
+  );
+  el('source-details').open = true;
+  mark.scrollIntoView({block: 'center', behavior: 'auto'});
+  mark.focus({preventScroll: true});
+}
+
+async function loadKnowledge(id) {
+  const holder = el('knowledge');
+  if (currentDoc !== id) return;
+  holder.replaceChildren();
+  const loading = document.createElement('p');
+  loading.className = 'hint';
+  loading.textContent = '保存済みの知識候補を確認しています…';
+  holder.append(loading);
+  try {
+    const data = await api('documents/' + id + '/knowledge-proposals');
+    if (currentDoc !== id) return;
+    holder.replaceChildren();
+    if (!Array.isArray(data.items) || data.items.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'hint';
+      empty.textContent = '知識候補はまだありません。分析内容から「知識エッセンスを抽出」を選択してください。';
+      holder.append(empty);
+      return;
+    }
+    for (const snapshot of data.items) {
+      const parsed = JSON.parse(snapshot.content);
+      if (!Array.isArray(parsed.items)) throw new Error('保存済みの知識候補を表示できません');
+      const group = document.createElement('details');
+      group.className = 'knowledge-group';
+      group.open = snapshot === data.items[0];
+      const summary = document.createElement('summary');
+      summary.textContent = (snapshot.stale ? '原文更新・再抽出が必要' : '未確認の知識候補') +
+        ' · ' + parsed.items.length + '件';
+      group.append(summary);
+      if (!parsed.items.length) {
+        const empty = document.createElement('p');
+        empty.className = 'hint';
+        empty.textContent = '根拠に合致する知識候補はありませんでした。';
+        group.append(empty);
+      }
+      for (const item of parsed.items) {
+        const card = document.createElement('article');
+        card.className = 'knowledge-card';
+        const title = document.createElement('h3');
+        title.textContent = KNOWLEDGE_KINDS[item.kind] || '知識候補';
+        const status = document.createElement('p');
+        status.className = 'hint';
+        status.textContent = (snapshot.stale ? '原文変更・失効 · ' : '') +
+          'AI推論 · 未確認（人による採用前）';
+        const statement = document.createElement('p');
+        statement.className = 'knowledge-statement';
+        statement.textContent = item.statement;
+        const details = document.createElement('details');
+        const heading = document.createElement('summary');
+        heading.textContent = '引用・条件・限界を確認';
+        const quote = document.createElement('blockquote');
+        quote.textContent = item.evidence.quote;
+        const context = document.createElement('p');
+        context.className = 'hint';
+        context.textContent = '条件: ' + (item.conditions.join('、') || '未提示') +
+          ' / 限界: ' + (item.limitations.join('、') || '未提示');
+        const source = document.createElement('button');
+        source.type = 'button';
+        source.className = 'secondary';
+        source.textContent = snapshot.stale ? '原文が更新されています' : '原文の該当箇所を表示';
+        source.disabled = Boolean(snapshot.stale);
+        source.onclick = () => focusKnowledgeEvidence(item.evidence);
+        details.append(heading, quote, context, source);
+        card.append(title, status, statement, details);
+        group.append(card);
+      }
+      holder.append(group);
+    }
+  } catch (_) {
+    if (currentDoc !== id) return;
+    holder.replaceChildren();
+    const message = document.createElement('p');
+    message.className = 'hint';
+    message.textContent = '知識候補を読み込めませんでした。接続とサーバーの更新状態を確認してください。';
+    const retry = document.createElement('button');
+    retry.type = 'button';
+    retry.className = 'secondary';
+    retry.textContent = '知識候補を再読み込み';
+    retry.onclick = () => loadKnowledge(id);
+    holder.append(message, retry);
+  }
+}
 
 async function loadAnalyses(id) {
   const data = await api('documents/' + id + '/analyses');
