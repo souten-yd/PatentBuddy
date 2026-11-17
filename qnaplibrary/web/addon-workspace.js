@@ -125,6 +125,7 @@ function crossKey(item) {
 }
 function clearCrossSelection() {
   ++crossCompareRequest;
+  lastComparedItems = [];
   crossSelected.clear();
   for (const input of el('cross-results').querySelectorAll('input[type="checkbox"]'))
     input.checked = false;
@@ -192,6 +193,7 @@ function crossRenderSearch(items, append = false) {
     check.setAttribute('aria-label', '比較対象に選択: ' + item.statement.slice(0, 90));
     check.onchange = () => {
       ++crossCompareRequest;
+      lastComparedItems = [];
       const key = crossKey(item);
       if (check.checked) {
         if (crossSelected.size >= 3) {
@@ -216,6 +218,7 @@ el('cross-search-form').addEventListener('submit', async event => {
   ++crossCompareRequest;
   const button = el('cross-search-submit');
   button.disabled = true;
+  lastComparedItems = [];
   crossSelected.clear();
   crossItems = [];
   crossFilters = {
