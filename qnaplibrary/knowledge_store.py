@@ -11,6 +11,10 @@ from .knowledge_generation import serialize
 from .store import StoreError
 
 
+class KnowledgeConflictError(StoreError):
+    """Stale source or immutable result ID collision (HTTP 409)."""
+
+
 def _payload(value):
     if not isinstance(value, dict) or set(value) != {
         'id', 'kind', 'source_revision', 'content',
@@ -47,7 +51,7 @@ def save(store, doc_id, value, actor='system'):
             raise StoreError('knowledge document not found')
         revision = store.document_revision(doc)
         if claimed_revision != revision:
-            raise StoreError('knowledge source revision changed; regenerate proposals')
+            raise KnowledgeConflictError('knowledge source revision changed; regenerate proposals')
         try:
             validated = validate({
                 'id': doc_id, 'revision': revision, 'body': doc['body'],
@@ -63,7 +67,7 @@ def save(store, doc_id, value, actor='system'):
             if (old['doc_id'], old['kind'], old['source_revision'], old['content']) != (
                 doc_id, 'knowledge', revision, canonical,
             ):
-                raise StoreError('knowledge result id conflicts with immutable analysis')
+                raise KnowledgeConflictError('knowledge result id conflicts with immutable analysis')
         else:
             from .store import now
             db.execute(
