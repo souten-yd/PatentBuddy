@@ -129,7 +129,7 @@ def read(store, doc_id, *, hops=1, include_unreviewed=False, include_links=False
             records = store.db.execute(
                 'SELECT g.id,g.relation,g.revision,g.start,g.end,g.quote,'
                 'g.source_node,g.target_node,o.proposal_id,o.item_index,'
-                'o.source_epoch,o.target_doc_id,t.title AS target_title '
+                'o.source_epoch,o.source_review_seq,o.target_doc_id,t.title AS target_title '
                 'FROM knowledge_link_origins o '
                 'JOIN graph_edges g ON o.edge_id=g.id '
                 'JOIN documents t ON o.target_doc_id=t.id '
@@ -148,13 +148,14 @@ def read(store, doc_id, *, hops=1, include_unreviewed=False, include_links=False
                         row['end'] - row['start'] > 1200):
                     continue
                 current_approval = store.db.execute(
-                    'SELECT decision,source_revision,source_epoch FROM knowledge_reviews '
+                    'SELECT seq,decision,source_revision,source_epoch FROM knowledge_reviews '
                     'WHERE proposal_id=? AND item_index=? ORDER BY seq DESC LIMIT 1',
                     (row['proposal_id'], row['item_index']),
                 ).fetchone()
                 if (current_approval is None or current_approval['decision'] != 'approved'
                         or current_approval['source_revision'] != current_revision
-                        or current_approval['source_epoch'] != current_epoch):
+                        or current_approval['source_epoch'] != current_epoch
+                        or current_approval['seq'] != row['source_review_seq']):
                     continue
                 excerpt = store.db.execute(
                     'SELECT substr(body,?,?) FROM documents WHERE id=?',
