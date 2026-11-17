@@ -7,6 +7,7 @@ let selectedMapId = null;
 let mapRequest = 0;
 let reviewAllowed = false;
 let linkAllowed = false;
+let ideaWriteReady = false;
 let linkSources = [];
 let linkTarget = null;
 let polling = false;
@@ -48,14 +49,19 @@ async function load() {
     const ready = s.reachable && !s.setup_required && s.token_configured;
     reviewAllowed = ready && s.knowledge_review_available === true;
     linkAllowed = ready && s.knowledge_link_available === true;
+    ideaWriteReady = ready && s.idea_write_available === true;
+    updateIdeaSaveState();
     updateLinkPreview();
     el('message').textContent = ready ? 'ResearchDataHubに接続しました。文献を検索できます。' :
       s.setup_required ? 'ResearchDataHubの管理Webで初期設定を完了してください。' : 'ResearchDataHubの接続トークン設定が必要です。';
     el('submit').disabled = !ready;
     el('cross-search-submit').disabled = !ready;
     el('import-pdf').disabled = !ready;
-    if (ready) await loadLibrary();
-  } catch (error) { reviewAllowed = false; linkAllowed = false; el('message').textContent = '読み込みに失敗しました。接続を再確認できます。' + (error instanceof TypeError ? '' : ' ' + error.message); }
+    if (ready) {
+      await loadLibrary();
+      await loadIdeas();
+    }
+  } catch (error) { reviewAllowed = false; linkAllowed = false; ideaWriteReady = false; el('message').textContent = '読み込みに失敗しました。接続を再確認できます。' + (error instanceof TypeError ? '' : ' ' + error.message); }
 }
 el('reconnect').onclick = () => load();
 window.addEventListener('message', event => {
@@ -328,13 +334,238 @@ el('cross-compare-button').onclick = async () => {
     const note = document.createElement('p');
     note.className = 'hint';
     note.textContent = '表現が異なる項目の意味的な一致・差異は判断していません。異分野応用は検証前の仮説として扱ってください。';
-    out.append(intro, grid, common, note);
+    const canvas = document.createElement('button');
+    canvas.type = 'button';
+    canvas.className = 'secondary';
+    canvas.textContent = 'この比較を材料にIdea Canvasへ';
+    canvas.onclick = () => beginIdeaFromComparison(result.items);
+    out.append(intro, grid, common, note, canvas);
     out.scrollIntoView({block: 'nearest', behavior: 'auto'});
   } catch (_) {
     if (request === crossCompareRequest)
       out.textContent = '比較を表示できません。承認や原文が更新された可能性があります。再検索して選び直してください。';
   } finally { if (request === crossCompareRequest) updateCrossSelection(); }
 };
+
+// K5: nothing is saved by searching, comparing, navigating or typing.
+// An Idea is created/edited only by a user-confirmed form submission.
+const IDEA_FIELDS = ['title', 'problem', 'solution', 'effect', 'conditions', 'limitations'];
+let lastComparedItems = [];
+let ideaSources = [];
+let currentIdea = null;
+let ideaPending = null;
+let ideaSaving = false;
+let ideaReadRequest = 0;
+function ideaContent() {
+  return Object.fromEntries(IDEA_FIELDS.map(field =>
+    [field, el('idea-' + field).value.trim()]));
+}
+function ideaSourceSelectors() {
+  return ideaSources.map(item => ({
+    proposal_id: item.proposal_id, item_index: item.item_index,
+    doc_id: item.doc_id, source_revision: item.source_revision,
+    source_epoch: item.source_epoch, review_seq: item.review_seq,
+  }));
+}
+function updateIdeaSaveState() {
+  const content = ideaContent();
+  const active = !currentIdea || !currentIdea.stale;
+  const confirmed = el('idea-confirm').checked;
+  el('idea-save').disabled = !(
+    ideaWriteReady && !ideaSaving && active && confirmed &&
+    ideaSources.length >= 2 && ideaSources.length <= 3 &&
+    new Set(ideaSources.map(s => s.doc_id)).size >= 2 &&
+    content.title && content.problem && content.solution
+  );
+  if (!ideaWriteReady) el('idea-save-status').textContent =
+    'Idea専用保存権限がありません。ResearchDataHubで権限を設定してください。';
+}
+function showIdeaSources() {
+  const box = el('idea-source-list');
+  box.replaceChildren();
+  for (const source of ideaSources) {
+    const article = document.createElement('article');
+    article.className = 'idea-source';
+    const heading = document.createElement('h4');
+    heading.textContent = source.title || '文献 ' + source.doc_id;
+    const statement = document.createElement('p');
+    statement.textContent = source.statement;
+    const quote = document.createElement('blockquote');
+    quote.textContent = source.evidence.quote;
+    const note = document.createElement('p');
+    note.className = 'hint';
+    note.textContent = source.status === 'needs_revalidation'
+      ? '旧版・承認変更：再比較が必要'
+      : '人間承認済みAI推論（事実・特許性の認定ではありません）';
+    const open = document.createElement('button');
+    open.className = 'secondary';
+    open.type = 'button';
+    open.textContent = '元文献の引用へ';
+    open.disabled = source.status === 'needs_revalidation';
+    open.onclick = crossOpenSource(source);
+    article.append(heading, statement, quote, note, open);
+    box.append(article);
+  }
+}
+function showIdeaHistory(detail) {
+  const box = el('idea-history');
+  box.replaceChildren();
+  if (!detail?.history?.length) return;
+  const disclosure = document.createElement('details');
+  const summary = document.createElement('summary');
+  summary.textContent = '編集履歴（直近20版・上書きされません）';
+  disclosure.append(summary);
+  for (const record of detail.history) {
+    const p = document.createElement('p');
+    p.className = 'hint';
+    const date = new Date(record.created * 1000);
+    p.textContent = '第' + record.version + '版 · ' +
+      (Number.isFinite(date.getTime()) ? date.toLocaleString() : '日時不明');
+    disclosure.append(p);
+  }
+  box.append(disclosure);
+}
+function beginIdeaFromComparison(items) {
+  if (!Array.isArray(items) || items.length < 2 || items.length > 3 ||
+      new Set(items.map(item => item.doc_id)).size < 2 ||
+      !items.every(item => Number.isInteger(item.review_seq) &&
+        Number.isInteger(item.source_epoch) && item.source_revision)) {
+    el('idea-status').textContent = '承認済み出典を再取得してください。新たに2〜3件を比較する必要があります。';
+    return;
+  }
+  lastComparedItems = items;
+  currentIdea = null;
+  ideaSources = items.map(item => ({...item}));
+  ideaPending = null;
+  for (const field of IDEA_FIELDS) el('idea-' + field).value = '';
+  el('idea-confirm').checked = false;
+  el('idea-heading').textContent = '未保存の新しい発明仮説';
+  el('idea-form').hidden = false;
+  el('idea-history').replaceChildren();
+  showIdeaSources();
+  el('idea-status').textContent =
+    '引用元' + ideaSources.length + '件を固定する準備ができました。自分の言葉で課題・仕組みを記述してください。';
+  el('idea-save-status').textContent = '記入だけでは保存されません。確認チェックと保存ボタンが必要です。';
+  updateIdeaSaveState();
+  el('idea-canvas').scrollIntoView({block: 'start', behavior: 'auto'});
+  el('idea-title').focus({preventScroll: true});
+}
+el('idea-new').onclick = () => {
+  if (lastComparedItems.length < 2) {
+    el('idea-status').textContent =
+      '上の横断検索で異なる文献の知識を2〜3件選び、比較結果からIdea Canvasへ進んでください。';
+    return;
+  }
+  beginIdeaFromComparison(lastComparedItems);
+};
+for (const field of IDEA_FIELDS) {
+  el('idea-' + field).addEventListener('input', () => {
+    ideaPending = null;
+    updateIdeaSaveState();
+  });
+}
+el('idea-confirm').onchange = () => {
+  ideaPending = null;
+  updateIdeaSaveState();
+};
+async function openIdea(id) {
+  const request = ++ideaReadRequest;
+  el('idea-status').textContent = '保存済みの発明仮説を読み込んでいます…';
+  try {
+    const detail = await api('ideas/' + encodeURIComponent(id));
+    if (request !== ideaReadRequest) return;
+    if (!detail || detail.id !== id || !Array.isArray(detail.sources)) throw new Error('不正なIdea応答');
+    currentIdea = detail;
+    ideaSources = detail.sources;
+    ideaPending = null;
+    el('idea-form').hidden = false;
+    for (const field of IDEA_FIELDS) el('idea-' + field).value = detail.content[field] || '';
+    el('idea-confirm').checked = false;
+    el('idea-heading').textContent = detail.content.title + ' — 第' +
+      detail.version + '版';
+    showIdeaSources();
+    showIdeaHistory(detail);
+    el('idea-status').textContent = detail.stale
+      ? '根拠の版・レビューが変更されています。履歴は保持していますが、この案の編集保存はできません。最新知識を再比較して新しい案を作成してください。'
+      : '保存済みの手動発明仮説・第' + detail.version + '版。編集は保存操作でのみ履歴に追加されます。';
+    el('idea-save-status').textContent = detail.stale
+      ? '根拠再確認が必要：元の案を自動的に再承認しません。'
+      : '変更後、出典と本文を確認して新しい版として保存できます。';
+    updateIdeaSaveState();
+  } catch (_) {
+    if (request === ideaReadRequest)
+      el('idea-status').textContent = 'Ideaを読み込めません。接続と読取権限を確認してください。';
+  }
+}
+async function loadIdeas() {
+  const out = el('idea-recent');
+  out.textContent = '保存済みの案を確認中…';
+  try {
+    const result = await api('ideas');
+    out.replaceChildren();
+    if (!Array.isArray(result.items) || !result.items.length) {
+      out.textContent = '保存済みの発明仮説はまだありません。';
+      return;
+    }
+    for (const item of result.items) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'secondary idea-recent-button';
+      button.textContent = item.title + ' · 第' + item.version + '版' +
+        (item.stale ? ' · 根拠再確認が必要' : '');
+      button.onclick = () => openIdea(item.id);
+      out.append(button);
+    }
+    if (result.truncated) {
+      const note = document.createElement('p');
+      note.className = 'hint';
+      note.textContent = '最新20案を表示しています。古い案の閲覧機能は後続で拡張します。';
+      out.append(note);
+    }
+  } catch (_) { out.textContent = 'Idea一覧を読み込めません。更新ボタンから再試行してください。'; }
+}
+el('idea-refresh').onclick = () => loadIdeas();
+el('idea-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  updateIdeaSaveState();
+  if (el('idea-save').disabled || ideaSaving) return;
+  const content = ideaContent();
+  const existing = currentIdea;
+  const sourceSelectors = ideaSourceSelectors();
+  const signature = JSON.stringify({
+    id: existing?.id || null, version: existing?.version || 0,
+    content, sources: sourceSelectors,
+  });
+  if (!ideaPending || ideaPending.signature !== signature) {
+    ideaPending = {signature, request_id: crypto.randomUUID().replaceAll('-', '')};
+  }
+  const requestId = ideaPending.request_id;
+  ideaSaving = true;
+  updateIdeaSaveState();
+  el('idea-save-status').textContent = '根拠の版と人間の判断を再確認して保存しています…';
+  try {
+    const response = existing
+      ? await api('ideas/' + existing.id, {
+        request_id: requestId, expected_version: existing.version,
+        content, confirm_manual: true,
+      }, 'PUT')
+      : await api('ideas', {
+        request_id: requestId, sources: sourceSelectors,
+        content, confirm_manual: true,
+      });
+    el('idea-save-status').textContent =
+      '人の操作によって案を保存しました。出典・編集履歴は保持されます。';
+    ideaPending = null;
+    await openIdea(response.id);
+    await loadIdeas();
+  } catch (_) {
+    el('idea-save-status').textContent =
+      '保存できませんでした。根拠の変更・版競合・専用権限を確認してください。同じ内容なら再試行できます。';
+  } finally {
+    ideaSaving = false;
+    updateIdeaSaveState();
+  }
+});
 
 const KNOWLEDGE_KINDS = {
   problem: '課題', cause: '原因', constraint: '制約', principle: '解決原理',
