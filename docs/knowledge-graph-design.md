@@ -188,3 +188,9 @@ K1aでは `qnaplibrary/knowledge_essence.py` の独立した`validate(document, 
 K1cの実コード・安全/API契約は [knowledge-k1c-storage.md](knowledge-k1c-storage.md) を参照。既存SQLite`document_analyses(kind='knowledge')`に版付き候補をimmutable保存し、専用`knowledge_propose`スコープとGETの20件上限で限定する。原文revisionとquoteはResearchDataHubのtransaction内で再検証し、旧版/ID衝突はHTTP409。これは事実確認/人間のapprovalと異なり、候補は常にunreviewed/model_inference。元文献が更新された場合はstale表示。GraphRAGへの自動edge生成なし。
 
 K1cにはUIボタン・Host Jobの統合は**まだ無い**。次PR以降は [ControlDeck UI/UX規範](controldeck-ux-contract.md) に従ってHost-owned Shellの内側へ知識抽出/確認を載せる。先行PR #23のHost証跡と既存GraphRAGを再利用し、別のデフォルトUI/Vue/実行capabilityを追加しない。
+
+## K2レビューと原文版の境界（2026-11-17）
+
+[K2の人間レビュー詳細設計](knowledge-k2-human-review.md)をK3 Graph/Idea側の前提契約とする。K2は既存SQLiteのimmutable`knowledge`提案を変更せず、`knowledge_reviews`のappend-only判断イベントに`proposal_id,item_index,source_revision,reviewer`を紐づける。原文版が変われば旧承認は`status=unreviewed`と`stale=true`に失効、過去の履歴に旧`previous_decision`だけ残す。モデル推論を人手承認してもsource_factへ変えず、GraphRAGへ自動で辺・ノードを登録しない。
+
+HTTP POSTは新`knowledge_review` scope（既存`knowledge_propose` writerから分離）またはadmin CSRFのみ、GET履歴はread scopeで最大30件。リモート接続の専用token、レビューしたユーザー本人の署名なしという制約、ControlDeck Host-owned shell内の手動レビューUI、失効/再抽出/再試行は設計受入に含める。詳細なK3移行は [CODEX_NEXT](CODEX_NEXT.md) を参照。
