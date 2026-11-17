@@ -277,6 +277,19 @@ class IdeaCanvasHTTPTests(unittest.TestCase):
                                          'x' * 32)[0], 400)
         self.assertEqual(self.admin.call('GET', '/api/v1/ideas?limit=0')[0], 400)
 
+    def test_multibyte_japanese_full_length_fields_fit_bounded_http_payload(self):
+        fields = {
+            'title': '案' * 160, 'problem': '課' * 1500,
+            'solution': '技' * 2500, 'effect': '効' * 1200,
+            'conditions': '条' * 1200, 'limitations': '限' * 1200,
+        }
+        payload = dict(self.payload, content=fields, request_id='d' * 32)
+        self.assertGreater(len(json.dumps(payload, ensure_ascii=False).encode('utf-8')),
+                           16 * 1024)
+        code, stored = self.admin.call('POST', '/api/v1/ideas', payload)
+        self.assertEqual(code, 200, stored)
+        self.assertEqual(self._detail(stored['id'])['content'], fields)
+
     def test_scopes_are_strict_and_admin_csrf_required(self):
         anon = Client(self.live.base)
         self.assertEqual(anon.call('GET', '/api/v1/ideas')[0], 401)
