@@ -87,3 +87,9 @@ PR #19 / v0.5.8候補でHost local-only AI、Jobs、キャンセル/再実行、
 - 複数知識の組合せとIdea保存はユーザーの明示操作。モデルの推論関係を確定事実と見なさず、原文改訂/根拠撤回時は依存する知識/Ideaをstaleにする。
 - Host ai.inference/jobs/resourcesの既存権限とResearchDataHubの最小scopeを使い、ControlDeck本体に特許固有runtimeを追加しない。CDN、server起動時npm build、Vue default化、別の知識正本、自動外部送信を禁止。
 - **本追記はdocs-only**。Add-on manifestやHost権限の要求変更、SQL/API/UI実装、Releaseは含まない。
+
+## PatentBuddy Knowledge Map / Idea Canvas はControlDeck UXを必須継承（2026-11-17）
+
+[ControlDeck準拠UX契約](controldeck-ux-contract.md)を**次のUI実装PRの受入基準**に追加。Hostのtheme/route/Bridge、PageHeader・Primary Action・BottomSheet・SegmentedTabs・EmptyState・Jobs・状態チップの操作パターンに合わせ、グローバルナビを二重描画しない。320pxでは1カラムの知識一覧とカード・出典への遷移を優先。デスクトップではbounded Graphと右インスペクタを組み合わせる。未公開の知識/アイデアを通知・ログに含めない。
+
+K1aはpure Python検証関数のみでUI/manifest/Host runtimeは変更なし。ControlDeckのReact内部モジュールをPatentBuddyのopaque frameからimportしない。
