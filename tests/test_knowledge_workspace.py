@@ -28,7 +28,7 @@ class KnowledgeUXContractTests(unittest.TestCase):
         self.assertEqual(len(ids.ids), len(set(ids.ids)))
         for field in ('analysis-kind', 'analyze', 'jobs', 'knowledge', 'source-details', 'body'):
             self.assertIn(field, ids.ids)
-        self.assertIn('<option value="knowledge">', self.html)
+        self.assertIn('<option value="knowledge" selected>', self.html)
         self.assertNotIn('<h1>PatentBuddy</h1>', self.html)
         self.assertIn('loadKnowledge(id)', self.js)
         self.assertIn('focusKnowledgeEvidence(evidence)', self.js)
