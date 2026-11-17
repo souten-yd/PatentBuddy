@@ -70,6 +70,25 @@ class HostProvenanceStreamTests(unittest.TestCase):
         self.host.provenance_available = lambda: True
         self.host.local_available = lambda: True
 
+    def test_capability_envelope_fail_closed(self):
+        self.host.provenance_available = HostSession.provenance_available.__get__(
+            self.host, HostSession)
+        for response in (None, [], {}, {'text.generate': None},
+                         {'text.generate': {'request_options': None}},
+                         {'text.generate': {
+                             'available': True, 'local_only_available': True,
+                             'request_options': {'local_only': True,
+                                                 'require_provenance': {'supported': True}}}}):
+            with self.subTest(response=response):
+                self.host.call = lambda *args, result=response: result
+                self.assertFalse(self.host.provenance_available())
+        self.host.call = lambda *args: {'text.generate': {
+            'available': True, 'local_only_available': True,
+            'request_options': {
+                'local_only': {'supported': True},
+                'require_provenance': {'supported': True}}}}
+        self.assertTrue(self.host.provenance_available())
+
     def test_unverified_host_never_receives_secret_document(self):
         self.host.provenance_available = lambda: False
         with self.assertRaises(AddonError):
