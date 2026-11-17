@@ -54,3 +54,49 @@ select,input {border-color:var(--pb-border);background:var(--pb-surface);color:v
 .knowledge-review button {display:block;min-height:44px;width:100%;font-size:14px}
 .knowledge-review .hint {margin:10px 0}
 @media (max-width:767px) {.knowledge-review select,.knowledge-review button{width:100%}}
+
+/* K3 Knowledge Map: ControlDeck theme-derived, no external graph engine. */
+.knowledge-map {margin:18px 0;padding:14px;border:1px solid var(--pb-border);
+  background:var(--pb-surface);border-radius:14px;overflow-wrap:anywhere}
+.map-heading h3 {font-size:16px;font-weight:650;margin:0 0 7px}
+.map-heading p {margin:0 0 10px}
+.map-controls {display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:12px 0}
+.map-controls label {font-size:13px}
+.map-controls select,.map-controls button {min-height:44px}
+.map-toggle {display:flex;align-items:center;gap:8px;cursor:pointer}
+.map-toggle input {width:20px;height:20px;flex:none;accent-color:var(--pb-accent)}
+.map-workspace {display:grid;grid-template-columns:minmax(0,1.5fr) minmax(220px,.9fr);gap:12px}
+.map-visual {grid-column:1;grid-row:1;min-width:0;border:1px solid var(--pb-border);
+  border-radius:12px;background:var(--pb-bg);overflow:hidden}
+#map-svg {display:block;width:100%;height:auto;max-height:460px}
+.map-list {grid-column:1;grid-row:2;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.map-inspector {grid-column:2;grid-row:1/span 2;min-width:0;padding:12px;
+  border:1px solid var(--pb-border);border-radius:12px;background:var(--pb-surface)}
+.map-inspector h4 {font-size:16px;line-height:1.45;margin:0 0 10px;overflow-wrap:anywhere}
+.map-inspector h5 {font-size:13px;margin:14px 0 8px}
+.map-inspector blockquote {white-space:pre-wrap;overflow-wrap:anywhere;border-left:3px solid var(--pb-accent);
+  margin:10px 0;padding:8px;background:var(--pb-bg);line-height:1.55}
+.map-inspector button {display:block;width:100%;min-height:44px;margin:8px 0}
+.map-list-item {text-align:left;font-size:13px;line-height:1.45;
+  overflow-wrap:anywhere;min-height:44px}
+.map-list-item[aria-pressed="true"] {outline:2px solid var(--pb-accent);outline-offset:1px}
+.map-line {stroke:var(--pb-muted);stroke-width:1.5;opacity:.6}
+.map-line-factual {stroke:var(--pb-accent);opacity:.8}
+.map-line-source {stroke-dasharray:5 5}
+.map-point {cursor:pointer}
+.map-point circle {fill:var(--pb-surface);stroke:var(--pb-accent);stroke-width:2.5}
+.map-point.is-inference circle {stroke:var(--pb-muted);stroke-dasharray:4 3}
+.map-point.is-stale circle {opacity:.45}
+.map-point.is-selected circle {fill:var(--pb-accent);stroke:var(--pb-text)}
+.map-point text {fill:var(--pb-text);font-size:11px;pointer-events:none}
+.map-point.is-selected text {font-weight:700}
+.map-point:hover circle {stroke-width:4}
+@media(max-width:767px) {
+  .knowledge-map {padding:10px}
+  .map-workspace {display:flex;flex-direction:column}
+  .map-visual {display:none}
+  .map-list {display:flex;flex-direction:column}
+  .map-inspector {width:100%;min-height:120px}
+  .map-controls select {font-size:16px}
+}
+@media(prefers-reduced-motion:reduce) {.map-point,.map-line {transition:none}}
