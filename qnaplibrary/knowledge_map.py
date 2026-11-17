@@ -41,7 +41,7 @@ def read(store, doc_id, *, hops=1, include_unreviewed=False):
 
     with store.lock:
         doc = store.db.execute(
-            'SELECT id,title,body,hash,source FROM documents WHERE id=?',
+            'SELECT id,title,hash,source FROM documents WHERE id=?',
             (doc_id,),
         ).fetchone()
         if doc is None:
@@ -74,14 +74,20 @@ def read(store, doc_id, *, hops=1, include_unreviewed=False):
             for edge in expanded['edges']:
                 # PR23 already filters approved/factual/nonstale; recheck
                 # evidence revision and exact quote at the read boundary.
+                # SQLite substr counts Unicode characters and returns only the
+                # bounded quoted span, not a potentially 20 MB patent body.
+                if (edge['start'] < 0 or edge['end'] <= edge['start']
+                        or edge['end'] - edge['start'] > 4000):
+                    continue
                 source_doc = store.db.execute(
-                    'SELECT hash,source,body FROM documents WHERE id=?',
-                    (edge['evidence_doc_id'],),
+                    'SELECT hash,source,substr(body,?,?) AS excerpt '
+                    'FROM documents WHERE id=?',
+                    (edge['start'] + 1, edge['end'] - edge['start'],
+                     edge['evidence_doc_id']),
                 ).fetchone()
                 if (source_doc is None or
                         store.document_revision(source_doc) != edge['revision'] or
-                        edge['start'] < 0 or edge['end'] > len(source_doc['body']) or
-                        source_doc['body'][edge['start']:edge['end']] != edge['quote']):
+                        source_doc['excerpt'] != edge['quote']):
                     continue
                 src = by_graph_id.get(edge['source_node'])
                 dst = by_graph_id.get(edge['target_node'])
@@ -127,6 +133,7 @@ def read(store, doc_id, *, hops=1, include_unreviewed=False):
         snapshots = snapshots[:MAX_PROPOSALS]
         review_map = latest(store, [r['id'] for r in snapshots],
                             {r['id']: current_revision for r in snapshots})
+        body = None  # load the source text only when current proposals exist
         for row in snapshots:
             stale = row['source_revision'] != current_revision
             if stale and not include_unreviewed:
@@ -134,9 +141,13 @@ def read(store, doc_id, *, hops=1, include_unreviewed=False):
             try:
                 proposal = json.loads(row['content'])
                 if not stale:
+                    if body is None:
+                        body = store.db.execute(
+                            'SELECT body FROM documents WHERE id=?', (doc_id,)
+                        ).fetchone()['body']
                     proposal = validate({
                         'id': doc_id, 'revision': current_revision,
-                        'body': doc['body'],
+                        'body': body,
                     }, proposal)
                 if not isinstance(proposal, dict) or not isinstance(proposal.get('items'), list):
                     continue
