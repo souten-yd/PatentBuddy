@@ -141,6 +141,23 @@ class HumanReviewAPITests(unittest.TestCase):
                                          self.decision())[0], 409)
         self.assertEqual(self.count(), 1)
 
+    def test_reverting_document_text_does_not_reactivate_old_review(self):
+        self.assertEqual(self.admin.call('POST', self.review_path, self.decision())[0], 200)
+        self.assertEqual(self.state()['reviews']['0']['status'], 'approved')
+        for text in ('別の内容に変更', BODY):
+            self.assertEqual(self.admin.call('POST', '/api/v1/collections/reviews/documents',
+                {'documents': [{'id': 'document-1', 'body': text}]})[0], 200)
+        restored = self.state()
+        self.assertFalse(restored['stale'])  # digest now matches, but review epoch does not
+        self.assertTrue(restored['reviews']['0']['stale'])
+        self.assertEqual(restored['reviews']['0']['status'], 'unreviewed')
+        self.assertEqual(restored['reviews']['0']['previous_decision'], 'approved')
+        self.assertEqual(self.admin.call('POST', self.review_path, self.decision())[0], 409)
+        self.assertEqual(self.admin.call('POST', self.review_path,
+            self.decision('approved', 'e'*32))[0], 200)
+        self.assertEqual(self.state()['reviews']['0']['status'], 'approved')
+        self.assertEqual(self.count(), 2)
+
     def test_bad_item_index_untrusted_actor_and_review_fields_rejected(self):
         base = self.decision()
         for change in ({'item_index': True}, {'item_index': 12}, {'item_index': 1},
