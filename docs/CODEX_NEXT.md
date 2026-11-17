@@ -156,3 +156,7 @@ PR #16の設計はmainへ統合済み。PR #17でLinux別名入口・doctor/serv
 - **K3 UI/UX**: 既存ControlDeck design/theme/Bridge/Host nav/PageHeader/Job、44px、320px single-paneを踏襲。PCでは選択ノードから1〜2hop上限付きmap＋右Inspector＋出典PDF/段落へ移動、モバイルでは一覧→Card→Evidence。可視range/reason、status、truncated上限、offline/error/retry、keyboard/ScreenReaderをテスト。全件描画や外部CDN/Graph engine追加なし。
 - **Expected final state K2**: 人が判断を明示し、その署名されていない装置単位の審査記録が永続し、原文版で失効・復活しない。**Expected final state K3**: 出典つき技術エッセンスとレビュー結果を、ControlDeck内部で安全・制限付きに探索できる。完全な個人認証署名は今後専用Host contractが必要。
 - Merge/release: 実コード/PR diff/manifest/docs/tests/runtime/全verify/安全grepを確認→依存順PR merge→3か所のversion整合を持つrelease PRとActions成功→Linux/QNAP更新後health/実機確認。途中のDraftを勝手に完成済みと扱わない。
+
+### K2追加必須: revert/hash同一でもapproval自動復活禁止
+
+PR #33に単調増加`knowledge_review_epochs`を実装し、同一原文へ戻しても旧approvalを自動復活させない。`source_epoch`をreview eventで保持し、最新GET・履歴・K3 projectionでrevision+epochを検証。旧K2 schemaのレビューはepoch=-1で安全側失効。テスト: 初版→approved→別版→元版へ復元→active statusはunreviewed、旧decisionは歴史のみ、明示的新reviewでのみ再承認。read-only GETや同じ版の再取込でepoch増加0。全LiveServer/DB migrateテストは未実施。
