@@ -77,3 +77,10 @@ K1a Draft PR #29に原文範囲・source revision・Host local_only証跡形式�
 - K1dの知識候補抽出の次段階として[Draft PR #33](https://github.com/souten-yd/PatentBuddy/pull/33)へ、版別・項目別のappend-only人間レビュー（承認・却下・差戻し）、専用トークン/同UIDソケット、旧原文への自動失効、最大30件の履歴、ControlDeck準拠のカード操作を実装。[K2詳細設計・残検証](knowledge-k2-human-review.md)。
 - **未マージ/未リリース**。JS構文/HTML ID、SQL最終decisionの独立検証のみ合格。追加Python LiveServerテストと全verify、ControlDeck/RDH/iPhone実機は未実施。モデル出力が事実へ自動昇格する機能はない。
 - 次工程K3: PR #23のGraphRAGを実ファイルで整合してbounded Knowledge Mapを作る。AI推論・旧版・未確認の誤表示を禁止し、Host nav/theme/モバイル/キーボードを継承。K4〜K6は既存ロードマップに準ずる。
+
+## K3 Knowledge Mapの初期実装（2026-11-17 / Draft PR #34）
+
+- K3 [PR #34](https://github.com/souten-yd/PatentBuddy/pull/34) はK2レビュー結果＋PR #23の既存GraphRAGを**同一SQLiteの読取専用Projection**として表示する初期マップを実装。範囲1〜2hop、36 nodes/52 edges、PR #23版トリガー、承認済み/根拠付き事実辺のみ既定、AI推論はhuman review後もmodel_inference表示。未確認/旧版は明示opt-in、原文quoteは再照合。ControlDeck PCはSVG＋Inspector、iPhoneは一覧＋根拠。
+- K2にはhash/sourceの単調`review_epoch`と失効判定を追加し、旧文面への復帰でも過去の承認を自動復活させない。[K3設計と次のK3b/K4指示](knowledge-k3-map.md)。
+- **Draft/未検証**: GraphRAG/LiveServer/Pythonの実行は未実施。V8 JS構文/HTML IDと独立SQLite Unicode/epoch smokeのみ合格。旧PR #23の全体GraphRAG導入・手動関連リンク登録・発明キャンバス・リリースはまだ。
+- K3bで人間確認済みの根拠付き関係の明示登録、K4で蓄積知識の横断検索・異分野応用候補抽出、K5でIdea Canvas/新規性再調査、K6でNAS低I/O最適化/配布へ。
