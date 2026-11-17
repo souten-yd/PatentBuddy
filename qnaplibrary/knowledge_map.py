@@ -14,6 +14,9 @@ from .store import StoreError
 MAX_NODES = 36
 MAX_EDGES = 52
 MAX_PROPOSALS = 20
+# Reserve room for reviewed knowledge even if evidence GraphRAG is dense.
+GRAPH_NODES = 24
+GRAPH_EDGES = 36
 
 
 def _id(value):
@@ -63,7 +66,7 @@ def read(store, doc_id, *, hops=1, include_unreviewed=False):
         if graph_root:
             expanded = evidence_graph.expand(
                 store, [graph_root['id']], hops=hops,
-                max_nodes=MAX_NODES, max_edges=MAX_EDGES,
+                max_nodes=GRAPH_NODES, max_edges=GRAPH_EDGES,
                 include_inferred=False,
             )
             truncated = expanded['truncated']
