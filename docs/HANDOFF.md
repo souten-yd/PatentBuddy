@@ -277,3 +277,14 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - **実施済み**: GitHubブランチに登録されたK1c保存モジュールと同一Git blob SHA `2816a78a17e254e188fd1b2d7d0b063bd106fd8d` を隔離環境に復元。簡略化したK1a validatorとSQLite fake storeを使い、保存の代表シナリオ6件PASS＋py_compile PASS。ローカル検証は全Repoのテストではなく「保存関数の独立テスト」だけなので未検証範囲を誤認しない。
 - **未実施**: 実Store/HTTP/UDSを使った上記LiveServerテスト、`scripts/verify.sh` 全体、Host実local_only LLM + require_provenance/AI Job、QNAP/Linux配布、Browser/iPhone ControlDeck UX。モデル生成/保存ボタンは今は利用できない。GitHub checkoutはDNS不通で不可。
 - **次のK1d**: [docs/knowledge-k1c-storage.md](knowledge-k1c-storage.md) の詳細指示。Draft PR #23にあるHost require_provenance/GraphRAGをmain差分で検証し、衝突を整理してからHost Jobs→K1b generator→K1c immutable save→ControlDeck UXの最短経路を実装。全体verify合格までDraft維持。
+
+## 2026-11-17 K1d Host＋知識カード接続（Draft PR #32）
+
+- Stacked branch feat/knowledge-host-ui-k1d、[Draft PR #32](https://github.com/souten-yd/PatentBuddy/pull/32)。依存PR #31→#30→#29、さらにGraphRAG先行Draft PR #23とHost provenance重複あり。詳しくは [knowledge-k1d-implementation.md](knowledge-k1d-implementation.md)。
+- ControlDeck mainの実コード backend/app/addon_runtime/ai.py と models_mgmt/generation_provenance.pyを確認し、local_only+require_provenanceをサポート、SSE provenance→done、revision_kind=host_process_file_metadata_v1に一致。重み全体のハッシュではなくファイルメタデータ/ローカルプロセスの継続性検証であることを明記。frontend/src/features/addons/EmbeddedAddonView.tsxのBridge theme tokensと一致。
+- qnaplibrary/generation_contract.pyをPR #23から同じ内容で再利用。addon_host.pyのHostSessionに証跡対応と事前capability確認、addon_client.pyに保存専用資格事前確認、addon_jobs.pyに明示kind=knowledge→K1b generator→K1c knowledge-proposals専用POST、server.pyに認証済みknowledge-proposals GET proxyを追加。旧summary/claimsのストリーム仕様は維持。
+- web/addon-workspace.html/css/js はControlDeck theme.changed/connectedの色変数を取り込み、文献の主操作を初期値「知識エッセンスを抽出」に設定。未確認/staleカード・引用・条件・限界・Unicodeの原文該当位置をDOM text nodesだけで表示。Host nav/ログイン/ヘッダーを二重表示しない。
+- K1c writer tokenが通常のprivate GET APIまで読める問題を発見、PR #31とPR #32のserver.py双方で専用POST以外403へ強化し、tests/test_knowledge_store.pyに回帰を追加。PR #32にはPR #31の追記を安全に取り込んで後れを解消した。
+- tests/test_knowledge_host_jobs.py (既存real Store/SQLiteとfake local Host)、tests/test_knowledge_host_provenance.py (Host SSE/done/proofなし/順序不正/旧stream)、tests/test_knowledge_workspace.py (UI/quote/theme/安全)を追加。
+- **実施済み**: GitHubの実ファイル/PR diff確認、ControlDeck現行contract照合、K1d JSをV8で構文検証PASS、HTML ID欠落0/重複0、テーマ・Unicode引用・textContent・レスポンシブ確認。**未実施**: 上記Pythonテスト実行、bash scripts/verify.sh、実Host/RDH/API/iPhone/QNAP、Linux/QPKG build。github.comにDNS到達不可でrepo checkout不能。全体検証前に「テスト合格/完成/merge済み」としない。
+- **次の一手**: PR #32の完全チェックアウトでPython単体＋LiveServer＋node --check＋verify.shとbuild-linuxを実施し、失敗を同PRで修正。PR #29→#30→#31→#32の依存を整合・検証したうえでPR #23との重複を整理して統合。次工程K2 human reviewとK3 bounded Knowledge Mapは根拠付き正本・Host安全が完成後。コードPRはDraftのまま、リリースしていない。
