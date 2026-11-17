@@ -133,3 +133,14 @@ PR #16の設計はmainへ統合済み。PR #17でLinux別名入口・doctor/serv
 - `qnaplibrary/auth.py` / `local_auth.py` / `server.py` / `api.py` / `addon_client.py` に専用`knowledge_propose` token・同UID UDS・POST/GET routes・リモート専用`knowledge_server_token`を追加。既存`analysis`/`rw`/`pdf_analysis`/`published`トークンで知識POSTを許可しない。通常解析保存のscopeは従来通り。
 - `tests/test_knowledge_store.py` は実LiveServer/実UDS/全scope/原文改訂/悪意ある引用/不正証跡/冪等/AddonClient送信先を確認する回帰テストを**追加済みだが未実行**。GitHub blob SHAと照合済みのK1c保存モジュールをisolated SQLite mockへロードした6件はPASS。full `scripts/verify.sh`未実行（repo clone不可）、実API/JOB/E2E未検証。full検証前にmerge/releaseしない。
 - **K1d** はPR #23をレビュー/整合してからHost `stream(require_provenance=True)` と既存 `AnalysisJobs` のkind=knowledgeを繋ぐ。開始前のHost capability検証、local_only・proof、cancel/resume/terminal receipt、source-race→409、scoped remote tokenの実運用、Host-owned ControlDeck theme/navigation/Jobs/320px/cardをテスト。無断API拡張・自動採用・cloud fallback・default UI変更なし。
+
+## K1d実装・次のK2/K3指示（2026-11-17）
+
+- 現在 [Draft PR #32](https://github.com/souten-yd/PatentBuddy/pull/32) (base #31→#30→#29)。新しい [K1d実装・検証・次工程契約](knowledge-k1d-implementation.md)を優先して読む。**本番未完成・Python全体テスト未実行**。
+- Implemented: HostSessionのlocal_only/require_provenance（PR #23の限定移植）、knowledge生成前capability確認、専用token preflight、既存AnalysisJobsでkind=knowledge、K1cのimmutable storage POST、既存readスコープでの知識GET proxy、ControlDeck Host theme/文献の知識抽出ボタン/未確認staleカード/正しいUnicode引用ジャンプ。
+- K1c専用writer tokenを**POST knowledge-proposalsだけに制限**してprivate GETの誤許可を修正。旧analysis/rw tokenは新規POST不可。K1dのHost streamは旧summary/claims向けには従来呼出に互換で、cloud fallbackは不可。
+- Scope/Allowed: 既存PB addon_host/addon_jobs/addon_client/server/webと純粋generation_contract、追加テストのみ。Do NOT: GraphRAGの独立schema/DB/Host能力/新CDN/自動review/別LLM/cloud leak/execution/mutation系拡張、Vue default/UI default変更、server起動npm build。Expected final state: ユーザー明示で根拠付き未確認知識抽出→RDHに保存→ControlDeck準拠UIで版/引用/stale確認まで。
+- **Required next check**: PR #32のmain比だけでなく、stacked PR #29/#30/#31と先行PR #23の実diff、mainのdocs/manifest/Host runtime/API/testsを読む。Python tests.test_knowledge_essence, tests.test_knowledge_generation, tests.test_knowledge_store, tests.test_knowledge_host_provenance, tests.test_knowledge_host_jobs, tests.test_knowledge_workspace、node --check qnaplibrary/web/addon-workspace.js、bash scripts/verify.sh、bash scripts/build-linux.sh dist、RDH実API+Host local-only/require_provenance実ジョブ+モバイルUI E2E。テストは未実行でありPASS済みと扱わない。
+- 事前停止（旧Host/保存資格なし）、prompt injection、原文引用偽造、Host model/version drift、cancel/timeout、文献改訂race→409、zero write再送、writer tokenのGET403、old rw/analysisのPOST403、No raw-source/redirect、新旧UI default、ControlDeck theme/Job実動作、iPhone 320pxを必ず検証。少量の修正は本PRまたは次のK2に同梱し、不要な追加PRを作らない。
+- K2: 人間のレビュー権限と不変バージョン記録・stale propagation・approve/reject/差戻し。AI推論は承認後も事実へ自動昇格しない。K3: 既存GraphRAGを使う1〜2hopのKnowledge Map＋出典ドロワー＋320px代替一覧。先行PR #23のGraph/証跡を二重実装しない。
+- マージ/リリースは必須verifyとbuild成功後、PR依存順にmerge、その後Version/QPKG/CHANGELOG3点整合で正式Release、QNAP/Linuxの起動/health/更新確認まで行う。
