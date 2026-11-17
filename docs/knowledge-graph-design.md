@@ -194,3 +194,9 @@ K1cにはUIボタン・Host Jobの統合は**まだ無い**。次PR以降は [Co
 [K2の人間レビュー詳細設計](knowledge-k2-human-review.md)をK3 Graph/Idea側の前提契約とする。K2は既存SQLiteのimmutable`knowledge`提案を変更せず、`knowledge_reviews`のappend-only判断イベントに`proposal_id,item_index,source_revision,reviewer`を紐づける。原文版が変われば旧承認は`status=unreviewed`と`stale=true`に失効、過去の履歴に旧`previous_decision`だけ残す。モデル推論を人手承認してもsource_factへ変えず、GraphRAGへ自動で辺・ノードを登録しない。
 
 HTTP POSTは新`knowledge_review` scope（既存`knowledge_propose` writerから分離）またはadmin CSRFのみ、GET履歴はread scopeで最大30件。リモート接続の専用token、レビューしたユーザー本人の署名なしという制約、ControlDeck Host-owned shell内の手動レビューUI、失効/再抽出/再試行は設計受入に含める。詳細なK3移行は [CODEX_NEXT](CODEX_NEXT.md) を参照。
+
+## K3b 人手確認付き技術仮説リンクの境界（2026-11-17）
+
+[K3bの詳細設計](knowledge-k3b-links.md)では、既存K2の「人が採用したAI推論」を元に、別文献に対する**仮説**だけをPR #23 GraphRAGの`basis=inferred`へ登録する。利用者は元のquoteと対象文献の版を選び、明示チェック→リンク未承認登録→別の明示的承認/却下操作を行う。K2のsource revision/単調epoch/latest review seq、ターゲット版、Graph graph_revisionを検証し、旧承認が復活しない。
+
+Graphの`factual` edgeはK3b APIから生成できない。GraphRAGの`relation_proposals.py`は古い`kind=relations`前提なので、K1a〜K2 `knowledge`候補とは重複生成せず既存`evidence_graph.save/review`だけ再利用する。新しい`knowledge_link_origins`はグラフ正本ではなく、既存edgeとK2元証拠のFKメタデータ。K3 mapの仮説表示は明示opt-inで人間がreviewした現在の関係だけ、既定factual検索へ混ぜない。
