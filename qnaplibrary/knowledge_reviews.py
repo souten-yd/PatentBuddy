@@ -16,6 +16,14 @@ REVIEW_ID = re.compile(r'[a-f0-9]{32}\Z')
 PROPOSAL_ID = re.compile(r'[A-Za-z0-9_-]{1,128}\Z')
 
 
+def document_epoch(db, doc_id):
+    """Monotonic changes to source hash/source, independent of a hash revert."""
+    row = db.execute(
+        'SELECT epoch FROM knowledge_review_epochs WHERE doc_id=?', (doc_id,)
+    ).fetchone()
+    return row['epoch'] if row else 0
+
+
 def submit(store, doc_id, proposal_id, value, reviewer):
     """Append one human review event; duplicate request ID causes zero writes.
 
@@ -52,6 +60,7 @@ def submit(store, doc_id, proposal_id, value, reviewer):
         if document is None:
             raise StoreError('knowledge document not found')
         current_revision = store.document_revision(document)
+        current_epoch = document_epoch(db, doc_id)
         row = db.execute(
             'SELECT doc_id,source_revision,content FROM document_analyses '
             'WHERE id=? AND kind=?', (proposal_id, 'knowledge')
@@ -70,19 +79,20 @@ def submit(store, doc_id, proposal_id, value, reviewer):
         if item_index >= len(validated['items']):
             raise StoreError('review item not found')
         existing = db.execute(
-            'SELECT proposal_id,item_index,decision,source_revision,reviewer '
+            'SELECT proposal_id,item_index,decision,source_revision,reviewer,source_epoch '
             'FROM knowledge_reviews WHERE request_id=?', (request_id,)
         ).fetchone()
         if existing is not None:
-            if tuple(existing) != (proposal_id, item_index, decision, revision, reviewer):
+            if tuple(existing) != (proposal_id, item_index, decision, revision, reviewer, current_epoch):
                 raise KnowledgeConflictError('review request ID already used for another decision')
             # No UPDATE/INSERT/audit on identical retry.
         else:
             db.execute(
                 'INSERT INTO knowledge_reviews('
-                'request_id,proposal_id,item_index,decision,source_revision,reviewer,created) '
-                'VALUES(?,?,?,?,?,?,?)',
-                (request_id, proposal_id, item_index, decision, revision, reviewer, now()),
+                'request_id,proposal_id,item_index,decision,source_revision,source_epoch,reviewer,created) '
+                'VALUES(?,?,?,?,?,?,?,?)',
+                (request_id, proposal_id, item_index, decision,
+                 revision, current_epoch, reviewer, now()),
             )
             # IDs and decision only; never log patent text, claim or user notes.
             store.audit(reviewer, 'knowledge.review', '%s %d %s' %
@@ -94,7 +104,7 @@ def submit(store, doc_id, proposal_id, value, reviewer):
         }
 
 
-def latest(store, proposal_ids, current_revision_by_id):
+def latest(store, proposal_ids, current_revision_by_id, current_epoch_by_id):
     """Read newest decision per item; use one bounded query per GET page."""
     if not proposal_ids:
         return {}
@@ -104,7 +114,7 @@ def latest(store, proposal_ids, current_revision_by_id):
     placeholders = ','.join('?' for _ in proposal_ids)
     sql = (
         'SELECT r.proposal_id,r.item_index,r.decision,r.reviewer,'
-        'r.source_revision,r.created FROM knowledge_reviews r '
+        'r.source_revision,r.source_epoch,r.created FROM knowledge_reviews r '
         'JOIN (SELECT proposal_id,item_index,MAX(seq) latest_seq FROM knowledge_reviews '
         'WHERE proposal_id IN (' + placeholders + ') '
         'GROUP BY proposal_id,item_index) current ON r.seq=current.latest_seq'
@@ -112,7 +122,8 @@ def latest(store, proposal_ids, current_revision_by_id):
     out = {pid: {} for pid in proposal_ids}
     for row in store.db.execute(sql, proposal_ids):
         pid = row['proposal_id']
-        stale = row['source_revision'] != current_revision_by_id[pid]
+        stale = (row['source_revision'] != current_revision_by_id[pid]
+                 or row['source_epoch'] != current_epoch_by_id[pid])
         out[pid][str(row['item_index'])] = {
             'status': 'unreviewed' if stale else row['decision'],
             'previous_decision': row['decision'],
@@ -139,8 +150,9 @@ def history(store, doc_id, proposal_id):
         if document is None or proposal is None or proposal['doc_id'] != doc_id:
             raise StoreError('knowledge proposal not found')
         current_revision = store.document_revision(document)
+        current_epoch = document_epoch(store.db, doc_id)
         rows = store.db.execute(
-            'SELECT request_id,item_index,decision,source_revision,reviewer,created '
+            'SELECT request_id,item_index,decision,source_revision,source_epoch,reviewer,created '
             'FROM knowledge_reviews WHERE proposal_id=? ORDER BY seq DESC LIMIT 30',
             (proposal_id,),
         ).fetchall()
@@ -148,6 +160,7 @@ def history(store, doc_id, proposal_id):
             'proposal_id': proposal_id,
             'stale': proposal['source_revision'] != current_revision,
             'items': [dict(dict(row),
-                           stale=row['source_revision'] != current_revision)
+                           stale=(row['source_revision'] != current_revision
+                                  or row['source_epoch'] != current_epoch))
                       for row in rows],
         }
