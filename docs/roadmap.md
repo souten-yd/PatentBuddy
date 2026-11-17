@@ -52,3 +52,9 @@ PR #16の設計はmainへ統合済み。PR #17でLinux別名入口・doctor/serv
 - **K0** 既存GraphRAGと正本所有権/認証を実コード・diffで確認 → **K1** 文献からProblem/Principle/Mechanism/Implementation/Effect/Constraintの根拠付き知識提案抽出 → **K2** 同義語・上位概念、重複候補/人手review、版失効 → **K3** Obsidian型部分グラフ・知識カード・原文への逆引き。
 - **K4** 別案件・異分野の知識検索と応用条件の提示 → **K5** 選択知識の組合せからIdea案を作り、先行技術・請求項・FTOへ再照合 → **K6** 大量データ、NAS低I/O、実機と単一正本移行を受入。
 - **文書だけの計画**: 知識化・地図UI・発明案生成はこのPRで実装しない。既存検索/論文/PDF/特許性評価を壊さない。軽微な共有型はPR #23に同梱し得るが、K1以降の主要機能は後続PRへ分割する。
+
+## K1a着手 — ControlDeck準拠の知識エッセンス抽出契約（2026-11-17）
+
+[ControlDeck UI/UX受入契約](controldeck-ux-contract.md)をK3のKnowledge Map/Knowledge Card/Idea Canvasに必須化。見た目と操作はControlDeckのHost shell、theme、共通PageHeader、Job状態/BottomSheet/モバイル規則を踏襲し、独自UI体系を新設しない。
+
+K1a Draft PR #29に原文範囲・source revision・Host local_only証跡形式・未承認推論固定を検証する純粋モジュールと10件の単体テストを追加。**モデルによる生成/保存/API/画面は未接続**。K1bは先行Draft PR #23のHost generation provenanceとrelation_proposalsの差分を確認して共通化する。
