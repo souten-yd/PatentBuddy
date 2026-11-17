@@ -294,16 +294,17 @@ def list_recent(store, *, limit=20):
     with store.lock:
         rows = store.db.execute(
             'SELECT id FROM idea_drafts ORDER BY created DESC,id DESC LIMIT ?',
-            (limit,),
+            (limit + 1,),
         ).fetchall()
+        more = len(rows) > limit
         return {'items': [
             {
                 'id': item['id'], 'version': item['version'],
                 'title': item['content']['title'], 'state': item['state'],
                 'stale': item['stale'], 'updated': item['updated'],
             }
-            for row in rows for item in [_one(store, store.db, row['id'])]
-        ], 'limit': limit, 'truncated': len(rows) == limit}
+            for row in rows[:limit] for item in [_one(store, store.db, row['id'])]
+        ], 'limit': limit, 'truncated': more}
 
 
 def update(store, identifier, value, actor):
