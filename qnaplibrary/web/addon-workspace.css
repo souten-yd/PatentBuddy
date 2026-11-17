@@ -131,3 +131,43 @@ select,input {border-color:var(--pb-border);background:var(--pb-surface);color:v
   #link-target-form .row {display:flex;flex-direction:column}
   #link-target-form input,#link-target-form button {width:100%;flex-basis:auto}
 }
+
+/* K4: read-only knowledge discovery and literal cross-document comparison. */
+.knowledge-cross {margin:20px 0;padding:16px;background:var(--pb-surface);
+  border:1px solid var(--pb-border);border-radius:14px;overflow-wrap:anywhere}
+.knowledge-cross h2 {margin:0 0 10px;font-size:19px}
+.knowledge-cross label {font-size:14px}
+#cross-search-form .row {display:flex;flex-wrap:wrap;gap:9px;align-items:center}
+#cross-query {min-width:190px;flex:1 1 230px}
+#cross-kind {min-width:155px;flex:0 1 220px}
+#cross-query,#cross-kind {font-size:16px;min-height:44px}
+#cross-search-submit {min-height:44px}
+#cross-results {display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,310px),1fr));
+  gap:12px;margin:15px 0}
+.cross-hit,.cross-compare-card {padding:13px;border:1px solid var(--pb-border);
+  border-radius:12px;background:var(--pb-surface);min-width:0}
+.cross-hit h3,.cross-compare-card h3 {font-size:15px;line-height:1.5;margin:0 0 8px}
+.cross-hit p,.cross-compare-card p {line-height:1.6;white-space:pre-wrap}
+.cross-hit blockquote,.cross-compare-card blockquote {white-space:pre-wrap;overflow-wrap:anywhere;
+  margin:10px 0;padding:10px;border-left:3px solid var(--pb-accent);background:var(--pb-bg)}
+.cross-hit-actions {display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.cross-hit-actions button {min-height:44px;flex:1}
+.cross-select {display:flex;align-items:center;min-height:44px;gap:8px}
+.cross-select input {width:20px;height:20px;accent-color:var(--pb-accent);flex:none}
+.cross-compare-controls {display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:8px 0}
+.cross-compare-controls .hint {flex:1 1 220px;margin:0}
+.cross-compare-controls button {min-height:44px}
+.cross-compare-grid {display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,285px),1fr));
+  gap:12px;margin:12px 0}
+.cross-compare-card button {min-height:44px;width:100%}
+.cross-common {padding:10px 12px;border:1px solid var(--pb-border);
+  border-radius:10px;background:var(--pb-bg)}
+.cross-compare-results:empty {display:none}
+@media(max-width:767px) {
+ .knowledge-cross {padding:10px}
+ #cross-search-form .row {flex-direction:column;align-items:stretch}
+ #cross-query,#cross-kind,#cross-search-submit {width:100%;max-width:none;flex-basis:auto}
+ #cross-results,.cross-compare-grid {display:flex;flex-direction:column}
+ .cross-compare-controls button {width:100%}
+}
+@media(prefers-reduced-motion:reduce) {.knowledge-cross * {scroll-behavior:auto}}
