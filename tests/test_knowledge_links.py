@@ -119,7 +119,7 @@ class KnowledgeLinksAPITests(unittest.TestCase):
         self.assertEqual(link['relation'], 'substitution')
         self.assertEqual(link['evidence']['quote'], QUOTE)
         self.assertTrue(opt['include_links'])
-        self.assertIn('model_inference', json.loads(
+        self.assertEqual('model_inference', json.loads(
             self.store.one("SELECT content FROM document_analyses WHERE id=?",
                            (self.proposal_id,))[0])['items'][0]['basis'])
 
@@ -191,6 +191,27 @@ class KnowledgeLinksAPITests(unittest.TestCase):
         self.assertEqual(self.decide(link['id'], link['graph_revision'])[0], 409)
         self.assertEqual(self.store.one(
             'SELECT basis FROM graph_edges WHERE id=?', (link['id'],))[0], 'inferred')
+
+    def test_link_review_without_explicit_confirmation_is_rejected_atomically(self):
+        self.approve_source()
+        link = self.create_link()
+        path = '/api/v1/knowledge-links/%s/review' % link['id']
+        for change in (
+            {'confirm_evidence': False},
+            {'decision': 'factual'},
+            {'decision': 'unreviewed'},
+            {'expected_graph_revision': 'not-a-revision'},
+            {'user_reviewer': 'admin'},
+        ):
+            with self.subTest(change=change):
+                body = {'decision': 'approved',
+                        'expected_graph_revision': link['graph_revision'],
+                        'confirm_evidence': True}
+                body.update(change)
+                self.assertEqual(self.admin.call('POST', path, body)[0], 400)
+        self.assertEqual(self.store.one(
+            'SELECT review_status FROM graph_edges WHERE id=?', (link['id'],))[0],
+            'unreviewed')
 
     def test_source_and_target_changes_fail_closed_even_on_revert(self):
         self.approve_source()
