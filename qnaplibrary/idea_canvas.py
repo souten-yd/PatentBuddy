@@ -260,6 +260,29 @@ def get(store, identifier):
         return _one(store, store.db, identifier, history=True)
 
 
+def get_version(store, identifier, version):
+    """Inspect an immutable historical edit without changing active draft."""
+    identifier = _id(identifier)
+    if type(version) is not int or not 1 <= version <= 2**31 - 1:
+        raise StoreError('invalid idea history version')
+    with store.lock:
+        current = _one(store, store.db, identifier)
+        history = store.db.execute(
+            'SELECT content,created FROM idea_versions '
+            'WHERE idea_id=? AND version=?', (identifier, version),
+        ).fetchone()
+        if history is None:
+            raise StoreError('idea history version not found')
+        return {
+            'id': identifier, 'version': version,
+            'current_version': current['version'],
+            'content': json.loads(history['content']),
+            'created': history['created'],
+            'sources': current['sources'], 'stale': current['stale'],
+            'basis': 'manual_hypothesis', 'read_only': True,
+        }
+
+
 def list_recent(store, *, limit=20):
     if type(limit) is not int or not 1 <= limit <= 20:
         raise StoreError('invalid idea list limit')
