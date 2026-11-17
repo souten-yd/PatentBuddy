@@ -221,26 +221,42 @@ def list_for_document(store, doc_id):
     with store.lock:
         if not store.db.execute('SELECT 1 FROM documents WHERE id=?', (doc_id,)).fetchone():
             raise StoreError('knowledge link document not found')
+        doc = store.db.execute(
+            'SELECT hash,source FROM documents WHERE id=?', (doc_id,)
+        ).fetchone()
+        revision = store.document_revision(doc)
         rows = store.db.execute(
             'SELECT o.edge_id,o.proposal_id,o.item_index,o.source_doc_id,o.source_epoch,'
             'o.target_doc_id,g.relation,g.basis,g.review_status,g.graph_revision,'
-            'g.stale,g.quote,t.title AS target_title '
+            'g.stale,g.quote,t.title AS target_title,'
+            'r.decision AS source_decision,r.source_revision AS review_revision,'
+            'r.source_epoch AS review_epoch '
             'FROM knowledge_link_origins o JOIN graph_edges g ON o.edge_id=g.id '
             'JOIN documents t ON o.target_doc_id=t.id '
+            'LEFT JOIN knowledge_reviews r ON r.seq=('
+            ' SELECT MAX(q.seq) FROM knowledge_reviews q'
+            ' WHERE q.proposal_id=o.proposal_id AND q.item_index=o.item_index) '
             'WHERE o.source_doc_id=? ORDER BY g.created DESC,g.id DESC LIMIT 30',
             (doc_id,),
         ).fetchall()
         epoch = document_epoch(store.db, doc_id)
-        return {'items': [
-            {
+        items = []
+        for r in rows:
+            stale = bool(
+                r['stale'] or r['source_epoch'] != epoch or
+                r['source_decision'] != 'approved' or
+                r['review_revision'] != revision or r['review_epoch'] != epoch
+            )
+            items.append({
                 'id': r['edge_id'], 'proposal_id': r['proposal_id'],
                 'item_index': r['item_index'],
                 'target_doc_id': r['target_doc_id'],
                 'target_title': r['target_title'],
                 'relation': r['relation'], 'basis': 'inferred',
-                'review_status': r['review_status'],
+                'review_status': 'unreviewed' if stale else r['review_status'],
+                'previous_review_status': r['review_status'],
                 'graph_revision': r['graph_revision'],
-                'stale': bool(r['stale'] or r['source_epoch'] != epoch),
+                'stale': stale,
                 'quote': r['quote'],
-            } for r in rows,
-        ]}
+            })
+        return {'items': items}
