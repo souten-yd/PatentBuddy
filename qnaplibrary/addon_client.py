@@ -104,6 +104,19 @@ class AddonClient:
             raise AddonError(403, '文献閲覧のHost権限がありません')
         return identity
 
+    def knowledge_write_ready(self):
+        """Probe the dedicated credential before starting costly inference."""
+        config = self.settings()
+        if config.get('auth_method') == 'local_peer':
+            from .local_auth import connect
+            try:
+                scoped = connect(17871, 'knowledge_propose')
+            except (OSError, ValueError):
+                return False
+            return isinstance(scoped.get('server_token'), str) and scoped['server_token'].startswith('qlk_')
+        token = config.get('knowledge_server_token')
+        return isinstance(token, str) and len(token) > 8 and '\\r' not in token and '\\n' not in token
+
     def data(self, method, path, body=None):
         config = self.settings()
         local_peer = config.get('auth_method') == 'local_peer'
