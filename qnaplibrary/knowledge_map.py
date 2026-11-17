@@ -157,7 +157,8 @@ def read(store, doc_id, *, hops=1, include_unreviewed=False):
                 continue
             for index, item in enumerate(proposal['items'][:12]):
                 review = review_map.get(row['id'], {}).get(str(index), {})
-                state = 'unreviewed' if stale else review.get('status', 'unreviewed')
+                decision_stale = bool(review.get('stale', False))
+                state = 'unreviewed' if stale or decision_stale else review.get('status', 'unreviewed')
                 # Explicit opt-in to inspect unreviewed/rejected/stale nodes.
                 if state != 'approved' and not include_unreviewed:
                     continue
@@ -173,7 +174,7 @@ def read(store, doc_id, *, hops=1, include_unreviewed=False):
                     'document_id': doc_id,
                     'review_status': state,
                     'previous_decision': review.get('previous_decision'),
-                    'stale': stale,
+                    'stale': stale or decision_stale,
                     'basis': 'model_inference',
                     'evidence': {
                         'doc_id': doc_id,
