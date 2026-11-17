@@ -72,6 +72,42 @@ CREATE TABLE IF NOT EXISTS knowledge_link_origins(
   target_doc_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE);
 CREATE INDEX IF NOT EXISTS knowledge_link_origin_source
   ON knowledge_link_origins(source_doc_id,edge_id);
+-- K5 user-authored Idea Canvas. No autonomous inference or independent graph.
+-- Sources are immutable snapshots without foreign keys to documents/analyses:
+-- preserve exact history even if source material is later deleted.
+CREATE TABLE IF NOT EXISTS idea_drafts(
+  id TEXT PRIMARY KEY,
+  request_id TEXT UNIQUE NOT NULL,
+  request_hash TEXT NOT NULL,
+  creator TEXT NOT NULL,
+  created REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS idea_versions(
+  seq INTEGER PRIMARY KEY,
+  idea_id TEXT NOT NULL REFERENCES idea_drafts(id) ON DELETE CASCADE,
+  version INTEGER NOT NULL CHECK(version>=1),
+  request_id TEXT NOT NULL UNIQUE,
+  expected_version INTEGER NOT NULL,
+  content TEXT NOT NULL,
+  actor TEXT NOT NULL,
+  created REAL NOT NULL,
+  UNIQUE(idea_id,version));
+CREATE INDEX IF NOT EXISTS idea_versions_by_idea
+  ON idea_versions(idea_id,version DESC);
+CREATE TABLE IF NOT EXISTS idea_sources(
+  idea_id TEXT NOT NULL REFERENCES idea_drafts(id) ON DELETE CASCADE,
+  ordinal INTEGER NOT NULL CHECK(ordinal BETWEEN 0 AND 2),
+  proposal_id TEXT NOT NULL,
+  item_index INTEGER NOT NULL CHECK(item_index BETWEEN 0 AND 11),
+  doc_id INTEGER NOT NULL,
+  source_revision TEXT NOT NULL,
+  source_epoch INTEGER NOT NULL,
+  review_seq INTEGER NOT NULL,
+  quote TEXT NOT NULL,
+  quote_start INTEGER NOT NULL,
+  quote_end INTEGER NOT NULL,
+  statement TEXT NOT NULL,
+  PRIMARY KEY(idea_id,ordinal),
+  UNIQUE(idea_id,proposal_id,item_index));
 CREATE TABLE IF NOT EXISTS source_pdfs(
   sha256 TEXT PRIMARY KEY, content BLOB NOT NULL, created REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS document_pdfs(
