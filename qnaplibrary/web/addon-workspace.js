@@ -2,6 +2,9 @@
 let nonce = '';
 let currentDoc = null;
 let currentDocBody = '';
+let currentKnowledgeMap = null;
+let selectedMapId = null;
+let mapRequest = 0;
 let reviewAllowed = false;
 let polling = false;
 let bridgePort = null;
@@ -119,6 +122,230 @@ function focusKnowledgeEvidence(evidence) {
   mark.scrollIntoView({block: 'center', behavior: 'auto'});
   mark.focus({preventScroll: true});
 }
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const MAP_KIND_LABELS = {
+  document: '文献', concept: '技術概念', classification: '分類',
+  party: '出願人', claim: '請求項', family: 'ファミリー',
+  priority: '優先権', problem: '課題', cause: '原因',
+  constraint: '制約', principle: '解決原理', mechanism: '作用機構',
+  implementation: '実装', effect: '効果', observation: '観測',
+  application: '応用',
+};
+function mapElement(tag, attrs = {}) {
+  const node = document.createElementNS(SVG_NS, tag);
+  for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, String(value));
+  return node;
+}
+function mapItemStatus(node) {
+  if (node.stale) return '旧版・失効';
+  if (node.basis === 'model_inference') {
+    const names = {approved: '人間レビュー済みのAI推論',
+      rejected: '却下されたAI推論',
+      changes_requested: '差戻し中のAI推論',
+      unreviewed: '未確認のAI推論'};
+    return names[node.review_status] || names.unreviewed;
+  }
+  if (node.status === 'reviewed_graph_node') return '根拠で確認されたグラフの構成要素';
+  return '参照文献';
+}
+function drawKnowledgeMap(data, select) {
+  const svg = el('map-svg');
+  svg.replaceChildren();
+  const nodes = data.nodes;
+  const byId = new Map(nodes.map(n => [n.id, n]));
+  // Bounded, deterministic radial layout: zero remote libraries or CDN.
+  const distances = new Map([[data.root, 0]]);
+  for (let depth = 0; depth < data.hops; depth++) {
+    for (const edge of data.edges) {
+      if (distances.get(edge.source) === depth && !distances.has(edge.target)) {
+        distances.set(edge.target, depth + 1);
+      }
+    }
+  }
+  const levels = [[], [], []];
+  for (const node of nodes) {
+    levels[Math.min(distances.get(node.id) ?? 2, 2)].push(node);
+  }
+  const points = new Map();
+  for (const [depth, level] of levels.entries()) {
+    level.forEach((node, index) => {
+      const angle = -Math.PI / 2 + (2 * Math.PI * index) / level.length;
+      const rx = depth === 1 ? 190 : depth === 2 ? 327 : 0;
+      const ry = depth === 1 ? 145 : depth === 2 ? 202 : 0;
+      points.set(node.id, [380 + Math.cos(angle) * rx, 235 + Math.sin(angle) * ry]);
+    });
+  }
+  for (const edge of data.edges) {
+    const from = points.get(edge.source), to = points.get(edge.target);
+    if (!from || !to) continue;
+    const line = mapElement('line', {
+      x1: from[0], y1: from[1], x2: to[0], y2: to[1],
+      class: edge.basis === 'factual' ? 'map-line map-line-factual' :
+        'map-line map-line-source',
+    });
+    svg.append(line);
+  }
+  for (const node of nodes) {
+    const xy = points.get(node.id);
+    if (!xy) continue;
+    const selected = node.id === selectedMapId;
+    const group = mapElement('g', {
+      class: 'map-point' + (selected ? ' is-selected' : '') +
+        (node.stale ? ' is-stale' : '') +
+        (node.id.startsWith('k:') ? ' is-inference' : ''),
+      transform: 'translate(' + xy[0].toFixed(1) + ',' + xy[1].toFixed(1) + ')',
+    });
+    const circle = mapElement('circle', {r: node.id === data.root ? 29 : 20});
+    const label = mapElement('text', {x: 0, y: node.id === data.root ? 46 : 34,
+      'text-anchor': 'middle'});
+    const summary = String(node.label || node.kind || '').slice(0, 14);
+    label.textContent = summary + (String(node.label || '').length > 14 ? '…' : '');
+    const tooltip = mapElement('title');
+    tooltip.textContent = String(node.label || '') + ' — ' + mapItemStatus(node);
+    group.append(circle, label, tooltip);
+    group.addEventListener('click', () => select(node.id));
+    svg.append(group);
+  }
+}
+function renderMapInspector(data, nodeId) {
+  const box = el('map-inspector');
+  box.replaceChildren();
+  const node = data.nodes.find(n => n.id === nodeId) || data.nodes[0];
+  if (!node) return;
+  selectedMapId = node.id;
+  const title = document.createElement('h4');
+  title.textContent = node.label || '無題の知識';
+  const kind = document.createElement('p');
+  kind.className = 'hint';
+  kind.textContent = (MAP_KIND_LABELS[node.kind] || '知識の構成要素') + ' · ' +
+    mapItemStatus(node);
+  box.append(title, kind);
+  if (node.basis === 'model_inference') {
+    const note = document.createElement('p');
+    note.className = 'hint';
+    note.textContent = '人が承認していても、AI推論が出典の確定した事実になったわけではありません。';
+    box.append(note);
+    for (const [field, label] of [
+      ['conditions', '成立条件'], ['limitations', '限界'],
+    ]) {
+      if (Array.isArray(node[field]) && node[field].length) {
+        const line = document.createElement('p');
+        line.textContent = label + ': ' + node[field].join('、');
+        box.append(line);
+      }
+    }
+  }
+  if (node.evidence) {
+    const evidence = node.evidence;
+    const quote = document.createElement('blockquote');
+    quote.textContent = evidence.quote || '引用はありません';
+    box.append(quote);
+    const sourceButton = document.createElement('button');
+    sourceButton.type = 'button';
+    sourceButton.className = 'secondary';
+    sourceButton.textContent = node.stale ? '旧版の根拠・再抽出が必要' : '根拠の原文を開く';
+    sourceButton.disabled = Boolean(node.stale);
+    sourceButton.onclick = async () => {
+      if (!Number.isInteger(evidence.doc_id)) return;
+      try {
+        if (currentDoc !== evidence.doc_id) await openDocument(evidence.doc_id);
+        focusKnowledgeEvidence(evidence);
+      } catch (error) { el('map-status').textContent = '根拠を開けませんでした: ' + error.message; }
+    };
+    box.append(sourceButton);
+  }
+  if (Number.isInteger(node.document_id)) {
+    const open = document.createElement('button');
+    open.type = 'button';
+    open.className = 'secondary';
+    open.textContent = '文献を表示';
+    open.onclick = async () => {
+      try { await openDocument(node.document_id); }
+      catch (error) { el('map-status').textContent = '文献を開けませんでした: ' + error.message; }
+    };
+    box.append(open);
+  }
+  const adjacent = data.edges.filter(e => e.source === node.id || e.target === node.id);
+  if (adjacent.length) {
+    const heading = document.createElement('h5');
+    heading.textContent = '接続の理由と方向';
+    box.append(heading);
+    for (const edge of adjacent.slice(0, 12)) {
+      const row = document.createElement('p');
+      row.className = 'hint';
+      row.textContent = edge.basis === 'provenance_only'
+        ? '文献 → AI知識候補（出典リンクのみ・技術的関係の認定ではありません）'
+        : ('承認済みの事実関係: ' + edge.relation +
+           '（' + edge.source + ' → ' + edge.target + '）');
+      box.append(row);
+      if (edge.evidence?.quote) {
+        const quote = document.createElement('blockquote');
+        quote.textContent = edge.evidence.quote;
+        box.append(quote);
+      }
+    }
+  }
+}
+function renderKnowledgeMap(data) {
+  currentKnowledgeMap = data;
+  const list = el('map-list');
+  list.replaceChildren();
+  if (!data.nodes || data.nodes.length <= 1) {
+    list.textContent = 'この文献に表示可能な確認済み知識はまだありません。未確認候補の参考表示を選ぶか、知識候補を抽出・レビューしてください。';
+  }
+  if (!data.nodes.some(n => n.id === selectedMapId)) selectedMapId = data.root;
+  const select = id => {
+    selectedMapId = id;
+    renderMapInspector(data, id);
+    drawKnowledgeMap(data, select);
+    for (const button of list.querySelectorAll('button')) {
+      button.setAttribute('aria-pressed', String(button.dataset.nodeId === id));
+    }
+  };
+  for (const node of data.nodes) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'map-list-item secondary';
+    button.dataset.nodeId = node.id;
+    button.textContent = (MAP_KIND_LABELS[node.kind] || '知識') + ' · ' +
+      node.label + ' — ' + mapItemStatus(node);
+    button.onclick = () => select(node.id);
+    list.append(button);
+  }
+  renderMapInspector(data, selectedMapId);
+  drawKnowledgeMap(data, select);
+  select(selectedMapId);
+  el('map-status').textContent = '出典と知識 ' + data.nodes.length + '件、接続 ' +
+    data.edges.length + '件、' + data.hops + '段階（' +
+    (data.include_unreviewed ? '未確認も参考表示' : '確認済みだけ') + '）。' +
+    (data.truncated ? '上限に達したため一部を省略しています。' :
+     'グラフの線は出典の接続で、必ずしも技術的な因果関係ではありません。');
+}
+async function loadKnowledgeMap(id) {
+  if (currentDoc !== id) return;
+  const request = ++mapRequest;
+  el('map-status').textContent = '知識の関係を読み込んでいます…';
+  const hops = el('map-hops').value === '2' ? '2' : '1';
+  const visible = el('map-unreviewed').checked ? 'true' : 'false';
+  try {
+    const data = await api('documents/' + id + '/knowledge-map?hops=' + hops +
+                           '&include_unreviewed=' + visible);
+    if (request !== mapRequest || currentDoc !== id) return;
+    if (!Array.isArray(data.nodes) || !Array.isArray(data.edges)) throw new Error('知識マップ形式が不正です');
+    renderKnowledgeMap(data);
+  } catch (error) {
+    if (request !== mapRequest || currentDoc !== id) return;
+    el('map-status').textContent = '知識マップを読み込めません。サーバー更新・権限・接続を確認してください。';
+    el('map-list').replaceChildren();
+    el('map-inspector').replaceChildren();
+    el('map-svg').replaceChildren();
+    currentKnowledgeMap = null;
+  }
+}
+el('map-refresh').onclick = () => { if (currentDoc) void loadKnowledgeMap(currentDoc); };
+el('map-hops').onchange = () => { if (currentDoc) void loadKnowledgeMap(currentDoc); };
+el('map-unreviewed').onchange = () => { if (currentDoc) void loadKnowledgeMap(currentDoc); };
 
 async function loadKnowledge(id) {
   const holder = el('knowledge');
@@ -426,6 +653,7 @@ async function openDocument(id) {
   el('pdf-evidence').hidden = true; el('pdf-evidence').replaceChildren();
   await loadAnalyses(id);
   await loadKnowledge(id);
+  await loadKnowledgeMap(id);
   if (doc.meta?.source_type !== 'pdf' || currentDoc !== id) return;
   const evidence = await api('documents/' + id + '/pdf-extraction');
   if (currentDoc !== id) return;
