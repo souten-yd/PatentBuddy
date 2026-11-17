@@ -477,6 +477,8 @@ class Handler(BaseHTTPRequestHandler):
                             result = self.server.app.jobs.cancel(path.split('/')[-2], identity)
                         elif method == "GET" and re.fullmatch(r"/addon/v1/documents/[1-9][0-9]{0,17}/analyses", path):
                             result = client.data("GET", "/api/v1/documents/" + path.split('/')[-2] + "/analyses")
+                        elif method == "GET" and re.fullmatch(r"/addon/v1/documents/[1-9][0-9]{0,17}/knowledge-proposals", path):
+                            result = client.data("GET", "/api/v1/documents/" + path.split('/')[-2] + "/knowledge-proposals")
                         elif method == "GET" and path == "/addon/v1/collections":
                             result = client.data("GET", "/api/v1/collections")
                         elif method == "POST" and path == "/addon/v1/library":
