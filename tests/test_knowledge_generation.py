@@ -68,7 +68,8 @@ class GenerationContractTests(unittest.TestCase):
     def test_invalid_or_cloud_provenance_is_rejected(self):
         for bad in (None, {}, dict(PROVENANCE, execution_policy='cloud'),
                     dict(PROVENANCE, model_ref='not-a-fingerprint')):
-            host = Host(provenance=bad)
+            host = Host()
+            host.generation_provenance = bad
             with self.subTest(provenance=bad), self.assertRaises(KnowledgeProposalError):
                 generate(host, DOC)
 
