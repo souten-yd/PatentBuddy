@@ -48,6 +48,7 @@ async function load() {
     const ready = s.reachable && !s.setup_required && s.token_configured;
     reviewAllowed = ready && s.knowledge_review_available === true;
     linkAllowed = ready && s.knowledge_link_available === true;
+    updateLinkPreview();
     el('message').textContent = ready ? 'ResearchDataHubに接続しました。文献を検索できます。' :
       s.setup_required ? 'ResearchDataHubの管理Webで初期設定を完了してください。' : 'ResearchDataHubの接続トークン設定が必要です。';
     el('submit').disabled = !ready;
@@ -380,8 +381,8 @@ function chosenLinkSource() {
 }
 function refreshLinkSourceOptions() {
   const select = el('link-source');
-  const was = chosenLinkSource();
   select.replaceChildren();
+  el('link-confirm').checked = false;
   const blank = document.createElement('option');
   blank.value = '';
   blank.textContent = linkSources.length
@@ -393,11 +394,9 @@ function refreshLinkSourceOptions() {
     option.textContent = source.label.slice(0, 90);
     select.append(option);
   });
-  if (was) {
-    const found = linkSources.findIndex(x =>
-      x.proposalId === was.proposalId && x.itemIndex === was.itemIndex);
-    if (found >= 0) select.value = String(found);
-  }
+  // Re-reviewing the source can change its version/approval state; never
+  // silently carry a previously checked link target/source confirmation.
+  select.value = '';
   updateLinkPreview();
 }
 function updateLinkPreview() {
@@ -411,9 +410,8 @@ function updateLinkPreview() {
     el('link-confirm').checked,
   );
   el('link-register').disabled = !ready;
-  el('link-feedback').textContent = !linkAllowed
-    ? 'リンク専用の書込権限が未設定です。ResearchDataHub管理画面で権限を設定してください。'
-    : '文献・引用・関係先の組合せを確認してから登録してください。';
+  if (!linkAllowed) el('link-feedback').textContent =
+    'リンク専用の書込権限が未設定です。ResearchDataHub管理画面で権限を設定してください。';
 }
 el('link-source').onchange = () => {
   el('link-confirm').checked = false;
