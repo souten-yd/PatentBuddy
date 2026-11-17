@@ -299,3 +299,7 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - **実施済み**：GitHub主ブランチ・PR #23/#29〜#32実ファイルとのコード照合、K2 JavaScriptをV8で構文検証PASS、HTMLのJS参照ID欠落/重複ゼロ、レビューhistory SQLをSQLiteに同形テーブルで単独実行して最新行を期待通り確認。**未実施**：新規Python LiveServer/UDS/全repo verify、Linux/QPKG build、ControlDeck/ResearchDataHub実機/iPhone E2E、低I/O計測。GitHub DNS不通でフルcheckout不能。新規テストを実行済みとは言わない。
 - **制約**：`reviewer`はサーバーが確認したadminまたはdevice_idであり、ControlDeckの各エンドユーザー個人についての独立署名ではない。リモートRDHではreview専用tokenの明示設定が必要。K2はhuman review記録まで、PR #23 GraphRAGへのエッジ・Knowledge Mapは自動登録しない。
 - 次：PR #33 stackを実checkoutして追加テスト・全`bash scripts/verify.sh`・`node --check`・`bash scripts/build-linux.sh dist`とHost/RDH実ブラウザを検証。失敗/スタイルずれはPR #33に同梱。K3ではPR #23 GraphRAGの実main差分を確認してbounded 1〜2hop Knowledge Map、出典ドロワー、320px代替リストをControlDeck準拠で実装。無検証merge/release不可。
+
+### K2セーフティ修正: 文献復元時の承認復活を禁止
+
+K3開発中にK2の単純revision一致だけでは旧本文への復元時に承認が復活しうることを発見。PR #33で`knowledge_review_epochs`＋文献hash/source変更trigger＋append-only review eventの`source_epoch`を追加。旧K2 schemaはDEFAULT -1に移行して旧レビューをfail closed。K2 GET/latest/historyはrevision**とepochの両方**でactive判定し、原文復元時も自動復活しない。実LiveServerは未実施。K3 PR #34も同じ実装を取り込むこと。
