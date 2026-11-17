@@ -125,3 +125,11 @@ PR #16の設計はmainへ統合済み。PR #17でLinux別名入口・doctor/serv
 - **実施済み**: isolated testsでK1a 10件+K1b 11件=計21件PASS、compileall成功。GitHubの4ファイルのblob SHAとローカル実行ファイルの一致を検証。**未実施**: repo全体の `bash scripts/verify.sh`、実Host、ResearchDataHubへの保存、graph/card/UI、Linux/QPKG build。cloneがDNSで利用できないため。全体検証完了まではDraftのまま。
 - K1cでは**最新mainとDraft PR #23の実コードを直接照合**する。PR #23はHost generation provenanceとrelations/graphを既に試作しており、そこで検証契約を共通化して別のHost処理や別グラフ正本を作らない。既存AnalysisJobs/Storeに単純に `kind=knowledge` を加えてread-only/published/既存analysisトークンの権限を意図せず拡張しない。新しいscoped permissionが必要なら明示設計する。原文照合を保存transaction内で再検証し、型・根拠・版・漏洩・冪等・取消をテスト。
 - UIは [ControlDeck準拠UI/UX契約](controldeck-ux-contract.md)が必須で、Host-owned shell/nav、one primary action、Jobの進捗/取消、テーマ、320pxレイアウトを守る。Vue default化/ui.html default変更等のDo NOTは従来通り。
+
+## K1c実装・K1d接続指示（2026-11-17）
+
+- K1c [PR #31](https://github.com/souten-yd/PatentBuddy/pull/31) はK1b PR #30をbaseとしたDraft。**専用スコープつきknowledge proposal保存APIは実装済みだが、Host JobやUIには未接続**。次工程は [K1c保存・K1d接続契約](knowledge-k1c-storage.md) に従う。
+- 新規 `qnaplibrary/knowledge_store.py`: 同一SQLite transactionでdocument revision/hash+Unicode exact quote+Host local_only証跡形式をK1a validatorで再検証、`document_analyses(kind='knowledge')`にimmutable save。再送のwrite0、異なるcontent同IDや古いrevisionは409、approveやGraph登録はしない。GETは20件上限、staleはrevision comparison、読み取りロック、無変更write0。
+- `qnaplibrary/auth.py` / `local_auth.py` / `server.py` / `api.py` / `addon_client.py` に専用`knowledge_propose` token・同UID UDS・POST/GET routes・リモート専用`knowledge_server_token`を追加。既存`analysis`/`rw`/`pdf_analysis`/`published`トークンで知識POSTを許可しない。通常解析保存のscopeは従来通り。
+- `tests/test_knowledge_store.py` は実LiveServer/実UDS/全scope/原文改訂/悪意ある引用/不正証跡/冪等/AddonClient送信先を確認する回帰テストを**追加済みだが未実行**。GitHub blob SHAと照合済みのK1c保存モジュールをisolated SQLite mockへロードした6件はPASS。full `scripts/verify.sh`未実行（repo clone不可）、実API/JOB/E2E未検証。full検証前にmerge/releaseしない。
+- **K1d** はPR #23をレビュー/整合してからHost `stream(require_provenance=True)` と既存 `AnalysisJobs` のkind=knowledgeを繋ぐ。開始前のHost capability検証、local_only・proof、cancel/resume/terminal receipt、source-race→409、scoped remote tokenの実運用、Host-owned ControlDeck theme/navigation/Jobs/320px/cardをテスト。無断API拡張・自動採用・cloud fallback・default UI変更なし。
