@@ -1,6 +1,9 @@
 """K5 real ResearchDataHub HTTP/SQLite tests: explicit human Idea save/edit."""
 import json
 import unittest
+from unittest import mock
+
+from qnaplibrary.addon_client import AddonClient, AddonError
 
 from qnaplibrary.knowledge_generation import _from_model, serialize
 from tests.helpers import Client, LiveServer
@@ -283,6 +286,56 @@ class IdeaCanvasHTTPTests(unittest.TestCase):
         self.assertEqual(self.live.app.auth.device_for_token(
             token, '127.0.0.1')['scopes'], 'idea_write')
         self.assertIsNone(self.live.app.auth.device_for_token(token, '192.168.1.20'))
+
+
+class IdeaAddonCredentialsTests(unittest.TestCase):
+    def test_idea_writes_use_only_dedicated_token_and_reads_use_normal_read(self):
+        client = AddonClient('/tmp/idea-addon-config-test')
+        config = {
+            'server_url': 'https://192.168.1.10:17871',
+            'server_token': 'read-secret',
+            'knowledge_link_token': 'link-secret',
+            'knowledge_review_token': 'review-secret',
+            'idea_write_token': 'idea-only-secret',
+        }
+        with mock.patch.object(client, 'settings', return_value=config), mock.patch(
+                'qnaplibrary.addon_client.request_json', return_value={'ok': True}) as send:
+            client.data('POST', '/api/v1/ideas', {})
+            self.assertEqual(send.call_args.args[4]['Authorization'],
+                             'Bearer idea-only-secret')
+            client.data('PUT', '/api/v1/ideas/idea_' + 'a'*32, {})
+            self.assertEqual(send.call_args.args[4]['Authorization'],
+                             'Bearer idea-only-secret')
+            client.data('GET', '/api/v1/ideas')
+            self.assertEqual(send.call_args.args[4]['Authorization'],
+                             'Bearer read-secret')
+        with mock.patch.object(client, 'settings', return_value={
+                'server_url': config['server_url'], 'server_token': config['server_token']}):
+            with self.assertRaises(AddonError):
+                client.data('POST', '/api/v1/ideas', {})
+            with self.assertRaises(AddonError):
+                client.data('PUT', '/api/v1/ideas/idea_' + 'a'*32, {})
+
+    def test_local_idea_credential_never_falls_back_to_read_scope(self):
+        client = AddonClient('/tmp/idea-addon-config-test')
+        config = {
+            'server_url': 'http://127.0.0.1:17871',
+            'server_token': 'read-secret', 'auth_method': 'local_peer',
+        }
+        with mock.patch.object(client, 'settings', return_value=config), mock.patch(
+                'qnaplibrary.local_auth.connect', return_value={
+                    'server_url': 'http://127.0.0.1:17871',
+                    'server_token': 'qlj_special-idea-secret',
+                }) as connect, mock.patch(
+                    'qnaplibrary.addon_client.request_json', return_value={'ok': True}) as send:
+            client.data('POST', '/api/v1/ideas', {})
+            self.assertEqual(connect.call_args.args, (17871, 'idea_write'))
+            self.assertEqual(send.call_args.args[4]['Authorization'],
+                             'Bearer qlj_special-idea-secret')
+        with mock.patch.object(client, 'settings', return_value=config), mock.patch(
+                'qnaplibrary.local_auth.connect', side_effect=OSError('unavailable')):
+            with self.assertRaises(AddonError):
+                client.data('POST', '/api/v1/ideas', {})
 
 
 if __name__ == '__main__':
