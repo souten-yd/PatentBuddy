@@ -121,6 +121,18 @@ class WorkbenchUXTests(unittest.TestCase):
         self.assertNotIn('localStorage.setItem', js)
         self.assertNotIn('autoApprove', js)
 
+    def test_empty_states_and_source_navigation_are_actionable(self):
+        self.assertIn("'資料へ戻って知識を抽出・確認する'", self.js)
+        self.assertIn("'知識を探して比べる'", self.js)
+        self.assertIn("back.onclick = () => switchWorkspace('research', {focusTab: true})", self.js)
+        self.assertIn("compare.onclick = () => switchWorkspace('knowledge', {focusTab: true})", self.js)
+        self.assertIn("const button = event?.currentTarget", self.js)
+        self.assertIn("if (button) button.disabled = true", self.js)
+        self.assertIn("if (button) button.disabled = false", self.js)
+        self.assertIn("if (currentDoc !== item.doc_id) return", self.js)
+        self.assertIn("if (ideaDirty && !window.confirm(", self.js)
+        self.assertIn("'import-pdf').disabled = true", self.js)
+
     def test_connection_jobs_and_accessible_activities(self):
         ids = set(self.parser.ids)
         self.assertIn('connection-state', ids)
