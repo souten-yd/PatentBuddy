@@ -313,8 +313,6 @@ function renderKnowledgeMap(data) {
     button.onclick = () => select(node.id);
     list.append(button);
   }
-  renderMapInspector(data, selectedMapId);
-  drawKnowledgeMap(data, select);
   select(selectedMapId);
   el('map-status').textContent = '出典と知識 ' + data.nodes.length + '件、接続 ' +
     data.edges.length + '件、' + data.hops + '段階（' +
@@ -462,6 +460,7 @@ async function loadKnowledge(id) {
                 });
               el('message').textContent = 'レビュー判断を記録しました。AIによる推論は事実と確定していません。';
               await loadKnowledge(id);
+              await loadKnowledgeMap(id);
             } catch (error) {
               if (String(error.message).includes('409')) {
                 el('message').textContent = '原文またはレビュー版が更新されています。最新の候補を確認してください。';
@@ -609,8 +608,10 @@ async function loadJobs() {
       }
       el('jobs').append(row);
       if (job.status === 'succeeded' && knownJobs.get(job.id) !== 'succeeded' && currentDoc === job.doc_id) {
-        if (job.kind === 'knowledge') await loadKnowledge(currentDoc);
-        else await loadAnalyses(currentDoc);
+        if (job.kind === 'knowledge') {
+          await loadKnowledge(currentDoc);
+          await loadKnowledgeMap(currentDoc);
+        } else await loadAnalyses(currentDoc);
       }
       knownJobs.set(job.id, job.status);
     }
