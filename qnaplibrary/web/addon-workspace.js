@@ -283,6 +283,19 @@ function renderMapInspector(data, nodeId) {
         const quote = document.createElement('blockquote');
         quote.textContent = edge.evidence.quote;
         box.append(quote);
+        const evidenceOpen = document.createElement('button');
+        evidenceOpen.type = 'button';
+        evidenceOpen.className = 'secondary';
+        evidenceOpen.textContent = 'この関係の出典へ移動';
+        evidenceOpen.onclick = async () => {
+          try {
+            if (currentDoc !== edge.evidence.doc_id) await openDocument(edge.evidence.doc_id);
+            focusKnowledgeEvidence(edge.evidence);
+          } catch (error) {
+            el('map-status').textContent = '関係の出典を開けませんでした: ' + error.message;
+          }
+        };
+        box.append(evidenceOpen);
       }
     }
   }
