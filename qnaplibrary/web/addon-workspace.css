@@ -46,3 +46,11 @@ select,input {border-color:var(--pb-border);background:var(--pb-surface);color:v
 }
 @media(prefers-reduced-motion:reduce) {button {transition:none}}
 :root.reduce-motion button {transition:none}
+
+/* ControlDeck-style progressive-disclosure human review. */
+.knowledge-review {margin-top:12px;border-top:1px solid var(--pb-border);padding-top:8px}
+.knowledge-review > summary {display:flex;align-items:center;min-height:44px;color:var(--pb-text);font-weight:600;cursor:pointer}
+.knowledge-review select {display:block;width:100%;min-height:44px;margin:8px 0;padding:10px;font-size:16px;border-radius:10px}
+.knowledge-review button {display:block;min-height:44px;width:100%;font-size:14px}
+.knowledge-review .hint {margin:10px 0}
+@media (max-width:767px) {.knowledge-review select,.knowledge-review button{width:100%}}
