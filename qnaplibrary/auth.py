@@ -183,6 +183,7 @@ class Auth:
         self._local_analysis_token = "qla_" + secrets.token_urlsafe(32)
         self._local_import_token = "qli_" + secrets.token_urlsafe(32)
         self._local_knowledge_token = "qlk_" + secrets.token_urlsafe(32)
+        self._local_review_token = "qlv_" + secrets.token_urlsafe(32)
 
     # admin --------------------------------------------------------------
     def admin_configured(self):
@@ -218,7 +219,7 @@ class Auth:
     def create_device(self, name, scopes="rw"):
         token = "qlt_" + secrets.token_urlsafe(32)
         name = (name or "device").strip()[:80] or "device"
-        if scopes not in ("rw", "ro", "published", "analysis", "pdf_import", "pdf_analysis", "knowledge_propose"):
+        if scopes not in ("rw", "ro", "published", "analysis", "pdf_import", "pdf_analysis", "knowledge_propose", "knowledge_review"):
             raise ValueError("unsupported device token scope")
         with self.store.lock:
             cur = self.store.db.execute("INSERT INTO devices(name,token_hash,scopes,created) VALUES(?,?,?,?)",
@@ -229,17 +230,19 @@ class Auth:
         if self.admin_configured() and self.config.get("auth", "local_auto_connect", default=True):
             return {"analysis": self._local_analysis_token, "read": self._local_token,
                     "pdf_import": self._local_import_token,
-                    "knowledge_propose": self._local_knowledge_token}.get(scope)
+                    "knowledge_propose": self._local_knowledge_token,
+                    "knowledge_review": self._local_review_token}.get(scope)
         return None
 
     def device_for_token(self, token, ip):
-        if token and token.startswith(("qll_", "qla_", "qli_", "qlk_")):
+        if token and token.startswith(("qll_", "qla_", "qli_", "qlk_", "qlv_")):
             import ipaddress
             try:
                 loopback = ipaddress.ip_address(ip).is_loopback
             except ValueError:
                 loopback = False
-            scope = ("knowledge_propose" if token.startswith("qlk_") else
+            scope = ("knowledge_review" if token.startswith("qlv_") else
+                     "knowledge_propose" if token.startswith("qlk_") else
                      "pdf_import" if token.startswith("qli_") else
                      "analysis" if token.startswith("qla_") else "read")
             current = self.local_token(scope)
