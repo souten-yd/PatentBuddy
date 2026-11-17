@@ -88,7 +88,10 @@ class KnowledgeStoreApiTests(unittest.TestCase):
                                       dict(self.value, kind='summary'))[0], 403)
         self.assertEqual(allowed.call('POST', '/api/v1/collections/knowledge-tests/documents',
                                       {'documents': []})[0], 403)
-        self.assertEqual(allowed.call('GET', self.path)[0], 200)
+        # A dedicated proposal writer cannot read private documents/collections.
+        self.assertEqual(allowed.call('GET', self.path)[0], 403)
+        self.assertEqual(allowed.call('GET', '/api/v1/documents/%d' % self.doc_id)[0], 403)
+        self.assertEqual(allowed.call('GET', '/api/v1/collections')[0], 403)
 
     def test_same_uid_local_token_is_isolated_and_loopback_only(self):
         authorized = self.server.app.auth.local_token('knowledge_propose')
