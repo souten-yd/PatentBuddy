@@ -73,3 +73,9 @@ SQL/APIのbounded cursorを「次の候補を探す」で人が操作し、1回�
 [K5実装設計](knowledge-k5-idea-canvas.md)。K4比較結果の末尾に「この比較を材料にIdea Canvasへ」を明示ボタンとして追加。クリックはメモリ上のフォーム展開だけで、**自動生成/保存しない**。元知識カードを確認し、title/problem/solutionをユーザー入力、effect/conditions/limitationsを編集。明示checkbox+Idea専用権限を満たした保存ボタンで初めてサーバーへPOST。既存案編集はexpected_version付きPUT、バージョンごとの前本文をread-only参照。失効時は古い案を変更せず、最新のK4比較から別案を作る。
 
 ControlDeck Hostのshell/nav/theme/accent/Bridge認証を増設しない。保存シークレットはiframeへ渡さずavailabilityのboolのみ。PCでは出典カードを並列し、iPhone 320〜767pxは出典→フォーム→履歴を縦並び、44px touch/16px input/keyboard/スクリーンリーダー/明確な状態表示。原文や仮説の未公開テキストは`textContent`のみで描画し、Cloud送信・新CDN無し。
+
+## K6b 作業領域3段階のUI/UX追加契約（2026-11-18）
+
+[実装詳細](workspace-ux-k6b.md)。ControlDeck Host本体のPageHeader/Theme/Mobile設計（2026-11-18 main実ファイル）に準じ、PatentBuddy Embedded Workspaceに**ローカルコンテンツ切替**「資料 / 知識 / アイデア」のみを追加。HostのGlobal nav/戻る/認証/下部ナビ・`ui.html` defaultは触らない。作業ステップは`role=tablist/tab/tabpanel`で矢印/開始/終了キー対応、非表示は確実にhidden。編集中Ideaはタブ/証拠参照で破棄されず、別Idea案で上書きする時だけ確認する。K2 approved knowledge→検索語のフォーム設定とK4→K5、引用確認→元画面へ戻るリンクを実装するが**自動検索・自動Graph/Idea保存しない**。
+
+PC幅では検索/資料一覧2カラム、詳細・Mapフル幅。iPhone 320〜767pxは1列、390px以下はステップ説明を簡略化。Host theme tokens/zinc/accent、16px入力/44pxヒット、focus-visible/safe-area/reduced-motion、textContentとversioned quote/明確な推論ラベルを維持。静的検証はPASSだが実機/Node CLI・全Python・QNAP/Linux build未検証のためDraft。
