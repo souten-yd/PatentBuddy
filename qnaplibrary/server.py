@@ -529,7 +529,11 @@ class Handler(BaseHTTPRequestHandler):
                     raise HTTPError(401, "認証が必要です")
                 if access == "admin" and req.actor != "admin":
                     raise HTTPError(403, "管理者のみ実行できます")
-                if req.device and method != "GET" and req.device["scopes"] != "rw" and access not in ("read", "published") and not (access in ("analysis", "pdf_import") and req.device["scopes"] in (access, "pdf_analysis")):
+                if access == "knowledge_propose" and req.actor != "admin" and (
+                        not req.device or req.device["scopes"] != "knowledge_propose"):
+                    raise HTTPError(403, "知識候補の専用保存権限がありません")
+                if req.device and method != "GET" and req.device["scopes"] != "rw" and access not in ("read", "published") and not ((access in ("analysis", "pdf_import") and req.device["scopes"] in (access, "pdf_analysis"))
+                        or (access == "knowledge_propose" and req.device["scopes"] == "knowledge_propose")):
                     raise HTTPError(403, "読み取り専用デバイスです")
             if req.session and access != "public" and method not in ("GET", "HEAD"):
                 origin = self.headers.get("Origin")
@@ -665,6 +669,7 @@ def main(argv=None):
             local_auth.append(LocalAuthServer(app.auth, httpd.server_port))
             local_auth.append(LocalAuthServer(app.auth, httpd.server_port, "analysis"))
             local_auth.append(LocalAuthServer(app.auth, httpd.server_port, "pdf_import"))
+            local_auth.append(LocalAuthServer(app.auth, httpd.server_port, "knowledge_propose"))
         except OSError:
             LOG.warning("Local automatic authentication unavailable; explicit device authentication remains available")
 
