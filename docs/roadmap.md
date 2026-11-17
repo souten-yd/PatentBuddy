@@ -71,3 +71,9 @@ K1a Draft PR #29に原文範囲・source revision・Host local_only証跡形式�
 - K1c writer scopeは専用POST以外の一般private GETを禁止するよう強化。AI結果はunreviewed/model_inferenceのみ、stale/引用一致を表示。原文にないquote、モデル証跡未検証、権限不足はfail closed。
 - **実装コードはDraftのみ**。JS構文・HTML ID・ControlDeck実コード契約は静的確認したが、Python/実API/実ControlDeck/iPhone/QNAP、全verify、build未実施。正式リリース不可。
 - K2ではversioned human review、K3ではPR #23 GraphRAGを再利用したbounded Knowledge Map、K4では異分野再利用検索、K5ではIdea Canvasと出典付き先行技術再照合、K6ではQNAP移行と低I/O検証へ進める。
+
+## K2人間レビューの実装（2026-11-17 / Draft PR #33）
+
+- K1dの知識候補抽出の次段階として[Draft PR #33](https://github.com/souten-yd/PatentBuddy/pull/33)へ、版別・項目別のappend-only人間レビュー（承認・却下・差戻し）、専用トークン/同UIDソケット、旧原文への自動失効、最大30件の履歴、ControlDeck準拠のカード操作を実装。[K2詳細設計・残検証](knowledge-k2-human-review.md)。
+- **未マージ/未リリース**。JS構文/HTML ID、SQL最終decisionの独立検証のみ合格。追加Python LiveServerテストと全verify、ControlDeck/RDH/iPhone実機は未実施。モデル出力が事実へ自動昇格する機能はない。
+- 次工程K3: PR #23のGraphRAGを実ファイルで整合してbounded Knowledge Mapを作る。AI推論・旧版・未確認の誤表示を禁止し、Host nav/theme/モバイル/キーボードを継承。K4〜K6は既存ロードマップに準ずる。
