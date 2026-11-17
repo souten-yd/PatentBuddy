@@ -63,9 +63,9 @@ class IdeaCanvasWorkspaceTests(unittest.TestCase):
     def test_stale_comparison_cannot_be_reused_after_filter_or_selection_changes(self):
         # The previous K4 comparison was cached for a manual K5 draft. A new
         # search or selection must invalidate it before an Idea can be reopened.
-        self.assertIn("function clearCrossSelection() {\\n  ++crossCompareRequest;\\n  lastComparedItems = [];", self.js)
-        self.assertIn("check.onchange = () => {\\n      ++crossCompareRequest;\\n      lastComparedItems = [];", self.js)
-        self.assertIn("button.disabled = true;\\n  lastComparedItems = [];\\n  crossSelected.clear();", self.js)
+        self.assertIn("function clearCrossSelection() {\n  ++crossCompareRequest;\n  lastComparedItems = [];", self.js)
+        self.assertIn("check.onchange = () => {\n      ++crossCompareRequest;\n      lastComparedItems = [];", self.js)
+        self.assertIn("button.disabled = true;\n  lastComparedItems = [];\n  crossSelected.clear();", self.js)
         self.assertIn("if (lastComparedItems.length < 2)", self.js)
 
     def test_provenance_and_no_external_model_execution(self):
