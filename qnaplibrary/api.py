@@ -1070,6 +1070,19 @@ def knowledge_proposals_list(req):
     return knowledge_store.list_for_document(req.app.store, int(req.params["did"]))
 
 
+@route("POST", "/api/v1/documents/{did}/knowledge-proposals/{pid}/reviews", "knowledge_review")
+def knowledge_review_submit(req):
+    from . import knowledge_reviews, knowledge_store
+    # Stable device identity, not a caller-supplied reviewer name.
+    reviewer = ("admin" if req.actor == "admin" else
+                "device:%d" % req.device["id"])
+    try:
+        return knowledge_reviews.submit(req.app.store, int(req.params["did"]),
+                                        req.params["pid"], req.json(), reviewer)
+    except knowledge_store.KnowledgeConflictError as error:
+        raise _err(409, str(error)) from None
+
+
 @route('POST', '/api/v1/pdf-imports', 'pdf_import')
 def pdf_import(req):
     import base64
