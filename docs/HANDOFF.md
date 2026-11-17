@@ -347,3 +347,10 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - K4比較の古いキャッシュをK5 Ideaフォームへ誤って再利用しないように、再検索・比較選択変更・選択解除時に`lastComparedItems`を無効化。サーバー側のsource revision/epoch/review seq再検証＋409は引き続き権威的安全境界。回帰テスト`tests/test_idea_workspace.py`へチェックを追加。
 - `tests/test_k6_integration_safety.py`で実ファイルからK1a〜K5の統合安全契約（read-only K4、新Ideaの2経路だけwrite、専用scope、default index.html、元UI/manifest/no raw HTML、版履歴と失効判定）を検査する。**新ファイルのPythonテストとローカルスクリプトは未実行**。新CI workflowはリポジトリ規則で禁止されているため追加していない。
 - K1〜K5の依存9PRは未マージ・Draft。フルcheckout環境で`bash scripts/verify-k6.sh`と`WITH_QPKG=1 bash scripts/verify-k6.sh`、Ubuntu/Linux配布物、QNAP/ControlDeck/iPhone実機、main版/Docs/Manifest/Host safety grepを検証してから正式統合・リリース。
+
+## 2026-11-18 K6b UX作業領域の再設計（Draft PR #38）
+
+- [Draft PR #38](https://github.com/souten-yd/PatentBuddy/pull/38)はK5 #37をbaseとする、**埋込UI限定**の作業ステップ再設計。[詳細・受入条件・次Codex指示](workspace-ux-k6b.md)。縦長だった画面を「01 資料→02 知識→03 アイデア」の3セグメントにまとめ、Hostナビは一切増設しない。既存K1a〜K5 backend、SQLite、UI default、権限・runtime semanticsは変更なし。
+- 資料はPCで検索/最近の資料を2カラム、iPhoneで単列。PDF取込は任意の折りたたみと直接ショートカット。接続状態/再接続、共通Jobsの実行件数、原文レビュー/Map/リンクは維持。Knowledgeは承認済みK2の条件を**検索語としてフォームへ引継ぐだけ**、人が検索を押すまでAPI/Idea mutationなし。文献から直接比較へ進め、K4/K5の引用確認後は元の比較・未保存のIdeaフォームに戻れる。
+- K5 Ideaの入力途中に別の新規案/保存案を開こうとする場合だけ破棄確認。タブ移動や原文参照はフォームを保持。ControlDeck Host theme zinc/accent、各44px/16px、768pxのPC gridと767/390px mobile、reduced-motion/focus/aria tabsなどを実装。
+- `tests/test_workspace_ux.py`で3 tabpanel/ARIA、旧機能ID、文献→知識→Idea/戻る、明示人間操作、接続/Jobs、No innerHTML/No CDN/Host UI重複なし、iPhoneテーマを静的検査。V8 JS構文PASS・HTML ID重複0/参照漏れ0・タグ階層整合を確認。**Python test本体/実ブラウザー/全verify/Ubuntu-QNAP/iPhoneは未実施**。正規repo checkout不可のためDraft・未マージ・未Releaseのまま。
