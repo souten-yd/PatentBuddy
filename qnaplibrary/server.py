@@ -526,6 +526,16 @@ class Handler(BaseHTTPRequestHandler):
                             if not isinstance(body, dict):
                                 raise AddonError(400, 'レビュー内容が不正です')
                             result = client.data("POST", "/api" + path[len("/addon"):], body)
+                        elif method == "POST" and path == "/addon/v1/knowledge/search":
+                            body = Request(self, method, path, {}, {}).json(limit=4 * 1024)
+                            if not isinstance(body, dict):
+                                raise AddonError(400, "知識検索条件が不正です")
+                            result = client.data("POST", "/api/v1/knowledge/search", body)
+                        elif method == "POST" and path == "/addon/v1/knowledge/compare":
+                            body = Request(self, method, path, {}, {}).json(limit=4 * 1024)
+                            if not isinstance(body, dict):
+                                raise AddonError(400, "知識比較条件が不正です")
+                            result = client.data("POST", "/api/v1/knowledge/compare", body)
                         elif method == "GET" and path == "/addon/v1/collections":
                             result = client.data("GET", "/api/v1/collections")
                         elif method == "POST" and path == "/addon/v1/library":
