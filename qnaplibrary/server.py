@@ -480,6 +480,10 @@ class Handler(BaseHTTPRequestHandler):
                         elif method == "GET" and re.fullmatch(r"/addon/v1/documents/[1-9][0-9]{0,17}/knowledge-proposals", path):
                             result = client.data("GET", "/api/v1/documents/" + path.split('/')[-2] + "/knowledge-proposals")
                         elif method == "GET" and re.fullmatch(
+                                r"/addon/v1/documents/[1-9][0-9]{0,17}/link-target", path):
+                            result = client.data(
+                                "GET", "/api/v1/documents/" + path.split('/')[-2] + "/link-target")
+                        elif method == "GET" and re.fullmatch(
                                 r"/addon/v1/documents/[1-9][0-9]{0,17}/knowledge-links", path):
                             result = client.data(
                                 "GET", "/api/v1/documents/" + path.split('/')[-2] +
