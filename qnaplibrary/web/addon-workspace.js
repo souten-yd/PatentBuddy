@@ -369,6 +369,237 @@ el('map-hops').onchange = () => { if (currentDoc) void loadKnowledgeMap(currentD
 el('map-unreviewed').onchange = () => { if (currentDoc) void loadKnowledgeMap(currentDoc); };
 el('map-links').onchange = () => { if (currentDoc) void loadKnowledgeMap(currentDoc); };
 
+const LINK_RELATION_LABELS = {
+  problem: '課題との関係', solution: '解決手段との関係',
+  effect: '効果との関係', substitution: '置換可能性',
+};
+function chosenLinkSource() {
+  const i = Number(el('link-source').value);
+  return el('link-source').value !== '' && Number.isInteger(i)
+    ? (linkSources[i] || null) : null;
+}
+function refreshLinkSourceOptions() {
+  const select = el('link-source');
+  const was = chosenLinkSource();
+  select.replaceChildren();
+  const blank = document.createElement('option');
+  blank.value = '';
+  blank.textContent = linkSources.length
+    ? '根拠となる知識を選択してください' : '現行版で承認済みの知識がありません';
+  select.append(blank);
+  linkSources.forEach((source, i) => {
+    const option = document.createElement('option');
+    option.value = String(i);
+    option.textContent = source.label.slice(0, 90);
+    select.append(option);
+  });
+  if (was) {
+    const found = linkSources.findIndex(x =>
+      x.proposalId === was.proposalId && x.itemIndex === was.itemIndex);
+    if (found >= 0) select.value = String(found);
+  }
+  updateLinkPreview();
+}
+function updateLinkPreview() {
+  const source = chosenLinkSource();
+  el('link-evidence').textContent = source
+    ? '原文の引用: 「' + source.evidence.quote + '」'
+    : 'K2で確認済みの知識と根拠を選択してください。';
+  const ready = Boolean(
+    linkAllowed && currentDoc && source && linkTarget &&
+    linkTarget.id !== currentDoc && el('link-relation').value &&
+    el('link-confirm').checked,
+  );
+  el('link-register').disabled = !ready;
+  el('link-feedback').textContent = !linkAllowed
+    ? 'リンク専用の書込権限が未設定です。ResearchDataHub管理画面で権限を設定してください。'
+    : '文献・引用・関係先の組合せを確認してから登録してください。';
+}
+el('link-source').onchange = () => {
+  el('link-confirm').checked = false;
+  updateLinkPreview();
+};
+el('link-relation').onchange = () => {
+  el('link-confirm').checked = false;
+  updateLinkPreview();
+};
+el('link-confirm').onchange = updateLinkPreview;
+el('link-target-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const text = el('link-target-query').value.trim();
+  if (!text || !currentDoc) return;
+  const hostDocument = currentDoc;
+  el('link-target-search').disabled = true;
+  const targetResults = el('link-target-results');
+  targetResults.textContent = '関係先の文献を検索しています…';
+  try {
+    const results = await api('search', {q: text});
+    if (currentDoc !== hostDocument) return;
+    targetResults.replaceChildren();
+    let matched = 0;
+    for (const row of results.results || []) {
+      if (!Number.isInteger(row.doc_id) || row.doc_id === hostDocument) continue;
+      matched++;
+      const button = document.createElement('button');
+      button.className = 'secondary map-list-item';
+      button.type = 'button';
+      button.textContent = '関係先に選択: ' + (row.title || row.ext_id || row.doc_id);
+      button.onclick = async () => {
+        button.disabled = true;
+        try {
+          // Only a minimal identity+revision response, never the target body.
+          const target = await api('documents/' + row.doc_id + '/link-target');
+          if (currentDoc !== hostDocument) return;
+          linkTarget = target;
+          el('link-target-choice').textContent =
+            '関係先: ' + target.title + '（文献 ' + target.id + '）';
+          el('link-confirm').checked = false;
+          updateLinkPreview();
+        } catch (error) {
+          el('link-target-choice').textContent = '文献を選択できませんでした: ' + error.message;
+        } finally { button.disabled = false; }
+      };
+      targetResults.append(button);
+    }
+    if (!matched) targetResults.textContent = '別の文献が見つかりませんでした。検索語を変更してください。';
+  } catch (error) {
+    if (currentDoc === hostDocument)
+      targetResults.textContent = '関係先を検索できませんでした: ' + error.message;
+  } finally { el('link-target-search').disabled = false; }
+});
+el('link-register').onclick = async () => {
+  const source = chosenLinkSource(), target = linkTarget;
+  const docId = currentDoc, relation = el('link-relation').value;
+  if (!linkAllowed || !source || !target || !el('link-confirm').checked ||
+      !LINK_RELATION_LABELS[relation] || target.id === docId) return;
+  el('link-register').disabled = true;
+  try {
+    const saved = await api('documents/' + docId + '/knowledge-proposals/' +
+      encodeURIComponent(source.proposalId) + '/links', {
+        item_index: source.itemIndex,
+        source_revision: source.sourceRevision,
+        target_doc_id: target.id, target_revision: target.revision,
+        relation, confirm_evidence: true,
+      });
+    if (currentDoc !== docId) return;
+    el('link-confirm').checked = false;
+    el('link-feedback').textContent = '仮説リンクを未確認で登録しました。別の明示的なレビューが必要です。';
+    await loadKnowledgeLinks(docId);
+    await loadKnowledgeMap(docId);
+  } catch (error) {
+    if (currentDoc === docId) el('link-feedback').textContent =
+      'リンクを登録できませんでした。原文・承認・関係先の版を再確認してください: ' + error.message;
+  } finally { if (currentDoc === docId) updateLinkPreview(); }
+};
+async function loadKnowledgeLinks(docId) {
+  const container = el('link-list');
+  if (currentDoc !== docId) return;
+  container.textContent = '保存済みの技術仮説リンクを確認しています…';
+  try {
+    const result = await api('documents/' + docId + '/knowledge-links');
+    if (currentDoc !== docId) return;
+    container.replaceChildren();
+    if (!Array.isArray(result.items) || result.items.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'hint';
+      empty.textContent = '関係リンクはまだありません。確認済みの知識から、別文献への仮説を登録できます。';
+      container.append(empty);
+      return;
+    }
+    for (const item of result.items) {
+      const card = document.createElement('details');
+      card.className = 'knowledge-link-card';
+      const summary = document.createElement('summary');
+      const names = {approved: '人間が確認済みの仮説', rejected: '却下', unreviewed: '未確認'};
+      summary.textContent = (LINK_RELATION_LABELS[item.relation] || '仮説') + ' — ' +
+        (item.target_title || '文献 ' + item.target_doc_id) + ' · ' +
+        (item.stale ? '原文更新・失効' :
+          (names[item.review_status] || '未確認')) + '（事実ではありません）';
+      const quote = document.createElement('blockquote');
+      quote.textContent = item.quote;
+      card.append(summary, quote);
+      const showTarget = document.createElement('button');
+      showTarget.className = 'secondary';
+      showTarget.type = 'button';
+      showTarget.textContent = '関係先の文献を表示';
+      showTarget.onclick = async () => {
+        try { await openDocument(item.target_doc_id); }
+        catch (error) { el('link-feedback').textContent = '文献を開けません: ' + error.message; }
+      };
+      card.append(showTarget);
+      if (item.review_status === 'unreviewed' && !item.stale && linkAllowed) {
+        const choice = document.createElement('select');
+        choice.setAttribute('aria-label', '仮説リンクの審査');
+        for (const [value, title] of [
+          ['', '確認する判断を選んでください'], ['approved', '仮説として承認'],
+          ['rejected', 'この関係を却下'],
+        ]) {
+          const option = document.createElement('option');
+          option.value = value;
+          option.textContent = title;
+          choice.append(option);
+        }
+        const label = document.createElement('label');
+        label.className = 'map-toggle';
+        const confirm = document.createElement('input');
+        confirm.type = 'checkbox';
+        label.append(confirm, document.createTextNode(
+          '引用と関係先を再確認し、事実扱いせず記録する'));
+        const save = document.createElement('button');
+        save.className = 'secondary';
+        save.type = 'button';
+        save.disabled = true;
+        save.textContent = 'リンクの審査結果を記録';
+        const update = () => { save.disabled = !(choice.value && confirm.checked); };
+        choice.onchange = update;
+        confirm.onchange = update;
+        save.onclick = async () => {
+          if (!choice.value || !confirm.checked || currentDoc !== docId) return;
+          save.disabled = true;
+          try {
+            await api('knowledge-links/' + encodeURIComponent(item.id) + '/review', {
+              decision: choice.value, expected_graph_revision: item.graph_revision,
+              confirm_evidence: true,
+            });
+            if (currentDoc !== docId) return;
+            el('link-feedback').textContent =
+              'リンクの判断を記録しました。承認しても技術的事実にはなりません。';
+            await loadKnowledgeLinks(docId);
+            await loadKnowledgeMap(docId);
+          } catch (error) {
+            if (currentDoc === docId) {
+              el('link-feedback').textContent =
+                '審査結果を保存できません。最新版を再取得してください: ' + error.message;
+              await loadKnowledgeLinks(docId);
+            }
+          }
+        };
+        card.append(choice, label, save);
+      } else if (!linkAllowed || item.stale) {
+        const note = document.createElement('p');
+        note.className = 'hint';
+        note.textContent = item.stale
+          ? '元文献が変更されたため、このリンクは再確認が必要です。'
+          : 'リンクの審査には専用の権限が必要です。';
+        card.append(note);
+      }
+      container.append(card);
+    }
+  } catch (error) {
+    if (currentDoc !== docId) return;
+    container.replaceChildren();
+    const message = document.createElement('p');
+    message.className = 'hint';
+    message.textContent = 'リンクを読み込めませんでした。接続とサーバー版を確認してください。';
+    const retry = document.createElement('button');
+    retry.className = 'secondary';
+    retry.type = 'button';
+    retry.textContent = 'リンクを再読み込み';
+    retry.onclick = () => loadKnowledgeLinks(docId);
+    container.append(message, retry);
+  }
+}
+
 async function loadKnowledge(id) {
   const holder = el('knowledge');
   if (currentDoc !== id) return;
