@@ -118,3 +118,10 @@ PR #16の設計はmainへ統合済み。PR #17でLinux別名入口・doctor/serv
 - K1aのPR #29: `qnaplibrary/knowledge_essence.py` と `tests/test_knowledge_essence.py` は、厳格な引用検証とunreviewedな知識候補だけを扱う**pure code**。抽出AI起動・永続DB/API・知識マップはまだ実装しない。
 - 隔離した同一ソースのunittest10件成功。GitHubに登録したソース2ファイルのblob SHAも一致。**全verify/Host実ブラウザ/配布は未実施、Draft PRは未マージ**。K1bではPR #23の実branchと最新mainの差分、relation_proposals/generation_contract等の重複箇所を読み、共通化と安全なHost Job連携から始める。
 - UI実装はControlDeckのボタン1画面1主操作、44px、progressive disclosure、Host-owned nav、dark/light/accent、320px、error/reconnect/cancelを受入契約に含める。
+
+## K1b実装済・K1c接続指示（2026-11-17）
+
+- [K1b→K1cの実装ガイド](knowledge-k1b-integration.md)を**現時点の次工程の指示**として参照。K1a PR #29（strict proposal validation）に依存するK1b Draft PR #30を作成した。K1bは `qnaplibrary/knowledge_generation.py`（Hostの `stream(require_provenance=True)` が必須、JSON parse、原文のユニーク引用完全一致、provenanceをHostからのみ取得）と `tests/test_knowledge_generation.py`（11件）を追加。
+- **実施済み**: isolated testsでK1a 10件+K1b 11件=計21件PASS、compileall成功。GitHubの4ファイルのblob SHAとローカル実行ファイルの一致を検証。**未実施**: repo全体の `bash scripts/verify.sh`、実Host、ResearchDataHubへの保存、graph/card/UI、Linux/QPKG build。cloneがDNSで利用できないため。全体検証完了まではDraftのまま。
+- K1cでは**最新mainとDraft PR #23の実コードを直接照合**する。PR #23はHost generation provenanceとrelations/graphを既に試作しており、そこで検証契約を共通化して別のHost処理や別グラフ正本を作らない。既存AnalysisJobs/Storeに単純に `kind=knowledge` を加えてread-only/published/既存analysisトークンの権限を意図せず拡張しない。新しいscoped permissionが必要なら明示設計する。原文照合を保存transaction内で再検証し、型・根拠・版・漏洩・冪等・取消をテスト。
+- UIは [ControlDeck準拠UI/UX契約](controldeck-ux-contract.md)が必須で、Host-owned shell/nav、one primary action、Jobの進捗/取消、テーマ、320pxレイアウトを守る。Vue default化/ui.html default変更等のDo NOTは従来通り。
