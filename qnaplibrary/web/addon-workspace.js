@@ -1,6 +1,7 @@
 'use strict';
 let nonce = '';
 let currentDoc = null;
+let currentDocBody = '';
 let polling = false;
 let bridgePort = null;
 let imageURL = null;
@@ -14,7 +15,7 @@ async function api(path, body, method) {
   let response;
   try { response = await fetch(root + '/addon/v1/' + path, {method: method || (body ? 'POST' : 'GET'), credentials: 'omit',
     headers: {'Content-Type': 'application/json', 'X-Control-Deck-Bridge-Session': nonce}, body: body ? JSON.stringify(body) : undefined}); }
-  catch (_) { throw new Error('通信失敗: ' + path.split('/')[0] + ' / ' + location.protocol + ' / v0.5.12。ControlDeckの画面を開き直してください。'); }
+  catch (_) { throw new Error('通信失敗: ' + path.split('/')[0] + ' / ' + location.protocol + '。ControlDeckの画面を開き直してください。'); }
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || '接続を確認してください');
   return data;
@@ -41,6 +42,7 @@ window.addEventListener('message', event => {
   nonce = event.data.session_nonce;
   const port = event.ports[0];
   bridgePort = port;
+  applyHostTheme(event.data.theme);
   port.onmessage = message => {
     const reply = message.data;
     if (reply?.type === 'response' && bridgeCalls.has(reply.id)) {
@@ -48,7 +50,7 @@ window.addEventListener('message', event => {
       if (reply.ok) call.resolve(reply.result); else call.reject(new Error(reply.error?.message || 'ファイル選択を中断しました'));
     }
     if (message.data?.type === 'event' && message.data.event === 'session.updated') nonce = message.data.data.session_nonce;
-    if (message.data?.event === 'theme.changed') document.documentElement.style.colorScheme = message.data.data?.mode || 'light dark';
+    if (message.data?.event === 'theme.changed') applyHostTheme(message.data.data);
   };
   port.start();
   load();
@@ -80,6 +82,7 @@ async function loadAnalyses(id) {
   if (currentDoc !== id) return;
   el('analyses').replaceChildren();
   for (const item of data.items) {
+    if (item.kind === 'knowledge') continue;
     const box = document.createElement('div'); box.className = 'analysis';
     const title = document.createElement('h3');
     title.textContent = (item.kind === 'claims' ? '請求項の確認' : '要約') + (item.stale ? ' — 原文が更新されています' : ' — 未確認');
@@ -87,6 +90,9 @@ async function loadAnalyses(id) {
     box.append(title, text); el('analyses').append(box);
   }
 }
+el('analysis-kind').onchange = () => {
+  el('analyze').textContent = el('analysis-kind').value === 'knowledge' ? '知識を抽出' : 'ローカルAIで分析';
+};
 el('analyze').onclick = async () => {
   if (!currentDoc) return;
   el('analyze').disabled = true;
@@ -106,7 +112,7 @@ async function loadJobs() {
     if (!data.items.length) el('jobs').textContent = '実行中の分析はありません。';
     for (const job of data.items) {
       const row = document.createElement('div'); row.className = 'job'; row.dataset.status = job.status;
-      const label = document.createElement('p'); label.textContent = `${job.kind === 'claims' ? '請求項の確認' : '要約'} · 文献 ${job.doc_id} — ${job.message}`;
+      const label = document.createElement('p'); label.textContent = `${job.kind === 'knowledge' ? '知識エッセンス' : job.kind === 'claims' ? '請求項の確認' : '要約'} · 文献 ${job.doc_id} — ${job.message}`;
       row.append(label);
       if (['queued', 'running'].includes(job.status)) {
         const cancel = document.createElement('button'); cancel.textContent = 'キャンセル';
@@ -149,7 +155,10 @@ async function loadJobs() {
         menu.append(heading, forget); row.append(menu);
       }
       el('jobs').append(row);
-      if (job.status === 'succeeded' && knownJobs.get(job.id) !== 'succeeded' && currentDoc === job.doc_id) await loadAnalyses(currentDoc);
+      if (job.status === 'succeeded' && knownJobs.get(job.id) !== 'succeeded' && currentDoc === job.doc_id) {
+        if (job.kind === 'knowledge') await loadKnowledge(currentDoc);
+        else await loadAnalyses(currentDoc);
+      }
       knownJobs.set(job.id, job.status);
     }
     await loadPDFJobs();
@@ -185,11 +194,12 @@ el('import-pdf').onclick = async () => {
 };
 async function openDocument(id) {
   const doc = await api('documents/' + id);
-  currentDoc = id; imageRequest++;
+  currentDoc = id; currentDocBody = doc.body || ''; imageRequest++;
   if (imageURL) { URL.revokeObjectURL(imageURL); imageURL = null; }
   el('title').textContent = doc.title || '文献'; el('body').textContent = doc.body || ''; el('detail').hidden = false;
   el('pdf-evidence').hidden = true; el('pdf-evidence').replaceChildren();
   await loadAnalyses(id);
+  await loadKnowledge(id);
   if (doc.meta?.source_type !== 'pdf' || currentDoc !== id) return;
   const evidence = await api('documents/' + id + '/pdf-extraction');
   if (currentDoc !== id) return;
