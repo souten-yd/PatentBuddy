@@ -93,10 +93,15 @@ def _sources(value):
 
 def _current_sources(store, selected):
     """Validate sources within the caller's SQLite transaction/lock."""
-    result = compare(store, {'items': [
-        {'proposal_id': x['proposal_id'], 'item_index': x['item_index']}
-        for x in selected
-    ]})
+    try:
+        result = compare(store, {'items': [
+            {'proposal_id': x['proposal_id'], 'item_index': x['item_index']}
+            for x in selected
+        ]})
+    except StoreError:
+        # Valid selectors that no longer point to currently approved evidence
+        # are a conflict, not a malformed form. Fail closed and ask to recompare.
+        raise KnowledgeConflictError('knowledge approval or source changed; compare again') from None
     found = result['items']
     if len(found) != len(selected):
         raise KnowledgeConflictError('knowledge comparison changed')
