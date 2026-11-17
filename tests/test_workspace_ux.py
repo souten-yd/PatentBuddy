@@ -83,7 +83,6 @@ class WorkbenchUXTests(unittest.TestCase):
         self.assertIn('id="link-confirm"', self.html)
         self.assertIn('id="map-unreviewed"', self.html)
         self.assertIn('id="map-links"', self.html)
-        self.assertIn('id="review"', self.js if 'id="review"' in self.js else 'id="review"') if False else None
 
     def test_workspace_keyboard_navigation_and_focus_without_new_host_routes(self):
         js = self.js
