@@ -499,16 +499,19 @@ class Handler(BaseHTTPRequestHandler):
                             result = client.data("POST", "/api" + path[len("/addon"):], body)
                         elif method == "GET" and re.fullmatch(r"/addon/v1/documents/[1-9][0-9]{0,17}/knowledge-map", path):
                             query = parse_qs(parts.query, keep_blank_values=True)
-                            if (set(query) - {'hops', 'include_unreviewed'}
+                            if (set(query) - {'hops', 'include_unreviewed', 'include_links'}
                                     or any(len(values) != 1 for values in query.values())):
                                 raise AddonError(400, '知識マップの条件が不正です')
                             hops = query.get('hops', ['1'])[0]
                             visible = query.get('include_unreviewed', ['false'])[0]
-                            if hops not in ('1', '2') or visible not in ('true', 'false'):
+                            links = query.get('include_links', ['false'])[0]
+                            if (hops not in ('1', '2') or visible not in ('true', 'false')
+                                    or links not in ('true', 'false')):
                                 raise AddonError(400, '知識マップは1〜2段階のみ閲覧できます')
                             path_remote = ("/api/v1/documents/" + path.split('/')[-2] +
                                            "/knowledge-map?hops=" + hops +
-                                           "&include_unreviewed=" + visible)
+                                           "&include_unreviewed=" + visible +
+                                           "&include_links=" + links)
                             result = client.data("GET", path_remote)
                         elif method == "GET" and re.fullmatch(
                                 r"/addon/v1/documents/[1-9][0-9]{0,17}/knowledge-proposals/[A-Za-z0-9_-]{1,128}/reviews", path):
