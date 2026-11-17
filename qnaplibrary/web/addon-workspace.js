@@ -135,6 +135,7 @@ async function load() {
     el('connection-state').textContent = '接続を確認してください';
     el('cross-search-submit').disabled = true;
     el('submit').disabled = true;
+    el('import-pdf').disabled = true;
     updateIdeaSaveState();
     el('message').textContent = '読み込みに失敗しました。接続を再確認できます。' +
       (error instanceof TypeError ? '' : ' ' + error.message);
