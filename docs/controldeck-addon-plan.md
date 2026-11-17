@@ -78,3 +78,12 @@ PR #10（クレーム）、#11（認証）、#13（大量投入）は別PR。PR 
 PR #19 / v0.5.8候補でHost local-only AI、Jobs、キャンセル/再実行、原文版付きの結果保存を追加。Host PR #349で推論先を検証し、機密入力の前に契約対応を確認する。別正本文献DBは作らない。実Host Jobs/LLMの合成請求項テストが成功し、ブラウザ幅1280/390/320pxは合成Host+実Addon/ResearchDataHubで成功。配布後の実Host画面受入はこれから。
 
 ユーザーがPDF/OCR対応を追加要求。後続のPDF取り込み単位で、Host Filesの限定grant→PC上のpdftotext→必要ページのみpdftoppm/Tesseract jpn+eng→ページ/抽出法/原本hash/根拠位置付きでResearchDataHubへ保存する。OCRは精度保証せず原本との照合を可能にする。Poppler/Tesseractは現在のPCに既存、日本語/英語データ利用可。QNAPへOCR負荷を移さず、任意ファイルパス/コマンドAPIを追加しない。CPU/RAMのHost Broker制約・ページ数/画像サイズ/時間上限・キャンセルを適用する。文字入りPDFを無条件OCRせず、直接抽出を優先。現在のclient PDF抽出はOCRなしであるため既存機能と混同しない。
+
+## 追加設計: Obsidian型Knowledge MapとIdea Canvas（2026-11-17）
+
+[知識グラフ計画](knowledge-graph-plan.md)と[詳細設計](knowledge-graph-design.md)を参照。既存の証拠付きGraphRAG（Draft PR #23）のノード/エッジ/版/レビュー機構を拡張し、**Source→Knowledge→Idea**の三層で発明の技術原理を別案件へ再利用する。Add-on側はlocal-only抽出/正規化候補/探索/グラフUIとIdea Canvas、ResearchDataHubだけが知識/レビュー/アイデアの正本を保持する。
+
+- Knowledge Mapはseedから1〜2hop以内の部分展開・ノード件数/辺数上限・明示truncated・原文根拠への逆遷移。320px端末では単一ペイン表示。
+- 複数知識の組合せとIdea保存はユーザーの明示操作。モデルの推論関係を確定事実と見なさず、原文改訂/根拠撤回時は依存する知識/Ideaをstaleにする。
+- Host ai.inference/jobs/resourcesの既存権限とResearchDataHubの最小scopeを使い、ControlDeck本体に特許固有runtimeを追加しない。CDN、server起動時npm build、Vue default化、別の知識正本、自動外部送信を禁止。
+- **本追記はdocs-only**。Add-on manifestやHost権限の要求変更、SQL/API/UI実装、Releaseは含まない。
