@@ -111,3 +111,10 @@ PR #16の設計はmainへ統合済み。PR #17でLinux別名入口・doctor/serv
 **Verification:** main docs/manifest/tests/runtime実確認、各PRのscope/Do NOT/expected最終状態、根拠偽造・版不一致・private流出・出典の無い効果・誤統合・取消・重複/応答喪失・検索打切り・再起動の陰性テスト、batches/物理I/O/P50/P95/P99/RSS・15分idle、Host実local-only・320px画面。必ず bash scripts/verify.sh、ビルド/安全grepと実施できなかった工程をPR/HANDOFFに記録する。
 
 **この文書更新はdocs-only**。ここに書かれたroute/table/UI/自動実行機能はまだ存在せず、Releaseは不要。
+
+## K1a進捗とControlDeck UX遵守（2026-11-17）
+
+- [ControlDeck準拠UI/UX契約](controldeck-ux-contract.md)がPatentBuddyのKnowledge Map/Card/Idea Canvasに**必須**。ControlDeckの実mainのUIガイド、Addon UXガイド、PageHeader、共通UI部品、CSSトークン、mobile-layout/Bridgeを再確認。Hostシェルを二重に作らない。
+- K1aのPR #29: `qnaplibrary/knowledge_essence.py` と `tests/test_knowledge_essence.py` は、厳格な引用検証とunreviewedな知識候補だけを扱う**pure code**。抽出AI起動・永続DB/API・知識マップはまだ実装しない。
+- 隔離した同一ソースのunittest10件成功。GitHubに登録したソース2ファイルのblob SHAも一致。**全verify/Host実ブラウザ/配布は未実施、Draft PRは未マージ**。K1bではPR #23の実branchと最新mainの差分、relation_proposals/generation_contract等の重複箇所を読み、共通化と安全なHost Job連携から始める。
+- UI実装はControlDeckのボタン1画面1主操作、44px、progressive disclosure、Host-owned nav、dark/light/accent、320px、error/reconnect/cancelを受入契約に含める。
