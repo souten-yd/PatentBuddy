@@ -6,7 +6,12 @@ cd "$ROOT"
 echo "== python syntax"
 python3 -m py_compile qnaplibrary/*.py researchdatahub/*.py scripts/*.py scripts/client/*.py
 echo "== js syntax"
-if command -v node >/dev/null; then node --check qnaplibrary/web/app.js; else echo "node not found: skipped"; fi
+if command -v node >/dev/null; then
+  node --check qnaplibrary/web/app.js
+  node --check qnaplibrary/web/addon-workspace.js
+else
+  echo "node not found: skipped (app.js and addon-workspace.js)"
+fi
 echo "== shell syntax"
 for f in rdh.sh qpkg/shared/qnaplibrary.sh qpkg/shared/python3-path packaging/linux/install.sh scripts/*.sh; do sh -n "$f"; done
 echo "== stdlib-only imports"
