@@ -340,3 +340,10 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - UI：K4の文献2〜3件の比較結果→明示「Idea Canvasへ」→根拠カード→ユーザーが課題/解決/効果/条件/限界入力→明示確認→保存。最近20案、版履歴直近20件、過去版read-only閲覧、古い根拠の案は編集不可。PC/320px mobile単列とHost themeに準拠。
 - tests/test_idea_canvas.py, tests/test_idea_workspace.py を追加したが**実Python/LiveServerテストは未実行**。実施済みはJS V8 syntax PASS、DOM ID欠落/重複0、独立SQLiteのunicode引用/epoch revert/文献削除後history/GET write0 smoke PASS。現コンテナからgithub.com DNSが解決できず完全checkout・verify.sh/Linux build/ControlDeck-QNAP-iPhone実機テストなし。**マージ/リリースなし**。
 - K6では全stackの実E2E+安全差分/manifest/default UI/GraphRAG重複整理を優先し、必要ならIdeaページング・低書込/履歴比較を同PRにまとめる。
+
+## 2026-11-18 K6マージ前統合ゲートの追加（PR #37へ同梱）
+
+- **新しいPRは作成せず**、K5 PR #37にK6の不足修正を同梱した。`scripts/verify.sh`が従来`qnaplibrary/web/app.js`だけNode構文チェックしていたため、**ControlDeck埋込`addon-workspace.js`も検査対象**にした。追加の`scripts/verify-k6.sh`は既存全テスト→Node UI→VERSION/QPKG_VER/addon.jsonの3点整合→Linux buildを一括検査し、`WITH_QPKG=1`指定時だけ公式pinのQDKでQPKGをビルドする。未指定時は「QPKG: NOT TESTED」と明示する。
+- K4比較の古いキャッシュをK5 Ideaフォームへ誤って再利用しないように、再検索・比較選択変更・選択解除時に`lastComparedItems`を無効化。サーバー側のsource revision/epoch/review seq再検証＋409は引き続き権威的安全境界。回帰テスト`tests/test_idea_workspace.py`へチェックを追加。
+- `tests/test_k6_integration_safety.py`で実ファイルからK1a〜K5の統合安全契約（read-only K4、新Ideaの2経路だけwrite、専用scope、default index.html、元UI/manifest/no raw HTML、版履歴と失効判定）を検査する。**新ファイルのPythonテストとローカルスクリプトは未実行**。新CI workflowはリポジトリ規則で禁止されているため追加していない。
+- K1〜K5の依存9PRは未マージ・Draft。フルcheckout環境で`bash scripts/verify-k6.sh`と`WITH_QPKG=1 bash scripts/verify-k6.sh`、Ubuntu/Linux配布物、QNAP/ControlDeck/iPhone実機、main版/Docs/Manifest/Host safety grepを検証してから正式統合・リリース。
