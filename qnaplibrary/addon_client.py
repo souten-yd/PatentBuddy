@@ -117,21 +117,45 @@ class AddonClient:
         token = config.get('knowledge_server_token')
         return isinstance(token, str) and len(token) > 8 and not any(ord(char) in (10, 13) for char in token)
 
+    def knowledge_review_ready(self):
+        """A reviewer uses an independent, narrowly scoped RDH credential."""
+        config = self.settings()
+        if config.get('auth_method') == 'local_peer':
+            from .local_auth import connect
+            try:
+                scoped = connect(17871, 'knowledge_review')
+            except (OSError, ValueError):
+                return False
+            return (isinstance(scoped.get('server_token'), str)
+                    and scoped['server_token'].startswith('qlv_'))
+        token = config.get('knowledge_review_token')
+        return (isinstance(token, str) and len(token) > 8
+                and not any(ord(char) in (10, 13) for char in token))
+
     def data(self, method, path, body=None):
         config = self.settings()
         local_peer = config.get('auth_method') == 'local_peer'
         knowledge_write = (method == 'POST' and re.fullmatch(
             r'/api/v1/documents/[1-9][0-9]{0,17}/knowledge-proposals', path) is not None)
+        review_write = (method == 'POST' and re.fullmatch(
+            r'/api/v1/documents/[1-9][0-9]{0,17}/knowledge-proposals/[A-Za-z0-9_-]{1,128}/reviews',
+            path) is not None)
         if local_peer and method == 'POST' and (
-                path.endswith('/analyses') or path == '/api/v1/pdf-imports' or knowledge_write):
+                path.endswith('/analyses') or path == '/api/v1/pdf-imports'
+                or knowledge_write or review_write):
             from .local_auth import connect
             try:
-                scope = ('knowledge_propose' if knowledge_write else
+                scope = ('knowledge_review' if review_write else
+                         'knowledge_propose' if knowledge_write else
                          'pdf_import' if path == '/api/v1/pdf-imports' else 'analysis')
                 config = connect(17871, scope)
             except (OSError, ValueError):
                 raise AddonError(503, 'ResearchDataHubの保存用認証を利用できません') from None
-        if knowledge_write and not local_peer:
+        if review_write and not local_peer:
+            token = config.get('knowledge_review_token')
+            if not token:
+                raise AddonError(503, '知識の人間レビュー専用権限を設定してください')
+        elif knowledge_write and not local_peer:
             token = config.get('knowledge_server_token')
             if not token:
                 raise AddonError(503, '専用の知識保存権限を設定してください')
@@ -180,4 +204,5 @@ class AddonClient:
                            'version': health.get('version'), 'reachable': health.get('ok') is True,
                            'setup_required': health.get('setup_required', True),
                            'token_configured': bool(config.get('server_token')),
+                           'knowledge_review_available': self.knowledge_review_ready(),
                            'auth_method': config.get('auth_method', 'manual')}}
