@@ -1054,6 +1054,19 @@ def analysis_list(req):
     return req.app.store.list_analyses(int(req.params["did"]))
 
 
+@route("POST", "/api/v1/documents/{did}/knowledge-proposals", "knowledge_propose")
+def knowledge_proposal_save(req):
+    from . import knowledge_store
+    return knowledge_store.save(req.app.store, int(req.params["did"]),
+                                req.json(), actor=req.actor)
+
+
+@route("GET", "/api/v1/documents/{did}/knowledge-proposals", "read")
+def knowledge_proposals_list(req):
+    from . import knowledge_store
+    return knowledge_store.list_for_document(req.app.store, int(req.params["did"]))
+
+
 @route('POST', '/api/v1/pdf-imports', 'pdf_import')
 def pdf_import(req):
     import base64
