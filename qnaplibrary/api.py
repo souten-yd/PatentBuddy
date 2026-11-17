@@ -1057,8 +1057,11 @@ def analysis_list(req):
 @route("POST", "/api/v1/documents/{did}/knowledge-proposals", "knowledge_propose")
 def knowledge_proposal_save(req):
     from . import knowledge_store
-    return knowledge_store.save(req.app.store, int(req.params["did"]),
-                                req.json(), actor=req.actor)
+    try:
+        return knowledge_store.save(req.app.store, int(req.params["did"]),
+                                    req.json(), actor=req.actor)
+    except knowledge_store.KnowledgeConflictError as error:
+        raise _err(409, str(error)) from None
 
 
 @route("GET", "/api/v1/documents/{did}/knowledge-proposals", "read")
