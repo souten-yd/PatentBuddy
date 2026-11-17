@@ -31,12 +31,12 @@ def _node_id(node):
     return 'g:%d' % node['id']
 
 
-def read(store, doc_id, *, hops=1, include_unreviewed=False):
+def read(store, doc_id, *, hops=1, include_unreviewed=False, include_links=False):
     """Project a single document neighborhood with stable bounds and no writes."""
     _id(doc_id)
     if type(hops) is not int or hops not in (1, 2):
         raise StoreError('knowledge map supports only 1 or 2 hops')
-    if type(include_unreviewed) is not bool:
+    if type(include_unreviewed) is not bool or type(include_links) is not bool:
         raise StoreError('invalid review visibility')
 
     with store.lock:
@@ -122,6 +122,78 @@ def read(store, doc_id, *, hops=1, include_unreviewed=False):
                         },
                     })
 
+        if include_links:
+            # Separate, explicit opt-in: a human-approved hypothesis NEVER enters
+            # default factual exploration. Only K3b links with a current K2
+            # approval may be shown. Other inferred PR23 edges stay hidden.
+            records = store.db.execute(
+                'SELECT g.id,g.relation,g.revision,g.start,g.end,g.quote,'
+                'g.source_node,g.target_node,o.proposal_id,o.item_index,'
+                'o.source_epoch,o.target_doc_id,t.title AS target_title '
+                'FROM knowledge_link_origins o '
+                'JOIN graph_edges g ON o.edge_id=g.id '
+                'JOIN documents t ON o.target_doc_id=t.id '
+                'WHERE o.source_doc_id=? AND g.stale=0 '
+                "AND g.review_status='approved' AND g.basis='inferred' "
+                'ORDER BY g.created DESC,g.id DESC LIMIT 9',
+                (doc_id,),
+            ).fetchall()
+            if len(records) > 8:
+                truncated = True
+            current_epoch = document_epoch(store.db, doc_id)
+            for row in records[:8]:
+                if (row['revision'] != current_revision or
+                        row['source_epoch'] != current_epoch or
+                        row['start'] < 0 or row['end'] <= row['start'] or
+                        row['end'] - row['start'] > 1200):
+                    continue
+                current_approval = store.db.execute(
+                    'SELECT decision,source_revision,source_epoch FROM knowledge_reviews '
+                    'WHERE proposal_id=? AND item_index=? ORDER BY seq DESC LIMIT 1',
+                    (row['proposal_id'], row['item_index']),
+                ).fetchone()
+                if (current_approval is None or current_approval['decision'] != 'approved'
+                        or current_approval['source_revision'] != current_revision
+                        or current_approval['source_epoch'] != current_epoch):
+                    continue
+                excerpt = store.db.execute(
+                    'SELECT substr(body,?,?) FROM documents WHERE id=?',
+                    (row['start'] + 1, row['end'] - row['start'], doc_id)
+                ).fetchone()
+                if excerpt is None or excerpt[0] != row['quote']:
+                    continue
+                from_node = store.db.execute(
+                    "SELECT doc_id FROM graph_nodes WHERE id=? AND kind='document'",
+                    (row['source_node'],)
+                ).fetchone()
+                to_node = store.db.execute(
+                    "SELECT doc_id FROM graph_nodes WHERE id=? AND kind='document'",
+                    (row['target_node'],)
+                ).fetchone()
+                if (from_node is None or from_node['doc_id'] != doc_id or
+                        to_node is None or to_node['doc_id'] != row['target_doc_id']):
+                    continue
+                dst_id = 'd:%d' % row['target_doc_id']
+                if len(edges) >= MAX_EDGES or (dst_id not in seen and len(nodes) >= MAX_NODES):
+                    truncated = True
+                    break
+                if dst_id not in seen:
+                    seen.add(dst_id)
+                    nodes.append({
+                        'id': dst_id, 'kind': 'document', 'document_id': row['target_doc_id'],
+                        'label': row['target_title'] or '文献 %d' % row['target_doc_id'],
+                        'status': 'hypothesis_target',
+                    })
+                edges.append({
+                    'id': 'h:' + row['id'], 'source': root_id, 'target': dst_id,
+                    'relation': row['relation'], 'basis': 'inferred',
+                    'review_status': 'approved',
+                    'evidence': {
+                        'doc_id': doc_id, 'revision': row['revision'],
+                        'start': row['start'], 'end': row['end'], 'quote': row['quote'],
+                    },
+                })
+
         snapshots = store.db.execute(
             "SELECT id,source_revision,content FROM document_analyses "
             "WHERE doc_id=? AND kind='knowledge' "
@@ -198,6 +270,7 @@ def read(store, doc_id, *, hops=1, include_unreviewed=False):
             'hops': hops, 'truncated': truncated,
             'limits': {'nodes': MAX_NODES, 'edges': MAX_EDGES},
             'include_unreviewed': include_unreviewed,
+            'include_links': include_links,
             'direction': 'outgoing',
             'disclaimer': 'AI inference is not a verified patent fact; provenance links do not imply technical relationships',
         }
