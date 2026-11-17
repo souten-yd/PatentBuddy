@@ -108,8 +108,20 @@ def register(store, doc_id, proposal_id, value, actor):
         if len(edge_id) > 128:
             raise StoreError('invalid link identifier')
         proof = parsed['generation']
-        source_label = (src['title'] or '文献 %d' % doc_id)[:300]
-        target_label = (target['title'] or '文献 %d' % target_id)[:300]
+        # Reuse PR23's immutable node-key/label if the document has already
+        # appeared in the graph. A title edit must not invent another graph node.
+        existing_source = db.execute(
+            "SELECT label FROM graph_nodes WHERE kind='document' AND node_key=?",
+            (str(doc_id),)
+        ).fetchone()
+        existing_target = db.execute(
+            "SELECT label FROM graph_nodes WHERE kind='document' AND node_key=?",
+            (str(target_id),)
+        ).fetchone()
+        source_label = (existing_source['label'] if existing_source else
+                        (src['title'] or '文献 %d' % doc_id)[:300])
+        target_label = (existing_target['label'] if existing_target else
+                        (target['title'] or '文献 %d' % target_id)[:300])
         # Exact quote, version, node identity and source-K2 approval are verified
         # by the same transaction as GraphRAG save and origin registration.
         evidence = item['evidence']
