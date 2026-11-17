@@ -121,3 +121,33 @@ def latest(store, proposal_ids, current_revision_by_id):
             'basis': 'model_inference',
         }
     return out
+
+def history(store, doc_id, proposal_id):
+    """Bounded authenticated-read audit trail; source texts never leave here."""
+    if type(doc_id) is not int or doc_id <= 0 or doc_id > 2**63 - 1:
+        raise StoreError('invalid source document')
+    if not isinstance(proposal_id, str) or PROPOSAL_ID.fullmatch(proposal_id) is None:
+        raise StoreError('invalid knowledge proposal ID')
+    with store.lock:
+        document = store.db.execute(
+            'SELECT hash,source FROM documents WHERE id=?', (doc_id,)
+        ).fetchone()
+        proposal = store.db.execute(
+            'SELECT doc_id,source_revision FROM document_analyses '
+            'WHERE id=? AND kind=?', (proposal_id, 'knowledge')
+        ).fetchone()
+        if document is None or proposal is None or proposal['doc_id'] != doc_id:
+            raise StoreError('knowledge proposal not found')
+        current_revision = store.document_revision(document)
+        rows = store.db.execute(
+            'SELECT request_id,item_index,decision,source_revision,reviewer,created '
+            'FROM knowledge_reviews WHERE proposal_id=? ORDER BY seq DESC LIMIT 30',
+            (proposal_id,),
+        ).fetchall()
+        return {
+            'proposal_id': proposal_id,
+            'stale': proposal['source_revision'] != current_revision,
+            'items': [dict(dict(row),
+                           stale=row['source_revision'] != current_revision)
+                      for row in rows],
+        }
