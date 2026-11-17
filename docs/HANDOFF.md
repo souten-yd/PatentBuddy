@@ -309,3 +309,13 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - K2の修正: K2 PR #33で本文を変更して**元の文章へ戻した際の旧承認自動復活**を防ぐ`knowledge_review_epochs`とsource_epochを追加し、K3でも参照。新しいK2イベントだけが現行epochと一致した時に承認と表示される。旧K2 schemaのイベントはsource_epoch=-1に安全側移行。これはAPI/監査・元本文再復元で重要な回帰ケース。
 - `tests/test_knowledge_map.py`と`tests/test_knowledge_map_workspace.py`にLiveServer/SQLite/2hop/Unicode/stale/revert/no-write/権限・モバイルUI契約の**テストコード**追加。**実施済み**: GitHubの実コード比較、K3のJSをV8で構文検査PASS、HTML参照ID欠落0・重複0、ControlDeckテーマ/Quote textContent/44px/320pxの静的チェック。別の独立SQLite smokeでUnicode substr・単調epoch・hash revertの失効とGET zero-writeを検証PASS。**未実施**: 新規Python本体/LiveServer、全`scripts/verify.sh`、Linux build、実ControlDeck+RDH/iPhone/QNAP、性能物理I/O。repo checkoutがgithub.com DNS不通でできない。
 - 現在K3はread-only投影なので**手動の異文献間関連リンクの登録UIは未実装**。GraphRAGテーブルに根拠付きレビュー済みの関係が存在すれば可視化できる。K3b/K4ではPR #23のrelation提案・明示レビュー登録機能と整合し、ユーザーの確認後にだけ異分野リンクを記録する。PR #34を完了/merge/release済みとしない。
+
+## 2026-11-17 K3b: 技術仮説リンクの明示登録・別操作レビュー（Draft PR #35）
+
+- [PR #35](https://github.com/souten-yd/PatentBuddy/pull/35) はK3 PR #34をbaseとするstacked Draft。根拠付きK2承認済み知識から、別文献への技術仮説を**利用者の明示選択で**登録し、別の操作で承認/却下するまで未確認で保持する。[K3b詳細設計・K4実装指示](knowledge-k3b-links.md)。
+- PR #23の`evidence_graph.save/review`を`_connection`オプションで同一ResearchDataHub SQLite transaction内に組込み、K2承認の現行source revision/epoch/latest review seq、出典quote、ターゲット文献のrevision、関係タイプがinferredのみであることを原子的に確認。`knowledge_link_origins`にproposal/item/doc/epoch/review_seqを保持。**graph_edges以外の新しい関係正本はなし**。
+- Source-review sequenceを保持するため、K2を承認→却下→再承認した時にも旧リンクが自動復活しない。GraphRAG approvalが存続しても、K3b listとmapはsource K2 latest seq照合で`stale=true`/非表示。新たな根拠確認・新IDの登録・別の明示reviewを必要とする。K2 source hash-revert epochの安全対策も維持。
+- 認証: 新`knowledge_link`トークン（qle_、同UID Unix socket、遠隔では別の`knowledge_link_token`）で2つの明示POSTだけ。通常read/rw/analysis/knowledge_propose/knowledge_review/published tokenの権限を追加しない。add-onはHost Bridge認証後のみproxyし、UIにはpermission boolしか渡さない。GET link一覧とターゲットid/title/revisionは既存read tokenのみ。対象文献の全文を選択時に転送しない。
+- ControlDeck UIに「承認済み知識→引用→別文献検索→仮説種別→確認チェック→未承認登録→別の承認/却下」を実装。初期未選択/ボタン無効、44px/16px/mobile list、Host theme/アクセント、テキスト引用のみ。Knowledge Mapで`include_links=true`を**別checkboxで明示選択**すると、人が承認した現行仮説リンクだけを点線/Inspector「事実ではありません」で表示。既定factual探索へ混ぜない。
+- tests/test_knowledge_links.py, tests/test_knowledge_link_workspace.py を追加。実LiveServer/SQLiteでscope/rollback/idempotent/review版409/revert/2段階/inferred-only、検索とUIの静的契約を検証するコード。**未実行**。独立SQLite smokeではFK順序・latest-review join・review seq失効・Unicode substr・epoch revert・cascadeをPASS。JS V8構文PASS、HTML参照IDの欠落/重複0。**全repo verify・実LiveServer/ControlDeck/QNAP/iPhone/Linux buildは未実施**。github.com DNS解決不可でcloneできず、CIは勝手に追加していない。
+- 次はK3bの追加テストを実行して全依存stackを整合し、失敗修正をPR #35またはK4の範囲にまとめる。K4は承認済み解決エッセンスの条件/効果/原理に基づく横断検索＋比較仮説、K5 Idea Canvas。実機・releaseは全verifyと配布検証後だけ。
