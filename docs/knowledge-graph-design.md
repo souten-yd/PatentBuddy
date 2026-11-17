@@ -182,3 +182,9 @@ Host principal認証とResearchDataHub scoped token/ローカルUnix peer契約�
 UI/UXは独自デザインではなく、[ControlDeck準拠UI/UX契約](controldeck-ux-contract.md)を**Normative**とする。ControlDeck mainのUIガイド/Addonガイド/PageHeader/共通UI部品/テーマ/モバイル対応を調べてから実装する。Hostのグローバルナビとアドオン内ナビを二重化しない。320pxはグラフ全体の縮小版を強制せず知識リスト→カード→出典の1ペイン。空/エラー/待機中には原因と実行可能な次アクションを示す。
 
 K1aでは `qnaplibrary/knowledge_essence.py` の独立した`validate(document, proposal)`を先行追加。doc_id/source_revisionとUnicode文字位置/原文quoteを完全一致確認し、モデル候補は常に model_inference/unreviewed として保持。model_ref/runtime_refがHost local_onlyの形式に一致しない場合は拒否。1文献最大100000文字・12カード、quote1200文字。**このモジュールはAI生成・DB保存・API/UIの呼出経路に未接続**。Hostの推論先が実際にlocal-onlyかという安全性は、連携時に既存Host出口で別途検証する。PR #23のrelation_proposals/generation_contractを呼び出す際に、同等機構を二重化せず共通化すること。
+
+## K1c保存境界とControlDeck UX（2026-11-17追加）
+
+K1cの実コード・安全/API契約は [knowledge-k1c-storage.md](knowledge-k1c-storage.md) を参照。既存SQLite`document_analyses(kind='knowledge')`に版付き候補をimmutable保存し、専用`knowledge_propose`スコープとGETの20件上限で限定する。原文revisionとquoteはResearchDataHubのtransaction内で再検証し、旧版/ID衝突はHTTP409。これは事実確認/人間のapprovalと異なり、候補は常にunreviewed/model_inference。元文献が更新された場合はstale表示。GraphRAGへの自動edge生成なし。
+
+K1cにはUIボタン・Host Jobの統合は**まだ無い**。次PR以降は [ControlDeck UI/UX規範](controldeck-ux-contract.md) に従ってHost-owned Shellの内側へ知識抽出/確認を載せる。先行PR #23のHost証跡と既存GraphRAGを再利用し、別のデフォルトUI/Vue/実行capabilityを追加しない。
