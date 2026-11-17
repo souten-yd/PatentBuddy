@@ -39,6 +39,15 @@ CREATE TABLE IF NOT EXISTS document_analyses(
 CREATE INDEX IF NOT EXISTS document_analyses_doc ON document_analyses(doc_id, created DESC);
 -- Review is append-only. AI proposals remain immutable and unreviewed facts.
 -- Each event references one item in a versioned knowledge snapshot.
+CREATE TABLE IF NOT EXISTS knowledge_review_epochs(
+  doc_id INTEGER PRIMARY KEY REFERENCES documents(id) ON DELETE CASCADE,
+  epoch INTEGER NOT NULL DEFAULT 0);
+CREATE TRIGGER IF NOT EXISTS knowledge_review_source_changed
+AFTER UPDATE OF hash,source ON documents
+WHEN OLD.hash != NEW.hash OR OLD.source != NEW.source BEGIN
+  INSERT INTO knowledge_review_epochs(doc_id,epoch) VALUES(NEW.id,1)
+  ON CONFLICT(doc_id) DO UPDATE SET epoch=epoch+1;
+END;
 CREATE TABLE IF NOT EXISTS knowledge_reviews(
   seq INTEGER PRIMARY KEY,
   request_id TEXT NOT NULL UNIQUE,
@@ -46,6 +55,7 @@ CREATE TABLE IF NOT EXISTS knowledge_reviews(
   item_index INTEGER NOT NULL CHECK(item_index BETWEEN 0 AND 11),
   decision TEXT NOT NULL CHECK(decision IN ('approved','rejected','changes_requested')),
   source_revision TEXT NOT NULL,
+  source_epoch INTEGER NOT NULL DEFAULT -1,
   reviewer TEXT NOT NULL,
   created REAL NOT NULL);
 CREATE INDEX IF NOT EXISTS knowledge_reviews_latest
@@ -158,8 +168,13 @@ class Store:
                        "wal_autocheckpoint=2000", "busy_timeout=30000"):
             self.db.execute("PRAGMA " + pragma)
         self.db.executescript(SCHEMA)
-        # Adopt the already designed, versioned Evidence GraphRAG schema from
-        # Draft PR #23; no duplicate knowledge graph tables or background jobs.
+        # One-time fail-closed migration if the early K2 draft schema was used:
+        # old review events have no epoch proof and remain stale (epoch=-1).
+        if 'source_epoch' not in {row[1] for row in self.db.execute(
+                'PRAGMA table_info(knowledge_reviews)')}:
+            self.db.execute('ALTER TABLE knowledge_reviews '
+                            'ADD COLUMN source_epoch INTEGER NOT NULL DEFAULT -1')
+        # Reuse PR23's GraphRAG schema within this same SQLite authority.
         from .evidence_graph import install as install_graph
         install_graph(self.db)
         self.fts = self._init_fts()
