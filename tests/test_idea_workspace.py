@@ -66,7 +66,7 @@ class IdeaCanvasWorkspaceTests(unittest.TestCase):
             self.assertIn(field, self.js)
         self.assertIn('quote.textContent = source.evidence.quote', self.js)
         self.assertIn('元文献の引用へ', self.js)
-        self.assertIn('human', self.js if 'human' in self.js else 'human')
+        self.assertIn('記入だけでは保存されません', self.js)
         self.assertIn("await openDocument(item.doc_id)", self.js)
         self.assertNotIn('idea_write_token', self.js)
         self.assertNotIn('shell:true', self.js)
