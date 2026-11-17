@@ -89,6 +89,7 @@ def _project(row, item):
         'kind': item['kind'], 'statement': item['statement'],
         'conditions': item['conditions'], 'limitations': item['limitations'],
         'evidence': item['evidence'], 'source_revision': row['current_revision'],
+        'review_seq': row['seq'], 'source_epoch': row['source_epoch'],
         'reviewed_at': row['reviewed_at'],
         'review_status': 'approved', 'basis': 'model_inference',
     }
