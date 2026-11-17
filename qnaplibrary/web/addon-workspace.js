@@ -226,10 +226,14 @@ function crossParagraph(title, contents) {
   return p;
 }
 function crossOpenSource(item) {
-  return async () => {
+  return async event => {
     const previous = activeWorkspace;
+    const button = event?.currentTarget;
+    if (button) button.disabled = true;
+    el('message').textContent = '根拠の原文を開いています…';
     try {
       await openDocument(item.doc_id);
+      if (currentDoc !== item.doc_id) return;
       sourceReturnWorkspace = previous === 'research' ? null : previous;
       const back = el('workspace-source-return');
       back.hidden = !sourceReturnWorkspace;
@@ -239,6 +243,8 @@ function crossOpenSource(item) {
       switchWorkspace(previous, {scroll: false});
       const status = previous === 'ideas' ? el('idea-status') : el('cross-search-status');
       status.textContent = '元文献を開けませんでした。接続・権限・原文の版を確認してください。';
+    } finally {
+      if (button) button.disabled = false;
     }
   };
 }
@@ -247,6 +253,12 @@ function crossRenderSearch(items, append = false) {
   if (!append) container.replaceChildren();
   if (!items.length && !append) {
     container.textContent = '現在の条件に一致する承認済みの知識はありません。検索語・種類を変更してください。';
+    const back = document.createElement('button');
+    back.type = 'button';
+    back.className = 'secondary workspace-empty-action';
+    back.textContent = '資料へ戻って知識を抽出・確認する';
+    back.onclick = () => switchWorkspace('research', {focusTab: true});
+    container.append(back);
     return;
   }
   for (const item of items) {
@@ -625,6 +637,12 @@ async function loadIdeas() {
     out.replaceChildren();
     if (!Array.isArray(result.items) || !result.items.length) {
       out.textContent = '保存済みの発明仮説はまだありません。';
+      const compare = document.createElement('button');
+      compare.type = 'button';
+      compare.className = 'secondary workspace-empty-action';
+      compare.textContent = '知識を探して比べる';
+      compare.onclick = () => switchWorkspace('knowledge', {focusTab: true});
+      out.append(compare);
       return;
     }
     for (const item of result.items) {
