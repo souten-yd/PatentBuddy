@@ -245,6 +245,41 @@ async function loadKnowledge(id) {
         card.append(title, status, statement, details, reviewPanel);
         group.append(card);
       }
+      const historyDetails = document.createElement('details');
+      historyDetails.className = 'knowledge-review';
+      const historySummary = document.createElement('summary');
+      historySummary.textContent = 'レビュー履歴（最大30件）';
+      const historyList = document.createElement('div');
+      const loadHistory = async () => {
+        historyList.textContent = '履歴を読み込んでいます…';
+        try {
+          const data = await api('documents/' + id + '/knowledge-proposals/' +
+            encodeURIComponent(snapshot.id) + '/reviews');
+          if (currentDoc !== id) return;
+          historyList.replaceChildren();
+          const labels = {
+            approved: '承認', rejected: '却下', changes_requested: '差戻し',
+          };
+          if (!data.items.length) historyList.textContent = 'レビュー履歴はまだありません。';
+          for (const event of data.items) {
+            const row = document.createElement('p');
+            row.className = 'hint';
+            const date = new Date(event.created * 1000);
+            row.textContent = '候補 ' + (event.item_index + 1) + ' · ' +
+              (labels[event.decision] || '未確認') +
+              (event.stale ? '（旧版・失効）' : '') + ' · ' +
+              (Number.isFinite(date.getTime()) ? date.toLocaleString() : '日時不明');
+            historyList.append(row);
+          }
+        } catch (_) {
+          historyList.textContent = '履歴を読み込めませんでした。閉じて再度開いてください。';
+        }
+      };
+      historyDetails.addEventListener('toggle', () => {
+        if (historyDetails.open) void loadHistory();
+      });
+      historyDetails.append(historySummary, historyList);
+      group.append(historyDetails);
       holder.append(group);
     }
   } catch (_) {
