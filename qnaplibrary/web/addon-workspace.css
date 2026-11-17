@@ -353,7 +353,7 @@ button:focus-visible,[role="tab"]:focus-visible,summary:focus-visible,textarea:f
  .workspace-disclosure > summary {padding:10px 12px}
  #cross-search-form {padding:12px}
  #idea-form {padding:12px}
- #library-items,#results {max-height:420px}
+ #library-items,#results {max-height:none;overflow:visible}
  input:not([type="checkbox"]):not([type="radio"]),textarea,select {font-size:16px}
 }
 @media (max-width:390px) {
