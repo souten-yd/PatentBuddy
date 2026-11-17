@@ -31,7 +31,7 @@
 
 - `auth.py`：`idea_write`専用device scope（`qlt_`）と同UID一時トークン`qlj_`。専用tokenは**IdeaのPOST/PUTのみ**可能で、GET文献・検索・他のwriteへのアクセスは403。既存`ro/rw/analysis/knowledge_propose/review/link/published`へIdea書込権限を追加しない。
 - `local_auth.py`：同UIDのprivate Unix socket`idea_write`のみでローカルトークンを取得。遠隔環境は専用の`idea_write_token`を明示設定する。AddonClientはread認証をwriteに流用せず、Web/iframeにはavailabilityの**booleanだけ**を渡す。認証の既存Origin/CSRF検証をそのまま適用。
-- `server.py`：Host Bridge認証済み`/addon/v1/ideas`,`/addon/v1/ideas/{id}`,`/versions/{ver}`とPOST/PUTを限定proxy。request body最大16KiB(create)/12KiB(update)。未公開本文を外部へ送る新経路なし。
+- `server.py`：Host Bridge認証済み`/addon/v1/ideas`,`/addon/v1/ideas/{id}`,`/versions/{ver}`とPOST/PUTを限定proxy。request body最大48KiB(create/update)。日本語Unicodeで仕様上の文字数上限を満たせるよう統一。未公開本文を外部へ送る新経路なし。
 
 ## ControlDeckの具体的操作
 1. K4「技術知識を横断検索・比較」で異なる文献から2〜3件を明示選択し、原文・成立条件・限界を確認する。
