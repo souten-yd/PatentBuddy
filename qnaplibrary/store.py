@@ -60,6 +60,17 @@ CREATE TABLE IF NOT EXISTS knowledge_reviews(
   created REAL NOT NULL);
 CREATE INDEX IF NOT EXISTS knowledge_reviews_latest
   ON knowledge_reviews(proposal_id,item_index,seq DESC);
+-- Origin metadata only: actual relations remain in PR23 graph_nodes/graph_edges.
+-- A hypothesis never becomes a factual relation via registration or review.
+CREATE TABLE IF NOT EXISTS knowledge_link_origins(
+  edge_id TEXT PRIMARY KEY REFERENCES graph_edges(id) ON DELETE CASCADE,
+  proposal_id TEXT NOT NULL REFERENCES document_analyses(id) ON DELETE CASCADE,
+  item_index INTEGER NOT NULL CHECK(item_index BETWEEN 0 AND 11),
+  source_doc_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+  source_epoch INTEGER NOT NULL,
+  target_doc_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE);
+CREATE INDEX IF NOT EXISTS knowledge_link_origin_source
+  ON knowledge_link_origins(source_doc_id,edge_id);
 CREATE TABLE IF NOT EXISTS source_pdfs(
   sha256 TEXT PRIMARY KEY, content BLOB NOT NULL, created REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS document_pdfs(
