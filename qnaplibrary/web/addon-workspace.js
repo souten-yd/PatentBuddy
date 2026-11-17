@@ -6,6 +6,9 @@ let currentKnowledgeMap = null;
 let selectedMapId = null;
 let mapRequest = 0;
 let reviewAllowed = false;
+let linkAllowed = false;
+let linkSources = [];
+let linkTarget = null;
 let polling = false;
 let bridgePort = null;
 let imageURL = null;
@@ -44,12 +47,13 @@ async function load() {
     el('version').textContent = `PatentBuddy v${state.addon.version} · ControlDeck管理`;
     const ready = s.reachable && !s.setup_required && s.token_configured;
     reviewAllowed = ready && s.knowledge_review_available === true;
+    linkAllowed = ready && s.knowledge_link_available === true;
     el('message').textContent = ready ? 'ResearchDataHubに接続しました。文献を検索できます。' :
       s.setup_required ? 'ResearchDataHubの管理Webで初期設定を完了してください。' : 'ResearchDataHubの接続トークン設定が必要です。';
     el('submit').disabled = !ready;
     el('import-pdf').disabled = !ready;
     if (ready) await loadLibrary();
-  } catch (error) { reviewAllowed = false; el('message').textContent = '読み込みに失敗しました。接続を再確認できます。' + (error instanceof TypeError ? '' : ' ' + error.message); }
+  } catch (error) { reviewAllowed = false; linkAllowed = false; el('message').textContent = '読み込みに失敗しました。接続を再確認できます。' + (error instanceof TypeError ? '' : ' ' + error.message); }
 }
 el('reconnect').onclick = () => load();
 window.addEventListener('message', event => {
@@ -182,6 +186,7 @@ function drawKnowledgeMap(data, select) {
     const line = mapElement('line', {
       x1: from[0], y1: from[1], x2: to[0], y2: to[1],
       class: edge.basis === 'factual' ? 'map-line map-line-factual' :
+        edge.basis === 'inferred' ? 'map-line map-line-hypothesis' :
         'map-line map-line-source',
     });
     svg.append(line);
@@ -276,8 +281,11 @@ function renderMapInspector(data, nodeId) {
       row.className = 'hint';
       row.textContent = edge.basis === 'provenance_only'
         ? '文献 → AI知識候補（出典リンクのみ・技術的関係の認定ではありません）'
-        : ('承認済みの事実関係: ' + edge.relation +
-           '（' + edge.source + ' → ' + edge.target + '）');
+        : edge.basis === 'inferred'
+          ? ('人が確認した技術仮説（事実ではありません）: ' + edge.relation +
+             '（' + edge.source + ' → ' + edge.target + '）')
+          : ('承認済みの事実関係: ' + edge.relation +
+             '（' + edge.source + ' → ' + edge.target + '）');
       box.append(row);
       if (edge.evidence?.quote) {
         const quote = document.createElement('blockquote');
@@ -329,7 +337,8 @@ function renderKnowledgeMap(data) {
   select(selectedMapId);
   el('map-status').textContent = '出典と知識 ' + data.nodes.length + '件、接続 ' +
     data.edges.length + '件、' + data.hops + '段階（' +
-    (data.include_unreviewed ? '未確認も参考表示' : '確認済みだけ') + '）。' +
+    (data.include_unreviewed ? '未確認も参考表示' : '確認済みだけ') +
+    (data.include_links ? '・確認済み仮説も参考表示' : '') + '）。' +
     (data.truncated ? '上限に達したため一部を省略しています。' :
      'グラフの線は出典の接続で、必ずしも技術的な因果関係ではありません。');
 }
@@ -339,9 +348,10 @@ async function loadKnowledgeMap(id) {
   el('map-status').textContent = '知識の関係を読み込んでいます…';
   const hops = el('map-hops').value === '2' ? '2' : '1';
   const visible = el('map-unreviewed').checked ? 'true' : 'false';
+  const links = el('map-links').checked ? 'true' : 'false';
   try {
     const data = await api('documents/' + id + '/knowledge-map?hops=' + hops +
-                           '&include_unreviewed=' + visible);
+                           '&include_unreviewed=' + visible + '&include_links=' + links);
     if (request !== mapRequest || currentDoc !== id) return;
     if (!Array.isArray(data.nodes) || !Array.isArray(data.edges)) throw new Error('知識マップ形式が不正です');
     renderKnowledgeMap(data);
@@ -357,10 +367,12 @@ async function loadKnowledgeMap(id) {
 el('map-refresh').onclick = () => { if (currentDoc) void loadKnowledgeMap(currentDoc); };
 el('map-hops').onchange = () => { if (currentDoc) void loadKnowledgeMap(currentDoc); };
 el('map-unreviewed').onchange = () => { if (currentDoc) void loadKnowledgeMap(currentDoc); };
+el('map-links').onchange = () => { if (currentDoc) void loadKnowledgeMap(currentDoc); };
 
 async function loadKnowledge(id) {
   const holder = el('knowledge');
   if (currentDoc !== id) return;
+  linkSources = [];
   holder.replaceChildren();
   const loading = document.createElement('p');
   loading.className = 'hint';
@@ -375,6 +387,8 @@ async function loadKnowledge(id) {
       empty.className = 'hint';
       empty.textContent = '知識候補はまだありません。分析内容から「知識エッセンスを抽出」を選択してください。';
       holder.append(empty);
+      refreshLinkSourceOptions();
+      await loadKnowledgeLinks(id);
       return;
     }
     for (const snapshot of data.items) {
@@ -395,6 +409,12 @@ async function loadKnowledge(id) {
       }
       for (const [itemIndex, item] of parsed.items.entries()) {
         const review = snapshot.reviews?.[String(itemIndex)];
+        if (!snapshot.stale && review?.status === 'approved' && review.stale !== true) {
+          linkSources.push({
+            proposalId: snapshot.id, itemIndex, sourceRevision: snapshot.source_revision,
+            evidence: item.evidence, label: item.statement,
+          });
+        }
         const card = document.createElement('article');
         card.className = 'knowledge-card';
         const title = document.createElement('h3');
@@ -526,8 +546,12 @@ async function loadKnowledge(id) {
       group.append(historyDetails);
       holder.append(group);
     }
+    refreshLinkSourceOptions();
+    await loadKnowledgeLinks(id);
   } catch (_) {
     if (currentDoc !== id) return;
+    linkSources = [];
+    refreshLinkSourceOptions();
     holder.replaceChildren();
     const message = document.createElement('p');
     message.className = 'hint';
@@ -662,6 +686,10 @@ el('import-pdf').onclick = async () => {
 async function openDocument(id) {
   const doc = await api('documents/' + id);
   currentDoc = id; currentDocBody = doc.body || ''; imageRequest++;
+  linkTarget = null;
+  el('link-target-choice').textContent = '関係先は未選択です。';
+  el('link-target-results').replaceChildren();
+  el('link-confirm').checked = false;
   if (imageURL) { URL.revokeObjectURL(imageURL); imageURL = null; }
   el('title').textContent = doc.title || '文献'; el('body').textContent = doc.body || ''; el('detail').hidden = false;
   el('pdf-evidence').hidden = true; el('pdf-evidence').replaceChildren();
