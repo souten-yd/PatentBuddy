@@ -115,7 +115,7 @@ class AddonClient:
                 return False
             return isinstance(scoped.get('server_token'), str) and scoped['server_token'].startswith('qlk_')
         token = config.get('knowledge_server_token')
-        return isinstance(token, str) and len(token) > 8 and '\\r' not in token and '\\n' not in token
+        return isinstance(token, str) and len(token) > 8 and not any(ord(char) in (10, 13) for char in token)
 
     def data(self, method, path, body=None):
         config = self.settings()
