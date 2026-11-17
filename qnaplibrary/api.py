@@ -1070,6 +1070,20 @@ def knowledge_proposals_list(req):
     return knowledge_store.list_for_document(req.app.store, int(req.params["did"]))
 
 
+@route("POST", "/api/v1/knowledge/search", "read")
+def knowledge_cross_search(req):
+    """Read-only POST avoids putting unpublished search terms into URL logs."""
+    from .knowledge_cross_search import search
+    return search(req.app.store, req.json(limit=4 * 1024))
+
+
+@route("POST", "/api/v1/knowledge/compare", "read")
+def knowledge_cross_compare(req):
+    """Read-only comparison; no new graph/idea/document writes."""
+    from .knowledge_cross_search import compare
+    return compare(req.app.store, req.json(limit=4 * 1024))
+
+
 @route("GET", "/api/v1/documents/{did}/link-target", "read")
 def knowledge_link_target_info(req):
     """Minimal document identity/revision: never return the full patent body."""
