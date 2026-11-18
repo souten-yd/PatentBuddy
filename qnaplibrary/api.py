@@ -620,10 +620,23 @@ def source_plan(req):
 @route("GET", "/api/v1/source-storage", "read")
 def source_storage_usage(req):
     from .source_storage import usage, policy
-    if req.arg("counts", "0") not in ("0", "1"):
-        raise _err(400, "counts が不正です")
-    return {"usage": usage(req.app.store, include_counts=req.arg("counts", "0") == "1"),
-            "policy": policy(req.app.store)}
+    from .source_history import by_source_sample
+    if req.arg("counts", "0") not in ("0", "1") or req.arg("breakdown", "0") not in ("0", "1"):
+        raise _err(400, "counts/breakdown が不正です")
+    response = {"usage": usage(req.app.store, include_counts=req.arg("counts", "0") == "1"),
+                "policy": policy(req.app.store)}
+    if req.arg("breakdown", "0") == "1":
+        response["by_source_sample"] = by_source_sample(req.app.store)
+    return response
+
+
+@route("GET", "/api/v1/source-acquisitions", "read")
+def source_acquisition_history(req):
+    from .source_history import list_recent
+    value = req.arg("limit", "20")
+    if not value.isascii() or not value.isdecimal() or not 1 <= len(value) <= 2:
+        raise _err(400, "履歴の件数が不正です")
+    return {"items": list_recent(req.app.store, int(value)), "scope": "manual_scoped_acquisitions_only"}
 
 
 @route("PUT", "/api/v1/source-storage/policy", "admin")
@@ -648,28 +661,50 @@ def source_acquisition(req):
     limit = body["limit"]
     if type(limit) is not int or not 1 <= limit <= rules["max_results_per_fetch"]:
         raise _err(400, "1回の取得上限を超えています")
-    before = usage(req.app.store)
-    # Even in the soft-limit implementation, never initiate a new download
-    # with insufficient database budget. Existing import paths are unchanged.
-    if before["soft_limit_reached"] or (
-            before["total_database_files_bytes"] + 1024 * 1024 > before["soft_limit_bytes"]):
-        raise _err(409, "保存容量のソフト上限に達しました。容量管理を確認してください")
-    if before["disk_free_bytes"] < 128 * 1024 * 1024:
-        raise _err(409, "保存先の空き容量が128MiB未満です")
-    # The query is generated from a static allowlist, never the user's
-    # unpublished theme or arbitrary AI-suggested query.
+    from . import source_history
+    lock = req.app.source_fetch_lock
+    if not lock.acquire(blocking=False):
+        raise _err(429, "別の分類別取得が完了するまで開始できません")
+    receipt_id = None
     try:
-        docs = connectors.epo_search(query, req.app.config.secret("epo_ops_key"),
-                                     req.app.config.secret("epo_ops_secret"), limit)
-    except connectors.ConnectorError as error:
-        raise _err(502, "EPO OPSから取得できません: " + str(error)[:160]) from None
-    if len(docs) > limit or len(json.dumps(docs, ensure_ascii=False).encode()) > 1024 * 1024:
-        raise _err(413, "取得結果の件数または容量が上限を超えました")
-    collection = req.app.store.ensure_collection("patent-ipc-" + body["ipc"], "patent")
-    result = req.app.store.add_documents(collection["id"], docs, actor="source-acquisition")
-    return {"source": "epo_ops", "ipc": body["ipc"], "requested": limit,
-            "received": len(docs), "added": result["added"], "collection_id": collection["id"],
-            "manual_only": True, "storage": usage(req.app.store)}
+        before = usage(req.app.store)
+        # This is a bounded, pre-flight soft limit, not a hard per-row quota.
+        if before["soft_limit_reached"] or (
+                before["total_database_files_bytes"] + 1024 * 1024 > before["soft_limit_bytes"]):
+            raise _err(409, "保存容量のソフト上限に達しました。容量管理を確認してください")
+        if before["disk_free_bytes"] < 128 * 1024 * 1024:
+            raise _err(409, "保存先の空き容量が128MiB未満です")
+        receipt_id = source_history.start(req.app.store, "epo_ops", body["ipc"], limit)
+        try:
+            docs = connectors.epo_search(query, req.app.config.secret("epo_ops_key"),
+                                         req.app.config.secret("epo_ops_secret"), limit)
+        except connectors.ConnectorError:
+            source_history.finish(req.app.store, receipt_id, "failed", failure="provider_error")
+            receipt_id = None
+            raise _err(502, "EPO OPSから取得できません。APIの認証・上限・接続を確認してください") from None
+        bytes_downloaded = len(json.dumps(docs, ensure_ascii=False).encode("utf-8"))
+        if len(docs) > limit or bytes_downloaded > 1024 * 1024:
+            source_history.finish(req.app.store, receipt_id, "failed", failure="limit_error")
+            receipt_id = None
+            raise _err(413, "取得結果が1回あたりの件数または1MiBの上限を超えました")
+        try:
+            collection = req.app.store.ensure_collection("patent-ipc-" + body["ipc"], "patent")
+            result = req.app.store.add_documents(collection["id"], docs, actor="source-acquisition")
+        except Exception:
+            source_history.finish(req.app.store, receipt_id, "failed",
+                                  received=len(docs), response_bytes=bytes_downloaded,
+                                  failure="storage_error")
+            receipt_id = None
+            raise
+        source_history.finish(req.app.store, receipt_id, "succeeded",
+                              received=len(docs), added=result["added"],
+                              response_bytes=bytes_downloaded)
+        return {"source": "epo_ops", "ipc": body["ipc"], "requested": limit,
+                "received": len(docs), "added": result["added"],
+                "collection_id": collection["id"], "receipt_id": receipt_id,
+                "manual_only": True, "storage": usage(req.app.store)}
+    finally:
+        lock.release()
 
 
 @route("GET", "/api/v1/stats", "read")
