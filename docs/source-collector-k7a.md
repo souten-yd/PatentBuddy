@@ -47,3 +47,18 @@ ResearchDataHubのIPC少量取得(明示管理者操作)＋ControlDeckの分野�
 GitHub実ファイルのResearchDataHub管理JSとControlDeck JSはV8構文検査PASS（管理JSの括弧漏れを発見し修正）、ControlDeck HTML ID重複0。独立SQLiteのrun履歴INSERT/UPDATEとsource別論理サイズSQL、合成PDFのベクターbboxから制限付きPython別プロセスで401x384/1,334BのPNGを切り抜いてSHA256を照合する独立smokeはPASS。これらはGitHub正規checkout内のPython unittest/実HTTP/PDFジョブ全体実行ではない。
 
 未実施: 新規Python unittest、LiveServer全回帰、実EPO OPS、ControlDeck/iPhone/QNAP実機、verify-k6.sh、QPKG、PDF高負荷時の物理I/O、PyMuPDFライセンスの正式受入。Draft #40・未マージ・未リリースを維持する。次Codexはまず全追加tests・認証/Host/PDF・scripts/verify-k6.sh・WITH_QPKG=1を実行し、失敗修正を本PRへ集約する。ui.html default、Vue read-only/non-default、backend authoritative、level_0_manual_only、no execution、raw source/fallback/redirect禁止、外部AIへの機密ゼロ、npm build at startup禁止を維持する。取得中電断によるrunの残留表示、PyMuPDF任意依存の安全性もレビューする。
+
+## 2026-11-18 継続3 — 公開国・公開年・手動ページングによる収集範囲の限定
+
+EPO OPS公式 Published-data CQL (Reference Guide v1.3.20, pp. 142–146, 61)を参照: https://link.epo.org/web/searching-for-patents/data/en-ops-v3.2-documentation-version-1.3.20.pdf
+WIPO公式 IPC 2026.01: https://www.wipo.int/en/web/classification-ipc
+
+- 新規 source_scope.py は固定IPC allowlist (H02Mなど) に、公開国 ALL/JP/US/EP/WO/CN/KR/DE/FR/GB と公開日による暦年範囲(最大10年)と、EPO結果1〜2000番の1回最大25件を安全に結合する。例: ic=H02M and pn=JP and pd within "20200101 20251231"。登録済の未公開のユーザー技術テーマは含まれない。公開日は出願日・優先日とは別で、公開国は出願先/市場への参入と同義ではない。
+- POST /api/v1/source-scope/preview (read) は外部接続ゼロのCQL表示。POST /api/v1/source-acquisitions (admin) の追加許容値: publication_country/year_from/year_to/first。従来のipc/limit/public_only_confirmedだけの呼び出しも維持。余分なcql/query等は400。管理者画面では「検索条件を確認」後に公開分類・公開年等の送信を再承認し、変更時は承認が無効になる。自動ページ送り・一括収集はなし。
+- EPO OPS connector: Published-data正式のX-OPS-Range HTTP header (Registerとは異なる) に変更し、従来 generic connectorのlimit数値文字列は維持。ネストしたexchange-document配列のJSON解析修正と不正JSON/認証エラーの安全な拒否。1回最大25件の制限は**新しい分類取得APIのみ**に適用し、既存generic connectorの100件上限は変更しない。
+- 取得履歴は公開国/公開年/開始位置を保持し、既存の早期K7aデータベースには起動時にカラムだけを移行。出典別の参考量は**最新2000文献のタイトル/メタデータのみ**をSQLで測る。重い全文・PDF・画像・ベクターは参照しない。SQLite/WAL/SHMの物理総使用量とは別に表示し、全件の完全な出典別占有率とは呼ばない。
+- ControlDeck側には同じ検索範囲の**読み取り専用プレビュー**を追加。Host Bridgeは既存read tokenでPOST /addon/v1/source-scope/preview -> ResearchDataHub read APIのみを中継。取得POST/admin tokenは設けない。
+- テストを tests/test_source_scope.py および tests/test_source_management_workspace.py に追加。国/年/件数/2000件上限/悪意あるCQLの拒否、管理者権限・明示公開確認、公式range headerとOPS配列JSON、Host read-only/再承認要件を対象とする。
+- 未実施: 正規checkoutでのPython unittest、実EPO無料キー接続、全verify-k6、ControlDeck/QNAP/iPhone実機。GitHub実JS構文PASS、実HTML DOM重複0は確認。型・API/テストの統合は**未認証**としてDraft維持。
+
+次工程: 公式IPC/CPC/FI辞書をライセンスに従ってローカル登録し、入力語の曖昧性・境界・confidenceを手動検証させる。2000結果を超える場合は期間・分類を再分割させる（無制限に取得しない）。原本PDF + local-only Vision AI図番号照合、図表数値検証/スキップ、硬い全入口quota、収集ジョブの手動中断・履歴監査を実装。現時点は未実装。
