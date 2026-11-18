@@ -597,6 +597,7 @@ async function chatView(main) {
 // authenticated ResearchDataHub admin UI. Host read-only view cannot acquire.
 async function scopedSourceCard(main, connectors) {
   const assistant = await api("GET", "/api/v1/source-assistant/options");
+  const bulkProducts = await api("GET", "/api/v1/uspto-bulk/options");
   const epoReady = connectors.some(c => c.id === "epo_ops" && c.configured);
   const topic = h("input", { class: "wide", maxlength: 120, placeholder: "例：インバータの冷却、モータ制御" });
   // No hand-authored topic chips: choose from an official code hierarchy or ask local AI.
@@ -940,6 +941,50 @@ async function scopedSourceCard(main, connectors) {
     jpoPublicSample,
     h("button", {class:"btn", onclick:refreshTests}, "登録状態を確認"),
     testRows);
+  const bulkProduct = sel(bulkProducts.products.map(x => [x.id, x.id + " · " + x.description]), "PTFWPRD");
+  const bulkRows = h("div", {});
+  const bulkNotice = h("p", { class: "small muted", role: "status" },
+    "USPTOの製品一覧から必要なファイルだけ選びます。実際のバルクZIP取得はまだ行いません。");
+  const bulkPreviewButton = h("button", { class: "btn",
+    disabled: !connectors.some(x => x.id === "uspto" && x.configured),
+    onclick: guard(async () => {
+      if (!confirm("USPTO公式Open Data Portalのバルクファイル一覧を手動照会しますか？" +
+        " ファイル本体はダウンロードしません。")) return;
+      bulkPreviewButton.disabled = true;
+      clear(bulkRows);
+      bulkNotice.textContent = "公式のバルクデータ製品情報を確認しています…";
+      try {
+        const result = await api("POST", "/api/v1/uspto-bulk/preview",
+          {product: bulkProduct.value, limit: 3, confirmed: true});
+        bulkNotice.textContent = result.product_title + " / ファイル" +
+          result.files_previewed + "件 / 合計" +
+          (result.file_bytes_total / (1024*1024)).toFixed(1) +
+          "MiB。ファイル本体の取得・保存は未実施です。";
+        for (const item of result.files) {
+          bulkRows.append(h("p", { class: "small muted" },
+            item.file_name + " · " + (item.bytes / (1024*1024)).toFixed(1) +
+            "MiB · " + (item.data_from || "期間未取得") +
+            "〜" + (item.data_to || "期間未取得") +
+            (item.over_advisory_cap ? " · 512MiB参考上限超過" : "")));
+        }
+      } catch (error) {
+        bulkNotice.textContent = "一覧取得に失敗しました: " + error.message;
+      } finally {
+        bulkPreviewButton.disabled = false;
+      }
+    })
+  }, "公式ファイル一覧・サイズを確認");
+  const bulkPanel = h("details", {},
+    h("summary", {}, "USPTO公式バルクデータ：製品・容量の下見"),
+    h("p", { class: "small muted" },
+      "pyUSPTO・bulk-file-loaderの製品選択を参考に、公式ODPの最新版だけ表示。"
+      + " 限定された製品ID以外は照会せず、大容量ZIPの取得は行いません。"),
+    h("div", { class: "row" }, bulkProduct, bulkPreviewButton),
+    !connectors.some(x => x.id === "uspto" && x.configured)
+      ? h("p", { class: "small muted" },
+          "USPTOキー未設定です。導入後に設定 → 外部キーで登録してください。")
+      : null,
+    bulkNotice, bulkRows);
   const panel = h("details", { class: "card" },
     h("summary", {}, "技術分野からの限定収集・容量／ソース管理"),
     h("p", { class: "small muted" }, "無料枠と公式規約の範囲で手動取得します。最初にIPC候補を選び、公開国と公開年で絞ってください。公開日による範囲指定であり、出願日・優先日ではありません。最大2000結果まで、25件ずつ手動取得します。"),
@@ -972,7 +1017,7 @@ async function scopedSourceCard(main, connectors) {
     acquisition, feedback,
     h("div", { class: "row" }, h("h2", {}, "保存容量と取得元別の参考量"),
       h("button", { class: "btn", onclick: refresh }, "容量・履歴を更新")),
-    cap, sample, list, policyFields, testsPanel, h("h3", {}, "分類別取得の履歴"), history);
+    cap, sample, list, policyFields, testsPanel, bulkPanel, h("h3", {}, "分類別取得の履歴"), history);
   main.append(panel);
 }
 
