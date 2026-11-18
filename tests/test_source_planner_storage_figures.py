@@ -135,6 +135,9 @@ class SourceHistoryTests(unittest.TestCase):
                         source_history.by_source_sample(store, size)
                 started = source_history.start(store, "epo_ops", "H02M", 2)
                 self.assertEqual(source_history.list_recent(store)[0]["status"], "running")
+                self.assertFalse(source_history.list_recent(store)[0]["possibly_interrupted"])
+                store.db.execute("UPDATE source_acquisition_runs SET started=started-720 WHERE id=?", (started,))
+                self.assertTrue(source_history.list_recent(store)[0]["possibly_interrupted"])
                 source_history.finish(store, started, "succeeded",
                                       received=2, added=1, response_bytes=125)
                 row = source_history.list_recent(store)[0]
