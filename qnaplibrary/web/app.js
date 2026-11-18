@@ -679,7 +679,11 @@ async function scopedSourceCard(main, connectors) {
       h("tr", {}, h("th", {}, "時刻"), h("th", {}, "取得元・IPC"), h("th", {}, "状態"),
         h("th", {}, "受信／新規"), h("th", {}, "応答量")),
       log.items.map(v => h("tr", {}, h("td", { class: "small" }, fmtDate(v.started)),
-        h("td", {}, v.source + " · " + v.classification),
+        h("td", {}, v.source + " · " + v.classification +
+          " / " + (v.publication_country || "ALL") +
+          " / " + (v.publication_year_from ?? "全年") + "〜" +
+          (v.publication_year_to ?? "全年") + "年" +
+          " / " + (v.first_result || 1) + "件目から"),
         h("td", {}, v.status === "succeeded" ? "成功" : v.status === "failed" ? "失敗 (" + v.failure_code + ")" : v.possibly_interrupted ? "中断の可能性" : "処理中"),
         h("td", {}, v.received + " / " + v.added),
         h("td", {}, sizeMiB(v.response_bytes)))))));
