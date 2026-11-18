@@ -677,6 +677,13 @@ async function scopedSourceCard(main, connectors) {
       candidateRows.append(h("p", { class: "small muted" }, item.code + " · " + item.label +
         "（暫定候補、正式なIPC/CPC辞書による照合が必要）"));
     }
+    if (plan.local_classification_matches?.length) {
+      const details = h("details", {}, h("summary", {}, "保存済みIPC/CPC分類辞書の関連候補"),
+        h("p", { class: "small muted" }, "これはResearchDataHub内の分類辞書検索です。外部EPO取得に使うIPCは上の承認済み初期候補だけです。"),
+        plan.local_classification_matches.map(item =>
+          h("p", { class: "small muted" }, item.code + " · " + item.title + "（" + item.collection + "）")));
+      candidateRows.append(details);
+    }
     approved.checked = false;
     acquisition.disabled = true;
     feedback.textContent = plan.candidates.length
