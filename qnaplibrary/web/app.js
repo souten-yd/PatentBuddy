@@ -945,7 +945,7 @@ async function scopedSourceCard(main, connectors) {
   const bulkProduct = sel(bulkProducts.products.map(x => [x.id, x.id + " · " + x.description]), "PTFWPRD");
   const bulkRows = h("div", {});
   const bulkNotice = h("p", { class: "small muted", role: "status" },
-    "USPTOの製品一覧から必要なファイルだけ選びます。実際のバルクZIP取得はまだ行いません。");
+    "USPTO公式一覧から対象を選んでください。1ファイル512MiB以下を管理者承認後に専用領域へ取得できます。自動取得は行いません。");
   const bulkPreviewButton = h("button", { class: "btn",
     disabled: !connectors.some(x => x.id === "uspto" && x.configured),
     onclick: guard(async () => {
@@ -960,13 +960,62 @@ async function scopedSourceCard(main, connectors) {
         bulkNotice.textContent = result.product_title + " / ファイル" +
           result.files_previewed + "件 / 合計" +
           (result.file_bytes_total / (1024*1024)).toFixed(1) +
-          "MiB。ファイル本体の取得・保存は未実施です。";
+          "MiB。必要な1ファイルのみ手動で保存できます（ZIP展開なし）。";
         for (const item of result.files) {
-          bulkRows.append(h("p", { class: "small muted" },
-            item.file_name + " · " + (item.bytes / (1024*1024)).toFixed(1) +
-            "MiB · " + (item.data_from || "期間未取得") +
-            "〜" + (item.data_to || "期間未取得") +
-            (item.over_advisory_cap ? " · 512MiB参考上限超過" : "")));
+          const stateLabel = h("span", { class: "small muted", role: "status" }, "取得していません");
+          const stateUrl = "/api/v1/uspto-bulk/transfer/status?product=" +
+            encodeURIComponent(bulkProduct.value) + "&file_name=" + encodeURIComponent(item.file_name);
+          let currentState = "not_downloaded";
+          const updateState = async () => {
+            const state = await api("GET", stateUrl);
+            currentState = state.state;
+            let message = state.state + " / " +
+              ((state.bytes_done || 0) / (1024*1024)).toFixed(1) + " / " +
+              (item.bytes / (1024*1024)).toFixed(1) + "MiB";
+            if (state.sha256) message += " / SHA256: " + state.sha256.slice(0, 16) + "…";
+            if (state.reason) message += " / " + state.reason;
+            if (state.state === "interrupted" && !state.can_resume)
+              message += " / 安全な途中再開不可（最初から取得）";
+            stateLabel.textContent = message;
+            return state;
+          };
+          const refreshBtn = h("button", { class:"btn", onclick: guard(updateState) }, "進捗を更新");
+          const saveBtn = h("button", { class:"btn", disabled: item.over_advisory_cap,
+            onclick: guard(async () => {
+              const last = await updateState();
+              const restarting = last.state === "interrupted" && !last.can_resume;
+              const reDownload = last.state === "completed" || restarting ||
+                (last.state === "failed" && !last.can_resume);
+              if (!confirm("USPTO公式配布の " + item.file_name + " (" +
+                (item.bytes / (1024*1024)).toFixed(1) + "MiB) を、このサーバーの非公開専用領域へ" +
+                (reDownload ? "最初から" : "手動で") + "取得しますか？" +
+                " 取得後もZIPは外部公開・自動展開されません。")) return;
+              saveBtn.disabled = true;
+              try {
+                const started = await api("POST", "/api/v1/uspto-bulk/transfer/start", {
+                  product: bulkProduct.value, file_name: item.file_name,
+                  expected_bytes: item.bytes, confirmed: true, restart: reDownload
+                });
+                stateLabel.textContent = started.state + " / " + item.file_name +
+                  "。進捗更新ボタンで確認できます。";
+              } finally {saveBtn.disabled = item.over_advisory_cap;}
+            })
+          }, "選択ファイルを取得・再開");
+          const cancelBtn = h("button", {class:"btn", onclick: guard(async () => {
+            if (!confirm("現在取得中の " + item.file_name + " を停止しますか？" +
+              " 検証可能な途中ファイルは再開用に保持します。")) return;
+            const state = await api("POST", "/api/v1/uspto-bulk/transfer/cancel",
+              {product: bulkProduct.value, file_name: item.file_name, confirmed: true});
+            stateLabel.textContent = "停止を要求しました / " +
+              ((state.bytes_done || 0) / (1024*1024)).toFixed(1) + "MiB";
+          })}, "停止");
+          bulkRows.append(h("div", {class: "row"},
+            h("span", {class:"small muted"}, item.file_name + " · " +
+              (item.bytes / (1024*1024)).toFixed(1) + "MiB · " +
+              (item.data_from || "期間未取得") + "〜" + (item.data_to || "期間未取得") +
+              (item.over_advisory_cap ? " · 上限超過のため保存不可" : "")),
+            saveBtn, refreshBtn, cancelBtn), stateLabel);
+          updateState().catch(() => {stateLabel.textContent = "状態を確認できません";});
         }
       } catch (error) {
         bulkNotice.textContent = "一覧取得に失敗しました: " + error.message;
@@ -978,8 +1027,10 @@ async function scopedSourceCard(main, connectors) {
   const bulkPanel = h("details", {},
     h("summary", {}, "USPTO公式バルクデータ：製品・容量の下見"),
     h("p", { class: "small muted" },
-      "pyUSPTO・bulk-file-loaderの製品選択を参考に、公式ODPの最新版だけ表示。"
-      + " 限定された製品ID以外は照会せず、大容量ZIPの取得は行いません。"),
+      "pyUSPTO・bulk-file-loaderを参考に、公式ODPの製品だけ表示します。"
+      + " 1ファイル512MiB以下を明示操作で専用の非公開領域へダウンロードし、厳格な206/ETag照合で途中再開できます。"
+      + " Linux PCのサーバーでの実行を推奨。NAS上の本機能はNASディスクへの書込みになります。"
+      + " ZIPの解析・文献DBへの取り込みはまだ行いません。"),
     h("div", { class: "row" }, bulkProduct, bulkPreviewButton),
     !connectors.some(x => x.id === "uspto" && x.configured)
       ? h("p", { class: "small muted" },
