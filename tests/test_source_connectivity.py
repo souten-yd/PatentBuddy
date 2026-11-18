@@ -79,6 +79,27 @@ class WIPOActualFormatFixtureTests(unittest.TestCase):
             official_ipc_titles.parse_titles(b"\x00"+WIPO_TITLE_SAMPLE, "H")
 
 
+class OfficialWIPOXMLTests(unittest.TestCase):
+    def test_actual_namespaced_wipo_xml_and_padded_group(self):
+        from qnaplibrary import official_ipc
+        fixture = (b'<IPCValidSymbolList xmlns="http://www.wipo.int/classifications/ipc/masterfiles" '
+                   b'edition="20260101">'
+                   b'<IPCSymbol symbol="H"/><IPCSymbol symbol="H02"/>'
+                   b'<IPCSymbol symbol="H02M" entryType="K"/>'
+                   b'<IPCSymbol symbol="H02M0007480000" entryType="K" '
+                   b'latestVersionIndicator="20260101"/>'
+                   b'<IPCSymbol symbol="H02M0001020000" entryType="K"/>'
+                   b'</IPCValidSymbolList>')
+        symbols = official_ipc.parse_valid_symbols(fixture, "H")
+        self.assertIn("H02M", symbols)
+        self.assertIn("H02M7/48", symbols)
+        self.assertIn("H02M1/02", symbols)
+        self.assertEqual(len(symbols), 3)
+        with self.assertRaises(ValueError):
+            official_ipc.parse_valid_symbols(fixture, "F")
+
+
+
 class ManualSourceTestAPITests(unittest.TestCase):
     def test_readiness_requires_key_but_not_registration_now(self):
         result = source_probes.readiness(lambda name: "")
