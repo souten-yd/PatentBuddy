@@ -132,10 +132,10 @@ def parse_one(identifier, html):
         "url": BASE + identifier + "/en",
         "title": title[:320],
         "publication_date": published[:10],
-        "priority_or_filing_date": dates[0][:10] if dates else "",
+        "first_dc_date": dates[0][:10] if dates else "",
         "country": identifier[:2],
         "kind": re.search(r"(A1|A2|B1|B2|A)$", identifier).group(1),
-        "assignees_sample": contributors[:3],
+        "dc_contributors_sample_unverified": contributors[:3],
         "classifications": codes[:40],
         "subclass_codes": list(dict.fromkeys(x[:4] for x in codes))[:20],
         "classification_count_capped": len(codes),
@@ -148,7 +148,7 @@ def parse_one(identifier, html):
         "topic_indicators": topics,
         "source_sha256": hashlib.sha256(html).hexdigest(),
         "html_bytes": len(html),
-        "limitations": "selected public patents; page metadata; citation and figure counts are UI-derived proxies",
+        "limitations": "DC.contributor may mix people and organizations; DC.relation and figure/family counts are UI-derived proxies; not patent claims or legal citations",
     }
 
 
