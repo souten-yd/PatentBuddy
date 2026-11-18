@@ -138,4 +138,9 @@ K7a 公式ソース実取得ゲート（2026-11-18）: WIPO 2026.01 H分類の�
 K7a OSS活用（2026-11-18）: GitHub現行bulk-file-loader(MIT)、pyUSPTO(MIT)、python-epo-ops-client(Apache-2.0)、Google patents-public-data等を実ソースで評価。USPTO ODPの公式製品/ファイルの**一覧とファイル容量**をadmin manual-onlyで取得する接続を追加（後続K7aでZIP手動取得まで実装）。初期モックCI13件0fail、一時Workflowは削除済み。Linux PCでの bounded/resumable/hashed manual stagingを追加、次は必要IPC/期間の書誌データだけstream import。 [詳細](patent-bulk-open-source-k7a.md)。
 
 
-K7a 手動ZIPダウンロード（2026-11-18）：公式USPTOファイル一覧から選択→管理者確認→1件を専用領域へ保存、512MiB/ファイル・専用領域2GiB、手動停止と強いETag/HTTP206による途中再開・SHA256を実装。全339件回帰skip3/0fail、Linuxビルド・隔離PDF test PASS (Actions 44240112831)。総容量/複数プロセス・起動時無書込みの追加testあり。次はZIP内部のIPC/CPC選別と文献DB投入。実USPTOキー・Linux/ControlDeck/QNAP/iOS実機のZIP試験は未実施。[設計・テスト・残課題](patent-bulk-manual-staging-k7a.md)。
+K7a 手動ZIPダウンロード（2026-11-18）：公式USPTOファイル一覧から選択→管理者確認→1件を専用領域へ保存、512MiB/ファイル・専用領域2GiB、手動停止と強いETag/HTTP206による途中再開・SHA256を実装。全342件回帰skip3/0fail、Linuxビルド・隔離PDF test PASS (Actions 44240112831)。総容量/複数プロセス・起動時無書込みの追加testあり。次はZIP内部のIPC/CPC選別と文献DB投入。実USPTOキー・Linux/ControlDeck/QNAP/iOS実機のZIP試験は未実施。[設計・テスト・残課題](patent-bulk-manual-staging-k7a.md)。
+
+
+### K7a最終受入証跡（2026-11-18）
+
+直近のGitHub Actions Run https://github.com/souten-yd/PatentBuddy/actions/runs/44240713777 で、対象テスト**25件0fail**、全体**342件0fail/3skip**、K6安全/バージョン/UI構文・Linux build・隔離PyMuPDF PASS。QPKG実パッケージ生成（WITH_QPKG=1）、実USPTO認証/公式ZIP、Linux/ControlDeck/QNAP/iPhone導入は未実施。追加した一時workflowは削除済み、既存release.ymlだけを維持。PR #40はDraft・未マージ・未リリース。
