@@ -589,6 +589,21 @@ class Handler(BaseHTTPRequestHandler):
                                 raise AddonError(400, "分類・公開国・公開年・取得範囲のプレビューだけを指定してください")
                             # Existing authenticated read token only. No external call.
                             result = client.data("POST", "/api/v1/source-scope/preview", body)
+                        elif method == "GET" and path == "/addon/v1/source-assistant/options":
+                            result = client.data("GET", "/api/v1/source-assistant/options")
+                        elif method == "POST" and path == "/addon/v1/source-assistant/ask":
+                            body = Request(self, method, path, {}, {}).json(limit=2048)
+                            if not isinstance(body, dict) or set(body) != {"question", "provider"}:
+                                raise AddonError(400, "分類質問とローカルモデルのみ指定できます")
+                            # Explicit manual local inference; no new Host tools or admin auth.
+                            result = client.data("POST", "/api/v1/source-assistant/ask", body)
+                        elif method == "GET" and path == "/addon/v1/ipc-catalog":
+                            result = client.data("GET", "/api/v1/ipc-catalog")
+                        elif method == "POST" and path == "/addon/v1/ipc-catalog/lookup":
+                            body = Request(self, method, path, {}, {}).json(limit=512)
+                            if not isinstance(body, dict) or set(body) != {"prefix"}:
+                                raise AddonError(400, "分類コードの照会のみを指定してください")
+                            result = client.data("POST", "/api/v1/ipc-catalog/lookup", body)
                         elif method == "GET" and path == "/addon/v1/source-storage":
                             result = client.data("GET", "/api/v1/source-storage?counts=1&breakdown=1")
                         elif method == "GET" and path == "/addon/v1/source-acquisitions":
