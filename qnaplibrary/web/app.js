@@ -592,6 +592,133 @@ async function chatView(main) {
     h("div", { class: "composer" }, ta, h("button", { class: "btn primary", onclick: send }, "送信")));
 }
 
+
+// Scoped patent research: sources and capacity are managed only from the
+// authenticated ResearchDataHub admin UI. Host read-only view cannot acquire.
+async function scopedSourceCard(main, connectors) {
+  const epoReady = connectors.some(c => c.id === "epo_ops" && c.configured);
+  const topic = h("input", { class: "wide", maxlength: 120, placeholder: "例：インバータ、電気、機械" });
+  const selectCode = sel([["", "先に分類候補を調べてください"]], "");
+  const max = h("input", { type: "number", min: 1, max: 25, step: 1, value: 10 });
+  const approved = h("input", { type: "checkbox" });
+  const feedback = h("p", { class: "small muted", role: "status" }, "入力テーマは外部送信せず、分類候補だけをローカルで提案します。");
+  const candidateRows = h("div", {});
+  const acquisition = h("button", { class: "btn primary", disabled: true }, "確認したIPCで10件取得");
+  const cap = h("div", { class: "small muted", role: "status" }, "「容量・履歴を更新」で確認します。");
+  const list = h("div", {});
+  const history = h("div", {});
+  const limitMiB = h("input", { type: "number", min: 128, max: 1048576, step: 1 });
+  const perFetch = h("input", { type: "number", min: 1, max: 25, step: 1 });
+  const crops = h("input", { type: "number", min: 0, max: 12, step: 1 });
+  const policyFields = h("details", {},
+    h("summary", {}, "容量・取得件数・図面枚数の設定（管理者）"),
+    field("分類別収集のソフト上限（MiB）", limitMiB),
+    field("EPO 1回の取得上限（件）", perFetch),
+    field("1 PDFの切り抜き図面候補（0〜12点）", crops),
+    h("p", { class: "small muted" }, "設定は分類別の新規取得とPDF追加切り抜きに適用されます。旧APIを含む全経路のハード上限ではありません。自動取得は常に無効です。"),
+    h("button", { class: "btn", onclick: guard(async () => {
+      const data = { soft_limit_mib: Number(limitMiB.value),
+        max_results_per_fetch: Number(perFetch.value),
+        max_figures_per_pdf: Number(crops.value), allow_scheduled_collection: false };
+      await api("PUT", "/api/v1/source-storage/policy", data);
+      toast("取得容量の設定を保存しました");
+      await refresh();
+    }) }, "設定を保存"));
+  const sample = h("p", { class: "small muted" }, "ソース別データ量は直近最大2,000文献の論理ペイロード参考値。物理DB容量をソース別に割り当てた値ではありません。");
+  const refresh = guard(async () => {
+    cap.textContent = "容量・履歴を取得しています…";
+    const [st, log] = await Promise.all([
+      api("GET", "/api/v1/source-storage?counts=1&breakdown=1"),
+      api("GET", "/api/v1/source-acquisitions?limit=20")
+    ]);
+    const u = st.usage, p = st.policy;
+    limitMiB.value = String(p.soft_limit_mib);
+    perFetch.value = String(p.max_results_per_fetch);
+    crops.value = String(p.max_figures_per_pdf);
+    max.max = String(p.max_results_per_fetch);
+    if (Number(max.value) > p.max_results_per_fetch) max.value = String(p.max_results_per_fetch);
+    cap.textContent = "DB " + sizeMiB(u.files.sqlite_bytes) + " / WAL " + sizeMiB(u.files.wal_bytes) +
+      " / SHM " + sizeMiB(u.files.shm_bytes) + " · 合計 " + sizeMiB(u.total_database_files_bytes) +
+      " / ソフト上限 " + sizeMiB(u.soft_limit_bytes) + " · 空き " + sizeMiB(u.disk_free_bytes) +
+      " · 文献 " + (u.counts?.documents ?? "?") + "件 / 原本PDF " + (u.counts?.pdf_originals ?? "?") +
+      "件 / 画像Blob " + (u.counts?.pdf_images ?? "?") +
+      (u.soft_limit_reached ? "（新規の分類別収集を停止）" : "");
+    const breakdown = st.by_source_sample;
+    clear(list);
+    if (breakdown?.items?.length) list.append(h("div", { class: "scrollx" },
+      h("table", {},
+        h("tr", {}, h("th", {}, "出典"), h("th", {}, "標本の文献数"), h("th", {}, "本文・メタデータの参考量")),
+        breakdown.items.map(v => h("tr", {}, h("td", {}, v.source), h("td", {}, v.documents_in_sample),
+          h("td", {}, sizeMiB(v.logical_payload_bytes_in_sample))))));
+    list.append(h("p", { class: "small muted" },
+      "標本 " + (breakdown?.documents_examined ?? 0) + "件" +
+      (breakdown?.has_older_documents ? "（古い文献は標本外。合計値ではありません）" : "（標本に含まれる文献のみ）")));
+    clear(history);
+    if (log.items?.length) history.append(h("div", { class: "scrollx" }, h("table", {},
+      h("tr", {}, h("th", {}, "時刻"), h("th", {}, "取得元・IPC"), h("th", {}, "状態"),
+        h("th", {}, "受信／新規"), h("th", {}, "応答量")),
+      log.items.map(v => h("tr", {}, h("td", { class: "small" }, fmtDate(v.started)),
+        h("td", {}, v.source + " · " + v.classification),
+        h("td", {}, v.status === "succeeded" ? "成功" : v.status === "failed" ? "失敗 (" + v.failure_code + ")" : "処理中"),
+        h("td", {}, v.received + " / " + v.added),
+        h("td", {}, sizeMiB(v.response_bytes))))));
+    else history.append(h("p", { class: "small muted" }, "分類別取得の履歴はありません。既存の汎用コネクタ履歴は含みません。"));
+  });
+  const sizeMiB = bytes => (Number(bytes || 0) / 1048576).toLocaleString("ja-JP", {maximumFractionDigits: 2}) + " MiB";
+  const suggest = guard(async () => {
+    if (!topic.value.trim()) return;
+    feedback.textContent = "分類候補を取得しています…";
+    const plan = await api("POST", "/api/v1/source-plan", {topic: topic.value.trim()});
+    clear(selectCode);
+    clear(candidateRows);
+    selectCode.append(h("option", { value: "" }, "分類候補を選択してください"));
+    for (const item of plan.candidates) {
+      selectCode.append(h("option", { value: item.code }, item.code + " / " + item.label));
+      candidateRows.append(h("p", { class: "small muted" }, item.code + " · " + item.label +
+        "（暫定候補、正式なIPC/CPC辞書による照合が必要）"));
+    }
+    approved.checked = false;
+    acquisition.disabled = true;
+    feedback.textContent = plan.candidates.length
+      ? "候補 " + plan.candidates.length + "件。技術範囲を確認し公開分類のみを収集してください。"
+      : "対象の分類がありません。IPC/CPC分類辞書の導入が必要です。";
+  });
+  const canAcquire = () => { acquisition.disabled = !epoReady || !selectCode.value || !approved.checked; };
+  selectCode.addEventListener("change", canAcquire);
+  approved.addEventListener("change", canAcquire);
+  acquisition.addEventListener("click", guard(async () => {
+    if (!approved.checked || !selectCode.value || !epoReady) return;
+    const selected = selectCode.value;
+    const count = Number(max.value);
+    if (!Number.isInteger(count) || count < 1 || count > Number(max.max)) throw Error("取得件数の上限を確認してください");
+    if (!confirm("公開済みの分類コード " + selected + " だけをEPO OPSへ送信し、最大" +
+      count + "件をResearchDataHubに保存します。実行しますか？")) return;
+    acquisition.disabled = true;
+    feedback.textContent = "公式APIから取得しています…別操作は開始しないでください。";
+    try {
+      const result = await api("POST", "/api/v1/source-acquisitions",
+        {ipc: selected, limit: count, public_only_confirmed: true});
+      feedback.textContent = "取得完了: 受信 " + result.received + "件 / 新規 " + result.added +
+        "件。履歴ID " + result.receipt_id + "。";
+      await refresh();
+    } finally { canAcquire(); }
+  }));
+  const panel = h("details", { class: "card" },
+    h("summary", {}, "技術分野からの限定収集・容量／ソース管理"),
+    h("p", { class: "small muted" }, "収集は無料枠と規約の範囲で手動実行します。未公開の発明・請求項は外部APIへ送信しません。先にIPCを選び、必要なら期間・国の絞り込みは今後の分類辞書統合で追加します。"),
+    field("調査分野（この入力は外部に送信しません）", topic),
+    h("div", { class: "row" }, h("button", { class: "btn", onclick: suggest }, "IPC候補を確認"), selectCode),
+    candidateRows,
+    h("div", { class: "row" }, field("今回の取得件数", max),
+      h("label", {}, approved, " 公開IPCコードのみを外部送信することを確認")),
+    !epoReady ? h("p", { class: "small muted" }, "EPO OPSのAPIキーが未設定です。設定 > 外部キーで登録してください。") : null,
+    acquisition, feedback,
+    h("div", { class: "row" }, h("h2", {}, "保存容量と取得元別の参考量"),
+      h("button", { class: "btn", onclick: refresh }, "容量・履歴を更新")),
+    cap, sample, list, policyFields, h("h3", {}, "分類別取得の履歴"), history);
+  main.append(panel);
+}
+
 // ---------- collect ----------
 async function collectView(main) {
   await loadCollections();
@@ -599,6 +726,7 @@ async function collectView(main) {
   await researchCard(main);
   main.append(h("h1", {}, "収集（外部データ源）"),
     h("p", { class: "muted small" }, "公式 API・フィードのみ利用します。キーが必要なものは 設定 > 外部キー で登録してください。別PCからは REST API / MCP で直接投入できます。"));
+  await scopedSourceCard(main, cs);
   cs.forEach(c => {
     const inputs = {};
     const coll = h("input", { placeholder: "保存先コレクション（空なら " + c.kind + "-" + c.id + "）", list: "colls" });
