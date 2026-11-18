@@ -143,3 +143,65 @@ def lookup(store, prefix, *, limit=30):
         "ORDER BY symbol LIMIT ?", (EDITION, prefix[0], escaped + "%", limit))
     return {"query": prefix, "items": [dict(r) for r in rows], "edition": EDITION,
             "source": "WIPO_IPC_valid_symbols", "official_title_available": False}
+
+
+
+def browse(store, parent="", *, limit=60, after=""):
+    """Navigate the official classification tree: section -> class -> subclass -> group.
+
+    Only previously imported official symbols are used; AI cannot inject codes.
+    No remote access, imports, or classification title fabrication.
+    """
+    if not isinstance(parent, str) or not re.fullmatch(r"(?:|[A-H]|[A-H][0-9]{2}|[A-H][0-9]{2}[A-Z])", parent):
+        raise ValueError("IPC分類階層はセクション・クラス・サブクラスに限ります")
+    if type(limit) is not int or not 1 <= limit <= 100:
+        raise ValueError("分類候補の件数は1〜100です")
+    if not isinstance(after, str) or len(after) > 15 or (
+            after and (not CODE_RE.fullmatch(after) or not parent
+                       or not after.startswith(parent))):
+        raise ValueError("分類の続き位置が不正です")
+    if not parent:
+        installed = store.q(
+            "SELECT section,symbol_count FROM official_ipc_catalogs "
+            "WHERE edition=? ORDER BY section", (EDITION,))
+        available = {row["section"]: row["symbol_count"] for row in installed}
+        return {"parent": "", "level": "section", "items": [
+            {"code": code, "imported": code in available,
+             "symbol_count": available.get(code), "selection_type": "section"}
+            for code in sorted(SECTIONS)],
+            "version": EDITION, "requires_import": not bool(installed),
+            "titles": "not_in_valid_symbols_feed", "manual_only": True}
+    if len(parent) == 1:
+        rows = store.q(
+            "SELECT DISTINCT substr(symbol,1,3) AS code FROM official_ipc_symbols "
+            "WHERE edition=? AND section=? ORDER BY code LIMIT ?",
+            (EDITION, parent, limit + 1))
+        next_level = "class"
+    elif len(parent) == 3:
+        rows = store.q(
+            "SELECT DISTINCT substr(symbol,1,4) AS code FROM official_ipc_symbols "
+            "WHERE edition=? AND section=? AND symbol>=? AND symbol<? "
+            "ORDER BY code LIMIT ?",
+            (EDITION, parent[0], parent, parent + "\uffff", limit + 1))
+        next_level = "subclass"
+    else:
+        if after:
+            lower = after
+            cmp = ">"
+        else:
+            lower = parent
+            cmp = ">="
+        rows = store.q(
+            "SELECT symbol AS code FROM official_ipc_symbols "
+            "WHERE edition=? AND section=? AND symbol " + cmp +
+            " ? AND symbol<? ORDER BY symbol LIMIT ?",
+            (EDITION, parent[0], lower, parent + "\uffff", limit + 1))
+        next_level = "group"
+    items = [dict(r) for r in rows[:limit]]
+    return {"parent": parent, "level": next_level,
+            "items": [{"code": entry["code"], "selection_type": next_level,
+                       "verified_in_imported_catalog": True} for entry in items],
+            "has_more": len(rows) > limit,
+            "next_after": items[-1]["code"] if len(rows) > limit and next_level == "group" else None,
+            "version": EDITION, "titles": "not_in_valid_symbols_feed",
+            "manual_only": True}
