@@ -1182,15 +1182,19 @@ def knowledge_link_decision(req):
 @route("GET", "/api/v1/knowledge/atlas", "read")
 def knowledge_atlas_overview(req):
     """Private, read-only, paged catalog overview without source bodies."""
-    from .knowledge_atlas import read
+    from .knowledge_atlas import read, read_collection
     raw_cursor = req.arg('cursor', '0')
     raw_limit = req.arg('limit', '10')
-    if (not raw_cursor.isascii() or not raw_cursor.isdecimal() or
-            len(raw_cursor) > 19 or
-            not raw_limit.isascii() or not raw_limit.isdecimal() or
-            len(raw_limit) > 2):
+    raw_collection = req.arg('collection_id', '0')
+    if (not all(isinstance(v, str) and v.isascii() and v.isdecimal() and
+                len(v) <= 19 for v in (raw_cursor, raw_collection))
+            or not raw_limit.isascii() or not raw_limit.isdecimal()
+            or len(raw_limit) > 2):
         raise _err(400, '知識アトラスのページ指定が不正です')
-    return read(req.app.store, cursor=int(raw_cursor), limit=int(raw_limit))
+    cursor, collection_id, limit = int(raw_cursor), int(raw_collection), int(raw_limit)
+    if collection_id:
+        return read_collection(req.app.store, collection_id, cursor=cursor, limit=limit)
+    return read(req.app.store, cursor=cursor, limit=limit)
 
 
 @route("GET", "/api/v1/documents/{did}/knowledge-map", "read")
