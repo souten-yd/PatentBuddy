@@ -9,11 +9,11 @@
 | EPO OPS 3.2 | free 4GB/rolling week, registered OAuth client | generic epo_search connector | fixed IPC+publication-office+publication-year+manual 25/page, receipts; modified X-OPS-Range/JSON | EPO developer registration + key/secret | real OAuth, one H02M JP 2020-2025 query, actual XML/JSON shape, bytes/quota, one-page retry/HTTP rate limit | worldwide bibliographic backbone, image/fulltext by separate approved API |
 | JPO 特許情報取得API | official free API with personal/business application | jpo_progress (application number) experimental | unchanged | JPO free registration, issued ID/password | official token endpoint, app_progress response, field mapping, status transitions, quota; one real known application | JP legal/prosecution complement, not bulk worldwide search |
 | USPTO Open Data Portal | registration at USPTO.gov required from 2026-06-18 | uspto_search experimental | unchanged | USPTO.gov + valid API credentials if provided | official current schema/key/header and login; one JP-independent US application result; limit+rate control | US patent applications/legal/prosecution complement |
-| WIPO IPC 2026.01 | official free classification data download | no | official_ipc.py valid symbols, official_ipc_titles.py EN titles, manual section import, version/hash | generally no account | **actual 2026.01 XML/TXT import and parser test NOT performed**; filename and schema validation, file size (section H titles ~822KB) | accurate classification suggestions, versioned lookups |
+| WIPO IPC 2026.01 | official free classification data download | no | official_ipc.py valid symbols, official_ipc_titles.py EN titles, manual section import, version/hash | no account for public export | **real official H-section HTTP retrieval, 66 title entries + 10,607 symbol records, SQLite import + H02M verified browse PASS in temporary CI SQLite**. QNAP/ControlDeck deployment untested | accurate classification suggestions, versioned lookups |
 | EPO PATSTAT / TIP | free online analytics, EPO says bulk data distributed free via TIP | no | planned only | EPO TIP account as required | verify registration/export rights/schema; select limited IPC/date/country extract, do not load 125M applications on NAS | company/year/citation/family network analytics |
 | PatentsView PatentSearch API | status operational but new API key grants temporarily suspended per API documentation | no | none | new key issuance not currently assured | defer until new key issuance resumes; if existing key, live verify without violating one-key policy | US analytic/citation enrichment |
 | Google BigQuery patents public data | public dataset/query quota; billing account conditions to verify | no | planned only | Google Cloud project | inspect exact dataset fields and free tier; require cost guard and user spend authorization | large-scale bibliography statistics, no automatic unlimited export |
-| OpenAlex | free academic metadata API; free account $1/day budget (current docs) | no | planned only | free OpenAlex key recommended | verify quotas, Crossref/OpenAlex identifiers/license; prevent unpublished claims in queries | scientific papers, authors/affiliations/technical knowledge links |
+| OpenAlex | free academic metadata API; anonymous use is opportunistic; free account key recommended | no | OpenAlex official first-page bounded metadata connector, optional `openalex_api_key` setting, one-click connection probe, 1–25 works/request | free key to input during installation | **real public `inverter` work 1 record PASS once; anonymous HTTP 429 subsequently reproduced**. Validate key-authenticated use and license on installation; never send private patent text | scientific papers, authors/affiliations/technical knowledge links |
 | JPO patent bulk official download | official data distribution, conditions/media may vary | no | planned manual data import only | per JPO request conditions | apply for covered product, inspect formats/backfile and cost | long-range JP corpora selected by technical domain |
 
 References (official): https://www.epo.org/en/searching-for-patents/data/web-services/ops ; https://www.jpo.go.jp/system/laws/sesaku/data/api-provision.html ; https://data.uspto.gov/apis/getting-started ; https://www.wipo.int/classifications/ipc/en/ ; https://www.epo.org/en/about-us/observatory-patents-and-technology/observatory-tools/patstat ; https://help.openalex.org/access/pricing/ ; https://github.com/PatentsView/PatentSearch-API/blob/main/docs/docs/Search%20API/SearchAPIReference.md
@@ -39,8 +39,16 @@ Existing connector does **not** demonstrate successful runtime API access. No pr
 
 ## Next Codex acceptance checklist
 
-- End-to-end WIPO title and symbol data using real 2026.01 section (e.g. H), stable sha256, schema, atomic import, hierarchical title display and offline correctness.
+- **WIPO H-section real-data API→parser→temporary SQLite→H02M labelled browse PASS.** Remaining: A–G coverage, schema version/change guards, WIPO attribution, UI/iOS/QNAP run.
 - EPO OPS OAuth with one user registered free key, official X-OPS-Range response, token/error conditions, first and 26th result page, dedup and 4GB weekly quota.
 - JPO auth and app_progress from official Swagger with one known public Japanese application; note its scope is not full patent search. USPTO ODP search with one public US record and validated 2026 auth.
 - Compare actual source metrics, preserved origin/license, stop conditions, safe credential removal; expose provider-status not as 'working' until verified.
 - Show in admin UI: source integration status, registration guidance, last successful fetch and failed reason, authorized quota/budget, no startup side effects.
+
+
+## K7a 2026-11-18 — 実取得・認証ゲートの結果
+
+- [実取得とCI検証ログ](source-smoke-evidence-2026-11-18.md)に実際のAPI経路・WIPOバイト数・OpenAlex429・Pythonテスト全件ログを記録。WIPOはタイトル66件、IPC有効記号10,607件、SQLiteへの原典保存とH02M名称付き照会が実成功。OpenAlexは無キー公開検索1件実成功後、別実行で429を実確認。**アプリからのOpenAlex継続運用は無料キーの入力後に再検証する。**
+- ResearchDataHub管理者画面には固定的なソースリストと接続状況（キー設定の有無）を表示し、手動確認後の単発テスト機能を実装。キー未設定のEPO/JPO/USPTOについては「登録して導入時入力」と表示し、実接続成功扱いにしない。OpenAlexの匿名テストは無料キーなしでも試せるが正常を保証しない。
+- 一時的なDraftブランチ用GitHub CIで対象29テストは2skip/0fail、全repo325テストは1fail（唯一、`release.yml`以外の一時CI追加に対するリポジトリの明示ルール）。検証後一時CIは削除。**削除後の全テストを再実行してはいないため全件PASSとは宣言しない。**
+- EPO/JPO/USPTO OAuth/キー本番認証は導入時にユーザーが登録・設定するまで未実施。外部機密送信はしない。
