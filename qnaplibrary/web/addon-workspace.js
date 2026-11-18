@@ -2085,8 +2085,13 @@ el('analyze').onclick = async () => {
   if (!currentDoc) return;
   el('analyze').disabled = true;
   try {
-    await api('jobs', {doc_id: currentDoc, kind: el('analysis-kind').value});
-    el('message').textContent = el('analysis-kind').value === 'knowledge' ? '知識候補の抽出を開始しました。結果は未確認のまま保存されます。' : 'ローカルAIの分析を開始しました。';
+    const state = await api('jobs', {doc_id: currentDoc, kind: el('analysis-kind').value,
+      defer_if_unavailable: el('analysis-defer').checked});
+    el('message').textContent = state.status === 'deferred'
+      ? 'ローカルAIが利用できないため依頼だけ保存しました。AI復旧後に「手動で再開」を選んでください。'
+      : el('analysis-kind').value === 'knowledge'
+        ? '知識候補の抽出を開始しました。結果は未確認のまま保存されます。'
+        : 'ローカルAIの分析を開始しました。';
     await loadJobs();
   } catch (error) { el('message').textContent = error.message; }
   finally { el('analyze').disabled = false; }
@@ -2097,7 +2102,7 @@ async function loadJobs() {
   try {
     const data = await api('jobs');
     activeAnalysisJobs = data.items.filter(item =>
-      ['queued', 'running'].includes(item.status)).length;
+      ['queued', 'running', 'deferred'].includes(item.status)).length;
     updateActivitySummary();
     el('jobs').replaceChildren();
     if (!data.items.length) el('jobs').textContent = '実行中の分析はありません。';
@@ -2114,11 +2119,20 @@ async function loadJobs() {
           finally { await loadJobs(); }
         };
         row.append(cancel);
-      } else if (['failed', 'canceled', 'interrupted'].includes(job.status)) {
-        const rerun = document.createElement('button'); rerun.textContent = '現在の原文で再実行';
+      } else if (['deferred', 'failed', 'canceled', 'interrupted'].includes(job.status)) {
+        const rerun = document.createElement('button');
+        rerun.textContent = job.status === 'deferred' ? 'ローカルAI復旧後に手動で再開' : '現在の原文で再実行';
         rerun.onclick = async () => {
           rerun.disabled = true;
-          try { await api('jobs', {doc_id: job.doc_id, kind: job.kind, resume_id: job.id}); }
+          try {
+            const result = await api('jobs', {doc_id: job.doc_id, kind: job.kind,
+              resume_id: job.id, defer_if_unavailable: el('analysis-defer').checked});
+            if (result.status === 'deferred') {
+              el('message').textContent = 'ローカルAIはまだ利用できません。依頼は保存済みで、自動実行されません。';
+            } else {
+              el('message').textContent = '現在の原文を確認し、ローカルAIで分析を再開しました。';
+            }
+          }
           catch (error) { el('message').textContent = error.message; }
           finally { await loadJobs(); }
         };
