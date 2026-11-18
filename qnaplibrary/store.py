@@ -183,6 +183,15 @@ CREATE TABLE IF NOT EXISTS watch_hits(
   UNIQUE(watch_id, doc_id));
 CREATE TABLE IF NOT EXISTS notify_log(key TEXT PRIMARY KEY, sent REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY, ts REAL NOT NULL, actor TEXT NOT NULL, action TEXT NOT NULL, detail TEXT NOT NULL DEFAULT '');
+-- History for explicit public IPC data acquisitions only; no source queries or credentials.
+CREATE TABLE IF NOT EXISTS source_acquisition_runs(
+ id INTEGER PRIMARY KEY,
+ source TEXT NOT NULL, classification TEXT NOT NULL,
+ requested INTEGER NOT NULL, received INTEGER NOT NULL DEFAULT 0,
+ added INTEGER NOT NULL DEFAULT 0, response_bytes INTEGER NOT NULL DEFAULT 0,
+ status TEXT NOT NULL, failure_code TEXT NOT NULL DEFAULT '',
+ started REAL NOT NULL, finished REAL
+);
 """
 
 
