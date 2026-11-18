@@ -64,7 +64,14 @@ class AnalysisJobs:
         session = HostSession(self.client, headers)
         # Only save a metadata-only request when the *local* model is absent.
         # Never select cloud inference as an alternative.
-        local_ready = session.local_available()
+        try:
+            local_ready = session.local_available()
+        except AddonError as error:
+            # A failed capability query may mean the local AI subsystem is
+            # temporarily down. Host authentication was checked above.
+            if not defer_if_unavailable or error.status not in (502, 503, 504):
+                raise
+            local_ready = False
         if kind == 'knowledge' and local_ready:
             # Old Hosts cannot prove their model/process revision.
             local_ready = session.provenance_available()
@@ -132,12 +139,20 @@ class AnalysisJobs:
             value = {'id': identifier, 'host_job_id': host_id, 'owner': session.owner,
                      'doc_id': doc_id, 'kind': kind, 'source_revision': document['revision'],
                      'status': 'queued', 'phase': 'queued', 'created': time.time(), 'message': '実行を準備しています'}
+            # Atomically commit successor and mark previous deferred entry as
+            # resumed. Prevents "retry" duplicating a completed analysis.
             self.jobs[identifier] = value
             self.sessions[identifier] = session
+            old_snapshot = dict(old) if old and old['status'] == 'deferred' else None
+            if old_snapshot:
+                old.update(status='resumed', phase='resumed', resumed_as=identifier,
+                           message='保存済みの依頼から分析を再開しました')
             try:
                 self._save()
             except OSError:
                 self.jobs.pop(identifier); self.sessions.pop(identifier)
+                if old_snapshot:
+                    old.clear(); old.update(old_snapshot)
                 session.finish('failed')
                 raise AddonError(503, 'ジョブ状態を保存できません') from None
             threading.Thread(target=self._run, args=(identifier, session, document), daemon=True).start()
