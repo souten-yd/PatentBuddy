@@ -84,3 +84,6 @@ WIPO公式 IPC 2026.01: https://www.wipo.int/en/web/classification-ipc
 
 
 最新の[USPTOファイルの限定取得設計](patent-bulk-manual-staging-k7a.md)を参照。初期カタログ-only記述は時系列の前段階で、現在はユーザーが承認して初めてZIPを保存する処理も実装済み。自動検索/自動取得・ControlDeck実行能力の追加はない。
+
+
+2026-11-18 公開特許11件の実データを用いた「少量取得→規則ベース解析→10種グラフ」パイロットを実施した。Google Patents個別ページだけであり公式バルクZIP取得とは別物。標本選定と定義上の注意は[public-patent-pilot-2026-11-18.md](public-patent-pilot-2026-11-18.md)。データとSHAはtests/fixtures/k7a_public_patents_20261118.json、取得run44311874751。AI無しで分析継続可能、ControlDeckのAIジョブは手動deferredを維持。次は正式ZIPのストリーム解析・DBチェックポイント。
