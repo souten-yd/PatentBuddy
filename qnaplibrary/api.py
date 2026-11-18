@@ -1183,6 +1183,9 @@ def knowledge_link_decision(req):
 def knowledge_atlas_overview(req):
     """Private, read-only, paged catalog overview without source bodies."""
     from .knowledge_atlas import read, read_collection
+    if (set(req.query) - {'cursor', 'limit', 'collection_id'} or
+            any(len(v) != 1 for v in req.query.values())):
+        raise _err(400, '知識アトラスのページ指定が重複・不正です')
     raw_cursor = req.arg('cursor', '0')
     raw_limit = req.arg('limit', '10')
     raw_collection = req.arg('collection_id', '0')
