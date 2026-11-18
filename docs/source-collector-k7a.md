@@ -71,3 +71,10 @@ WIPO公式 IPC 2026.01: https://www.wipo.int/en/web/classification-ipc
 - WIPO公式データは固定2026.01 URLからの有効記号XMLを、管理者の承認した単一セクションごとに最大3MiB/3万件で手動取得し、SQLiteへ版・セクション・SHA256・件数を登録。同一内容は再書込みを回避。IPC階層はローカルの保存済み公式記号から閲覧し、AI候補でも公式で検証できれば固定の10候補以外も対象にできる。backend authoritative。
 - 制約: 有効記号リストは分類タイトル/日本語定義を含まず、今後WIPO Scheme/JPO日本語IPC/CPC正式XMLをライセンスを守って追加する必要がある。WIPO実XMLの本番解析、外部接続、正規checkoutのPythonテストは未実施。今回追加した synthetic XMLとHTTP mockの tests/test_ipc_ai_selection.py もまだ実行していない。全CI、ユーザー実機、PyMuPDF性能/ライセンス、既存PR依存確認が終わるまでDraft維持。
 - 静的確認: GitHubの実 app.js / addon-workspace.js はV8構文PASS。HTML重複ID0、JSから参照されるID欠落0、Hostに辞書更新・EPO取得POSTなし。固定テーマの選択肢も撤去。mainのUIデフォルトやVue/runtime/manifestの変更無し。
+
+
+## 実接続・テスト進捗（2026-11-18：以前の「未実施」記録を更新）
+
+公式のWIPO IPC 2026.01 Hセクションについて、英語分類名66件/841,166 bytes、公式有効記号10,607件/1,227,656 bytesの**実HTTP取得→実XML/TXTパーサー→一時SQLite保存→H02M名称付き閲覧**を完了。OpenAlexは公開論文1件の実取得に成功後、匿名HTTP 429も実測。分類GUIには公式名取得ボタン、OpenAlexには最大25件の軽量metadata connectorを実装。管理画面ではEPO/JPO/USPTO等のキーを導入時に入力し、ユーザーが手動で少量の接続テストを実行できる（テストで資料は保存しない）。
+
+一時CIで対象29テストは27件成功＋2件スキップ。全体325テストは1件失敗＋3件スキップ（禁止されている一時CI workflowが唯一の失敗原因）であり、一時workflowは検証後撤去済み。撤去後の全体再テスト未実施。実機、EPO/JPO/USPTO実認証、PyMuPDF任意依存の実確認は残る。[根拠・ログ](source-smoke-evidence-2026-11-18.md)。本PRはDraftのまま。
