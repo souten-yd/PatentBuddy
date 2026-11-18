@@ -138,10 +138,17 @@ def _epo_auth(key, secret):
     basic = base64.b64encode(("%s:%s" % (key, secret)).encode()).decode()
     raw = http_get("https://ops.epo.org/3.2/auth/accesstoken", data=b"grant_type=client_credentials", method="POST",
                    headers={"Authorization": "Basic " + basic, "Content-Type": "application/x-www-form-urlencoded"})
-    data = json.loads(raw.decode())
-    _epo_token["value"] = data["access_token"]
-    _epo_token["exp"] = time.time() + int(data.get("expires_in", 1200))
-    return _epo_token["value"]
+    try:
+        data = json.loads(raw.decode("utf-8"))
+        token = data["access_token"]
+        expires = int(data.get("expires_in", 1200))
+        if not isinstance(token, str) or not token or not 1 <= expires <= 86400:
+            raise ValueError()
+    except (UnicodeError, ValueError, KeyError, TypeError):
+        raise ConnectorError("EPO OPS認証応答の形式が不正です") from None
+    _epo_token["value"] = token
+    _epo_token["exp"] = time.time() + expires
+    return token
 
 
 def epo_search(cql, key, secret, limit=25, *, start=1):
@@ -171,7 +178,10 @@ def epo_search(cql, key, secret, limit=25, *, start=1):
     raw = http_get(url, headers={"Authorization": "Bearer " + token,
                                  "Accept": "application/json",
                                  "X-OPS-Range": "%d-%d" % (start, start + limit - 1)}, pace=1.0)
-    data = json.loads(raw.decode())
+    try:
+        data = json.loads(raw.decode("utf-8"))
+    except (UnicodeError, ValueError):
+        raise ConnectorError("EPO OPSの応答JSONが不正です") from None
     return _epo_docs(data)
 
 
