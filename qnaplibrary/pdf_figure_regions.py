@@ -20,7 +20,10 @@ MAX_PIXELS = 16_000_000
 
 def _fitz():
     try:
-        import fitz
+        import importlib
+        # The core remains stdlib-only; PyMuPDF is optional and loaded only
+        # inside the resource-limited child on an explicitly imported PDF.
+        fitz = importlib.import_module("fitz")
     except ImportError as error:
         raise RuntimeError("図面位置の解析には任意のローカルPyMuPDFが必要です") from error
     return fitz
