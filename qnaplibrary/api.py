@@ -761,6 +761,32 @@ def ipc_catalog_lookup(req):
     return lookup(req.app.store, b["prefix"])
 
 
+@route("GET", "/api/v1/source-tests", "read")
+def source_test_options(req):
+    from .source_probes import readiness
+    return readiness(req.app.config.secret)
+
+
+@route("POST", "/api/v1/source-tests/run", "admin")
+def source_test_run(req):
+    """One administrator-confirmed probe, never an install-time or background call."""
+    from .source_probes import probe
+    b = req.json(limit=512)
+    if not isinstance(b, dict) or not {"source", "confirmed"} <= set(b) or not set(b) <= {
+            "source", "confirmed", "public_sample", "section"}:
+        raise _err(400, "ソース名・手動テスト承認のみ指定できます")
+    if b["confirmed"] is not True:
+        raise _err(400, "公式データソースへの単発接続を確認してください")
+    if not req.app.source_fetch_lock.acquire(blocking=False):
+        raise _err(429, "他のデータ取得・テストが実行中です")
+    try:
+        return probe(b["source"], req.app.config.secret,
+                     public_sample=b.get("public_sample") or "",
+                     section=b.get("section") or "H")
+    finally:
+        req.app.source_fetch_lock.release()
+
+
 @route("GET", "/api/v1/source-storage", "read")
 def source_storage_usage(req):
     from .source_storage import usage, policy
