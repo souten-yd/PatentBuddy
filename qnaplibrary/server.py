@@ -56,6 +56,8 @@ class App:
         self.store = Store(self.data_dir / "library.sqlite3")
         self.source_fetch_lock = threading.Lock()  # only one manual scoped source acquisition at a time
         self.source_advice_lock = threading.Lock()  # local-only explicit single classification query
+        from .patent_bulk_transfer import ManualBulkTransfer
+        self.uspto_bulk_transfer = ManualBulkTransfer(self.data_dir)  # idle until explicit admin action
         self.public_catalog = PublicCatalog(self.store)
         self.backups = Backups(self.store)
         self.auth = Auth(self.config, self.store)
