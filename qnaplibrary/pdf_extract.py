@@ -82,6 +82,7 @@ def _geometry_candidates(pdf, image_directory, start_index, limit, cancel):
     from .pdf_images import MAX_IMAGE_BYTES, png_size
     if not 0 <= start_index < 200 or not 1 <= limit <= 12:
         raise PDFError('図面候補の数が不正です')
+    _check_cancel(cancel)
     argv = [sys.executable, str(Path(__file__).with_name('pdf_figure_regions.py').resolve()),
             '--isolated-worker', str(pdf), str(image_directory), str(start_index), str(limit)]
     report = image_directory / 'figure-worker-report.json'
