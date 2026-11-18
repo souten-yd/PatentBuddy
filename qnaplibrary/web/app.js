@@ -649,7 +649,7 @@ async function scopedSourceCard(main, connectors) {
       h("table", {},
         h("tr", {}, h("th", {}, "出典"), h("th", {}, "標本の文献数"), h("th", {}, "本文・メタデータの参考量")),
         breakdown.items.map(v => h("tr", {}, h("td", {}, v.source), h("td", {}, v.documents_in_sample),
-          h("td", {}, sizeMiB(v.logical_payload_bytes_in_sample))))));
+          h("td", {}, sizeMiB(v.logical_payload_bytes_in_sample)))))));
     list.append(h("p", { class: "small muted" },
       "標本 " + (breakdown?.documents_examined ?? 0) + "件" +
       (breakdown?.has_older_documents ? "（古い文献は標本外。合計値ではありません）" : "（標本に含まれる文献のみ）")));
@@ -661,7 +661,7 @@ async function scopedSourceCard(main, connectors) {
         h("td", {}, v.source + " · " + v.classification),
         h("td", {}, v.status === "succeeded" ? "成功" : v.status === "failed" ? "失敗 (" + v.failure_code + ")" : "処理中"),
         h("td", {}, v.received + " / " + v.added),
-        h("td", {}, sizeMiB(v.response_bytes))))));
+        h("td", {}, sizeMiB(v.response_bytes)))))));
     else history.append(h("p", { class: "small muted" }, "分類別取得の履歴はありません。既存の汎用コネクタ履歴は含みません。"));
   });
   const sizeMiB = bytes => (Number(bytes || 0) / 1048576).toLocaleString("ja-JP", {maximumFractionDigits: 2}) + " MiB";
