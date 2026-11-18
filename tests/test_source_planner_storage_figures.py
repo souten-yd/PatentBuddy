@@ -242,3 +242,30 @@ class PDFIsolatedWorkerTests(unittest.TestCase):
                 pdf_extract._geometry_candidates(path, images, 2, 1, canceled)
             self.assertFalse((images / "2.png").exists())
             self.assertFalse((images / "figure-worker-report.json").exists())
+
+
+
+class LocalClassificationIndexTests(unittest.TestCase):
+    def test_uploaded_local_classification_is_suggestion_only(self):
+        srv = LiveServer()
+        try:
+            admin = Client(srv.base); admin.login_setup()
+            coll = srv.app.store.ensure_collection("ipc-fixture", "classification")
+            srv.app.store.add_documents(coll["id"], [
+                {"id": "H02M", "title": "インバータ 電力変換（合成分類）",
+                 "body": "インバータの電力変換装置", "source": "fixture"}])
+            with patch("qnaplibrary.connectors.epo_search", side_effect=AssertionError(
+                    "preview must not access external source")):
+                status, body = admin.call("POST", "/api/v1/source-plan", {"topic": "インバータ"})
+            self.assertEqual(status, 200, body)
+            self.assertTrue(body["preview_only"])
+            self.assertIn("local_classification_matches", body)
+            self.assertTrue(all(not x["verified_for_external_search"]
+                                for x in body["local_classification_matches"]))
+            if srv.app.store.fts:
+                self.assertIn("H02M", [x["code"] for x in body["local_classification_matches"]])
+            # One-shot allowlist remains exact and is independent of the local index.
+            with self.assertRaises(ValueError):
+                source_planner.accepted_ipc("H02M7/48")
+        finally:
+            srv.close()
