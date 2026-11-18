@@ -94,3 +94,50 @@ def read(store, *, cursor=0, limit=MAX_COLLECTIONS):
                 'document for approved evidence links and AI-reviewed concepts.'
             ),
         }
+
+def read_collection(store, collection_id, *, cursor=0, limit=50):
+    """A bounded keyset page within one huge collection: no text, no full scan."""
+    _limit(collection_id, 1, 2**63 - 1, 'collection')
+    _limit(cursor, 0, 2**63 - 1, 'cursor')
+    _limit(limit, 1, 50, 'limit')
+    with store.lock:
+        collection = store.db.execute(
+            'SELECT id,name,kind FROM collections WHERE id=?', (collection_id,),
+        ).fetchone()
+        if collection is None:
+            raise StoreError('atlas collection not found')
+        rows = store.db.execute(
+            'SELECT id,title FROM documents WHERE collection_id=? '
+            'AND (?=0 OR id<?) ORDER BY id DESC LIMIT ?',
+            (collection_id, cursor, cursor, limit + 1),
+        ).fetchall()
+        more = len(rows) > limit
+        root = 'c:%d' % collection_id
+        nodes = [{
+            'id': root, 'kind': 'collection', 'label': collection['name'],
+            'collection_id': collection_id, 'collection_kind': collection['kind'],
+            'status': 'catalog_index', 'basis': 'catalog_index',
+            'count_is_lower_bound': True, 'document_count': 0,
+        }]
+        edges = []
+        for row in rows[:limit]:
+            nid = 'd:%d' % row['id']
+            nodes.append({
+                'id': nid, 'kind': 'document',
+                'label': row['title'] or '文献 %d' % row['id'],
+                'document_id': row['id'], 'collection_id': collection_id,
+                'status': 'catalog_sample', 'basis': 'catalog_index',
+            })
+            edges.append({
+                'id': 'member:%d:%d' % (collection_id, row['id']),
+                'source': root, 'target': nid,
+                'basis': 'catalog_index', 'relation': 'collection_membership',
+            })
+        return {
+            'root': root, 'nodes': nodes, 'edges': edges,
+            'next_cursor': rows[limit - 1]['id'] if more else None,
+            'truncated': more, 'max_documents': 50, 'collection_id': collection_id,
+            'scope': 'catalog_page', 'read_only': True,
+            'disclaimer': ('Paged metadata only. Membership never means a technical '
+                           'relation or validated AI inference.'),
+        }
