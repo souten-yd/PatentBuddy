@@ -147,6 +147,116 @@ el('reconnect').onclick = () => load();
 function sourceMiB(bytes) {
   return (Math.max(0, Number(bytes) || 0) / (1024 * 1024)).toLocaleString('ja-JP', {maximumFractionDigits: 1}) + ' MiB';
 }
+
+const ipcSectionLabels = {
+  A: '生活', B: '処理・運輸', C: '化学・冶金', D: '繊維・紙',
+  E: '固定構造物', F: '機械工学', G: '物理', H: '電気'
+};
+function sourcePickCode(code, label) {
+  const list = el('source-ipc-select');
+  if (![...list.options].some(item => item.value === code)) {
+    const option = document.createElement('option');
+    option.value = code;
+    option.textContent = code + ' · ' + (label || '公式IPCに収録');
+    list.append(option);
+  }
+  list.value = code;
+  el('source-scope').open = true;
+  el('source-scope-status').textContent =
+    code + 'を仮選択しました。分類の定義と公開範囲を確認してください。';
+}
+async function sourceBrowseIPC(parent = '') {
+  const result = await api('ipc-catalog/browse', {parent});
+  const holder = el('source-catalog-tree');
+  holder.replaceChildren();
+  const status = el('source-catalog-browser-status');
+  status.textContent = 'WIPO IPC ' + result.version + ' / ' +
+    (parent || '大分類') + ' / ' + result.level + ' の記号（分類名は別資料）';
+  if (parent) {
+    const back = document.createElement('button');
+    back.type = 'button'; back.className = 'secondary'; back.textContent = '上の階層へ';
+    back.onclick = () => sourceBrowseIPC(parent.length === 4 ? parent.slice(0,3) :
+      parent.length === 3 ? parent.slice(0,1) : '').catch(error => {
+      status.textContent = error.message;
+    });
+    holder.append(back);
+  }
+  for (const item of result.items) {
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'secondary';
+    btn.textContent = item.code +
+      (result.level === 'section' ? ' · ' + (ipcSectionLabels[item.code] || '') +
+        (!item.imported ? '（未取込）' : '') : '');
+    btn.onclick = () => {
+      if (result.level === 'section' && !item.imported) {
+        status.textContent = item.code + 'は未登録です。ResearchDataHub管理画面の「収集」から公式辞書を取り込んでください。';
+      } else if (result.level === 'subclass') {
+        sourcePickCode(item.code);
+      } else if (result.level !== 'group') {
+        sourceBrowseIPC(item.code).catch(error => {status.textContent = error.message;});
+      }
+    };
+    holder.append(btn);
+  }
+}
+el('source-catalog-open').onclick = () => sourceBrowseIPC().catch(error => {
+  el('source-catalog-browser-status').textContent = '分類を取得できません: ' + error.message;
+});
+async function sourceLoadAdvisorModels() {
+  const selection = el('source-ai-provider');
+  const ask = el('source-ai-ask');
+  const status = el('source-ai-status');
+  selection.replaceChildren();
+  ask.disabled = true;
+  try {
+    const data = await api('source-assistant/options');
+    for (const model of data.models) {
+      const option = document.createElement('option');
+      option.value = model.id;
+      option.textContent = model.label;
+      selection.append(option);
+    }
+    ask.disabled = !data.models.length;
+    status.textContent = data.models.length ?
+      '検証済みローカルAIだけが表示されます。問い合わせはボタンを押した場合のみ実行します。' :
+      'ローカルAI未接続です。代わりに公式IPC分類から選択してください。';
+  } catch (error) {
+    status.textContent = 'ローカルAIの情報を取得できません: ' + error.message;
+  }
+}
+el('source-ai-ask').onclick = async () => {
+  const button = el('source-ai-ask');
+  const status = el('source-ai-status');
+  const holder = el('source-ai-candidates');
+  holder.replaceChildren();
+  button.disabled = true;
+  status.textContent = '検証済みローカルAIに問い合わせています…';
+  try {
+    const result = await api('source-assistant/ask', {
+      question: el('source-topic').value.trim(),
+      provider: el('source-ai-provider').value
+    });
+    const explanation = document.createElement('p');
+    explanation.textContent = result.reason +
+      (result.clarify ? ' / 確認事項: ' + result.clarify : '');
+    holder.append(explanation);
+    for (const item of result.codes) {
+      const btn = document.createElement('button');
+      btn.type = 'button'; btn.className = 'secondary';
+      btn.textContent = item.code + (item.label ? ' · ' + item.label : '') +
+        (item.official_catalog_verified ? '（辞書照合済）' : '（未登録）');
+      btn.disabled = !item.official_catalog_verified;
+      btn.onclick = () => sourcePickCode(item.code, item.label);
+      holder.append(btn);
+    }
+    status.textContent = result.codes.length ?
+      'AIの候補は未確認です。公式辞書と照合済みのコードだけ選択できます。' :
+      '候補を確定できません。公式IPC分類から選択してください。';
+  } catch (error) {
+    status.textContent = '分類を提案できません: ' + error.message;
+  } finally {button.disabled = !el('source-ai-provider').value;}
+};
+
 el('source-plan-form').onsubmit = async event => {
   event.preventDefault();
   const button = el('source-plan-go');
@@ -280,6 +390,7 @@ window.addEventListener('message', event => {
   };
   port.start();
   load();
+  sourceLoadAdvisorModels();
 });
 if (parent !== window) parent.postMessage({type: 'control-deck-addon.connect', bridge_version: '1.0'}, '*');
 else el('message').textContent = 'ControlDeckの「特許」から開いてください。';
