@@ -28,8 +28,8 @@
 
 - `tests/test_patent_bulk_transfer.py`: ZIP固定公式URL・サイズ・SHA256・既存receipt冪等・HTTP200/206/ETag/Range照合・切断・停止・不正ZIP・HTTPリダイレクト拒否・シンボリックリンク・空き容量/総2GiB制限・flock重複防止・管理者権限/認証・新規start時の公式一覧再確認。
 - `tests/test_patent_bulk_catalog.py`: 対象製品/メタデータ照合・keyのHTTPヘッダー・URL漏洩なし・権限境界。
-- GitHub CI（テスト用workflowは正式releases-only規則に従い実行後削除）でターゲット22件/失敗0、`bash scripts/verify-k6.sh`: 全体339件/失敗0/3 skip、構文・安全grep・バージョントリプル・Linux artifact作成PASS。任意PyMuPDFを導入した隔離図面抽出もPASS。証跡: https://github.com/souten-yd/PatentBuddy/actions/runs/44240112831
-- 追加した総2GiB・flock・起動時I/Oゼロの3テストは後続CIで確認する（最終結果に合わせ更新する）。
+- GitHub CI（テスト用workflowは正式releases-only規則に従い実行後削除）でターゲット25件/失敗0、`bash scripts/verify-k6.sh`: 全体342件/失敗0/3 skip、構文・安全grep・バージョントリプル・Linux artifact作成PASS。任意PyMuPDFを導入した隔離図面抽出もPASS。証跡: https://github.com/souten-yd/PatentBuddy/actions/runs/44240112831
+- 総2GiB・flock・起動時I/Oゼロの追加3テストは後続CIでPASS。Actions実行: https://github.com/souten-yd/PatentBuddy/actions/runs/44240713777 。Python対象25件0fail、全回帰342件0fail/3skip、Linux package/K6、任意PyMuPDF図面workerもPASS。一時CIはリポジトリから削除済み。
 - **実USPTO ZIPのライブ取得はまだ行っていない**。導入時 `設定 → 外部キー` に`uspto_api_key`を登録後、対象が512MiB以下の公開ZIPで1ファイルを選び、取得開始/停止/再開/最終SHA256/スペース消費を検査すること。公式APIがファイルダウンロードで302などのリダイレクトを必要とする場合、勝手に追従しない。正式配布元の転送先ホスト・署名付きURL契約を確認し、allowlist/credential leakage/retryの別レビューが必要。
 - `main`のデフォルトui.html/manifest/Vue read-only、ControlDeck Host、runtime level_0_manual_only、backend authoritative、no execution/no raw source serving/no fallback/no redirect/no startup npm buildを改変しない。Draft依存PR #39以下もレビュー前のマージは禁止。
 
@@ -40,3 +40,8 @@
 3. **ステージング移行**: 今回はPatentServerのdata_dir配下へ保存する。PC用Linux導入で本当に容量がある専用データ領域に構成できるようにする場合は、設定画面で**許可された設定済み保存ルートのみ**を選択し、任意の絶対パスや外部URLを入力させない。保存先をホストのファイルシステムへ公開するコマンド/APIを作らない。
 4. **公式キー実接続テスト**: WIPO HとOpenAlexの少量実取得実績を維持、USPTO/ EPO / JPO の実キーは環境導入時に登録。公式zipの短いファイルで200/206/ETag/Content-Length/Range/302の振舞いを確認し、許可されたリダイレクト先が存在するならTLS証明書・ホスト・署名・秘密鍵送信範囲を追加検証。自動巡回、Range偽装、規約違反のダウンロードは禁止。
 5. **ユーザー確認/PRレビュー**: リリース前の `bash scripts/verify-k6.sh`, `WITH_QPKG=1` は可能な範囲、実ControlDeck/Linux/QNAP/iPhone受入、main/docs/manifest/tests/runtimeセマンティクス検証、依存PR確認。少修正は次PRに含め、不要な追加PRを増やさない。
+
+
+### K7a最終受入証跡（2026-11-18）
+
+直近のGitHub Actions Run https://github.com/souten-yd/PatentBuddy/actions/runs/44240713777 で、対象テスト**25件0fail**、全体**342件0fail/3skip**、K6安全/バージョン/UI構文・Linux build・隔離PyMuPDF PASS。QPKG実パッケージ生成（WITH_QPKG=1）、実USPTO認証/公式ZIP、Linux/ControlDeck/QNAP/iPhone導入は未実施。追加した一時workflowは削除済み、既存release.ymlだけを維持。PR #40はDraft・未マージ・未リリース。
