@@ -111,7 +111,9 @@ def product_options():
     return {
         "products": [{"id": k, "description": v} for k, v in PRODUCTS.items()],
         "max_list": MAX_LIST, "max_window_days": 366,
-        "download_implemented": False, "manual_only": True,
+        "download_implemented": True, "bounded_staging_only": True,
+        "max_file_bytes": 512 * 1024 * 1024, "archive_parse_implemented": False,
+        "manual_only": True,
         "upstream_project": "https://github.com/DunlapCoddingPC/pyUSPTO",
     }
 
