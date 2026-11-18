@@ -2,6 +2,7 @@
 import hashlib
 import io
 import json
+import shutil
 import tempfile
 import threading
 import unittest
@@ -182,6 +183,7 @@ class ManualBulkFileUnitTests(unittest.TestCase):
         root = Path(self.scratch.name) / "some-directory"
         root.mkdir()
         target = Path(self.scratch.name) / "bulk_staging"
+        shutil.rmtree(target)
         target.symlink_to(root, target_is_directory=True)
         with self.assertRaises(bulk.BulkTransferError):
             self.fake_download(FakeOpener([]))
