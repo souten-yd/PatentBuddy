@@ -16,6 +16,7 @@ BASE = ("https://www.wipo.int/classifications/data/ipc/"
 MAX_SOURCE_BYTES = 3 * 1024 * 1024
 MAX_SYMBOLS = 30000
 CODE_RE = re.compile(r"^[A-H][0-9]{2}[A-Z](?:[0-9]{1,4}/[0-9]{1,6})?$")
+WIPO_PADDED_GROUP_RE = re.compile(r"^([A-H][0-9]{2}[A-Z])([0-9]{4})([0-9]{6})$")
 
 
 def section_url(section):
@@ -32,6 +33,13 @@ def normalized_symbol(raw):
     if not isinstance(raw, str):
         return ""
     code = re.sub(r"\s+", "", raw.upper())
+    wide = WIPO_PADDED_GROUP_RE.fullmatch(code)
+    if wide:
+        prefix, major, minor = wide.groups()
+        # The WIPO valid-symbol feed uses subclass + 4-digit main group +
+        # 6-digit (right-padded) subgroup. Preserve at least two digits.
+        last = max(2, len(minor.rstrip("0")))
+        code = "%s%d/%s" % (prefix, int(major), minor[:last])
     if not CODE_RE.fullmatch(code):
         return ""
     return code
@@ -58,7 +66,7 @@ def parse_valid_symbols(raw, section):
         kind = local_tag(node.tag)
         candidates = []
         if kind in ("ipc-entry", "classification-item", "ipcr-symbol", "symbol",
-                    "ipc-symbol", "classification-symbol", "valid-symbol"):
+                    "ipc-symbol", "ipcsymbol", "classification-symbol", "valid-symbol"):
             for attribute in ("symbol", "id", "code"):
                 if attribute in node.attrib:
                     candidates.append(node.attrib[attribute])
