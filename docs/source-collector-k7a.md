@@ -32,3 +32,18 @@ ResearchDataHubのIPC少量取得(明示管理者操作)＋ControlDeckの分野�
 ## リリース前の追加安全ゲート
 
 任意ライブラリPyMuPDFのAGPL/商用ライセンス適合性と、外部由来PDFを解析する際のCPU/メモリ制限・ワーカー隔離を確認する。今回の図面領域抽出はPDFジョブのプロセス内から任意ライブラリを呼ぶ暫定実装なので、無条件の本番リリースを認めない。必ずサンドボックス/別プロセスでの上限強制、異常/破損PDFでのハング・メモリ使用、実特許の多数図・回転・複数列をテストし、合格しなければ図面cropを既定無効にするか既存Popplerの安全な限定実装へ切り替える。設定 max_figures_per_pdf は0〜12で、PDF workerがResearchDataHubの設定を読んで適用する（旧サーバ404のみ互換デフォルト12）。
+
+## 2026-11-18 継続実装・レビュー待ち
+
+- 新規 source_history.py と source_acquisition_runs テーブルに、管理者が明示実行したEPO OPS分類別取得の開始・成功・失敗・IPC・件数・応答バイト数を記録。生の外部エラー・APIキー・未公開検索語は残さない。GET /api/v1/source-acquisitions?limit=20 は認証付きread専用。
+- GET /api/v1/source-storage?counts=1&breakdown=1 はDB/WAL/SHMの実ファイルサイズに加え、直近2,000文献に限定した出典別のタイトル・メタ・本文論理バイト数を返す。これは物理的な出典別ディスク占有量でも全件合計でもない。選択時のみクエリを行う。
+- ResearchDataHub管理Webの既存「収集」画面に、テーマからIPC候補確認→公開分類の明示承認→EPO最大25件単発取得→履歴確認、容量ソフト上限・件数・PDF図面上限設定を追加。ControlDeck側は候補・容量・履歴の閲覧のみで、Hostのadmin昇格はしない。
+- 既存の分類コレクションとFTS索引がある場合、テーマに合う分類辞書結果をローカルで最大8件参考表示する。ただし検索結果を承認済み外部検索コードに自動追加しない。公式IPC/CPC辞書の全導入は次工程。
+- PDF図面候補の任意PyMuPDF処理は別Python workerへ移し、CPU40秒・仮想メモリ1GiB・1ファイル2MiB、親側60秒タイムアウトとキャンセル、PNG形式・SHA256再検証を導入。補助処理に失敗した場合は図面候補を省いてPDF原本の取り込みを継続。原文PDFを正本とする。
+- 追加テスト: tests/test_source_planner_storage_figures.py（履歴/例外/同時操作/容量/分類辞書/PDF候補worker）と tests/test_source_management_workspace.py（管理者/Host分離・UI/制約）。図表数値の読取、Vision LLM、JPO/PATSTATバルク、全経路ハード容量制限は未実装。
+
+### 確認結果と未実施の境界
+
+GitHub実ファイルのResearchDataHub管理JSとControlDeck JSはV8構文検査PASS（管理JSの括弧漏れを発見し修正）、ControlDeck HTML ID重複0。独立SQLiteのrun履歴INSERT/UPDATEとsource別論理サイズSQL、合成PDFのベクターbboxから制限付きPython別プロセスで401x384/1,334BのPNGを切り抜いてSHA256を照合する独立smokeはPASS。これらはGitHub正規checkout内のPython unittest/実HTTP/PDFジョブ全体実行ではない。
+
+未実施: 新規Python unittest、LiveServer全回帰、実EPO OPS、ControlDeck/iPhone/QNAP実機、verify-k6.sh、QPKG、PDF高負荷時の物理I/O、PyMuPDFライセンスの正式受入。Draft #40・未マージ・未リリースを維持する。次Codexはまず全追加tests・認証/Host/PDF・scripts/verify-k6.sh・WITH_QPKG=1を実行し、失敗修正を本PRへ集約する。ui.html default、Vue read-only/non-default、backend authoritative、level_0_manual_only、no execution、raw source/fallback/redirect禁止、外部AIへの機密ゼロ、npm build at startup禁止を維持する。取得中電断によるrunの残留表示、PyMuPDF任意依存の安全性もレビューする。
