@@ -236,3 +236,11 @@ K7a Source Scope (Draft #40): 正規checkoutで python3 -m unittest tests.test_s
 
 
 K7a次Codex: WIPO IPC 2026.01の本物の公式有効記号XML（XSD v2）をダウンロードしてパーサ照合。仕様が違えば本PR内で修正。WIPO SchemeタイトルとJPO日本語タイトル/CPC公式辞書も版を守り新規導入する計画を立てる。先に python -m unittest tests.test_ipc_ai_selection tests.test_source_scope tests.test_source_planner_storage_figures tests.test_source_management_workspace -v、PDF/Host/auth/Atlasの既存回帰、scripts/verify-k6.sh、WITH_QPKG=1を実行。不具合は#40に集約。主UIはAI提案または公式分類から選ぶ方式を保つこと。ui.html default/Vue not default read-only/backend authoritative/level_0_manual_only/no execution/no raw source serving/no redirect/no startup npm buildを維持。実ControlDeck/iPhone/QNAP/EPO/WIPOで試験しない限りリリースしない。
+
+
+### K7a 真正実取得に続く受入作業（2026-11-18）
+
+1. [実取得の証跡](source-smoke-evidence-2026-11-18.md)、[最新のソース別導入状況](source-availability-2026-11.md)を読んで、先行する古い「WIPO実取得未実施」記述を現在状態として扱わない。WIPO H title 66 + valid symbols 10,607 の公式HTTP→SQLite→H02M階層はCI実証済み。OpenAlex匿名1件実成功とHTTP429実測、導入時無料キー登録前提。
+2. 削除済み一時CI後の正規checkoutで `bash scripts/verify.sh`、`bash scripts/verify-k6.sh`（LINUX成果物）、任意 `WITH_QPKG=1`、ローカル任意PyMuPDF worker、Host read-only/CSRF/main manifest/runtime docs照合を完了。直前全repo325 testsの唯一failureはテスト用追加workflowの存在であり現在削除済みだが、**未再実行なのでPASSとは扱わない**。
+3. EPO/JPO/USPTOの実公開データ取得はユーザーが各アカウント登録後にResearchDataHub管理画面「設定→外部キー」に入力してから、手動1件テストを行う。キーをCI/GitHubに貼らない。実接続できないソースは試験的表示のまま。OpenAlex無料キー登録も導入時に行い、429・リトライ・source license・取得制限を確認する。
+4. ソフトquotaを全経路hard quotaと表示しない。未公開発明/原文・Local AI質問・非公開請求項を外部検索に送らない。外部CQLはユーザー承認済み固定/公式IPC・国・期間だけ。Host executor追加、raw source/fallback/redirect、server起動時npm build、Vue default化、runtime semantics変更、autonomous actionsは禁止。依存PR #29～#40のmainファイル/manifest/docs/testsを照合し、すべて確認してからのみmerge/release。
