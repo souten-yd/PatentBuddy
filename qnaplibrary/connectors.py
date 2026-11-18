@@ -167,38 +167,73 @@ def epo_search(cql, key, secret, limit=25, *, start=1):
 
 
 def _epo_docs(data):
-    def as_list(x):
-        return x if isinstance(x, list) else ([x] if x else [])
+    """Flatten OPS JSON's exchange-documents variants without guessing records."""
+    def as_list(value):
+        return value if isinstance(value, list) else ([value] if value is not None else [])
 
-    def txt(x):
-        if isinstance(x, dict):
-            return x.get("$", "")
-        if isinstance(x, list):
-            return " ".join(txt(i) for i in x)
-        return str(x or "")
-    docs = []
+    def txt(value):
+        if isinstance(value, dict):
+            return txt(value.get("$", ""))
+        if isinstance(value, list):
+            return " ".join(txt(v) for v in value)
+        return str(value or "")
+
+    if not isinstance(data, dict):
+        raise ConnectorError("EPO OPSの応答形式が不正です")
     try:
-        results = data["ops:world-patent-data"]["ops:biblio-search"]["ops:search-result"]["exchange-documents"]
-    except (KeyError, TypeError):
-        return docs
-    for ed in as_list(results):
-        d = ed.get("exchange-document", {})
-        pn = "%s%s%s" % (d.get("@country", ""), d.get("@doc-number", ""), d.get("@kind", ""))
-        bib = d.get("bibliographic-data", {})
-        titles = as_list(bib.get("invention-title"))
-        title = next((txt(t) for t in titles if t.get("@lang") == "ja"), None) or (txt(titles[0]) if titles else pn)
-        abstract = " ".join(txt(a.get("p")) for a in as_list(d.get("abstract")))
-        parties = bib.get("parties", {})
-        applicants = [txt(a.get("applicant-name", {}).get("name")) for a in as_list(parties.get("applicants", {}).get("applicant"))
-                      if a.get("@data-format") == "epodoc"]
-        ipc = [txt(c.get("text")).strip() for c in as_list(bib.get("classifications-ipcr", {}).get("classification-ipcr"))]
-        pub = as_list(bib.get("publication-reference", {}).get("document-id"))
-        date = next((txt(p.get("date")) for p in pub if p.get("date")), "")
-        docs.append({"id": pn, "title": title, "url": "https://worldwide.espacenet.com/patent/search?q=pn%3D" + pn,
-                     "source": "EPO OPS", "date": ("%s-%s-%s" % (date[:4], date[4:6], date[6:8])) if len(date) == 8 else date,
-                     "abstract": abstract, "body": abstract,
-                     "meta": {"publication_number": pn, "applicants": applicants, "ipc": ipc, "office": d.get("@country", "")}})
-    return docs
+        response = data["ops:world-patent-data"]["ops:biblio-search"]
+        result = response.get("ops:search-result") or {}
+    except (KeyError, TypeError, AttributeError):
+        raise ConnectorError("EPO OPSの書誌応答の形式が不正です") from None
+    if not isinstance(result, dict):
+        raise ConnectorError("EPO OPSの書誌検索結果が不正です")
+    wrappers = as_list(result.get("exchange-documents", []))
+    documents = []
+    for wrapper in wrappers:
+        if not isinstance(wrapper, dict):
+            raise ConnectorError("EPO OPSの文献データが不正です")
+        documents.extend(as_list(wrapper.get("exchange-document", wrapper)))
+    output, seen = [], set()
+    for doc in documents:
+        if not isinstance(doc, dict):
+            raise ConnectorError("EPO OPSの文献書誌が不正です")
+        pn = "%s%s%s" % (doc.get("@country", ""), doc.get("@doc-number", ""), doc.get("@kind", ""))
+        if not pn.strip() or pn in seen:
+            continue
+        seen.add(pn)
+        bib = doc.get("bibliographic-data", {})
+        if not isinstance(bib, dict):
+            raise ConnectorError("EPO OPSの書誌項目が不正です")
+        titles = [t for t in as_list(bib.get("invention-title")) if isinstance(t, (str, dict))]
+        title = next((txt(t) for t in titles if isinstance(t, dict) and t.get("@lang") == "ja"), "") or (
+            txt(titles[0]) if titles else pn)
+        abstract = " ".join(txt(a.get("p")) for a in as_list(doc.get("abstract")) if isinstance(a, dict))
+        parties = bib.get("parties", {}) or {}
+        if not isinstance(parties, dict):
+            parties = {}
+        applicants = []
+        for party in as_list((parties.get("applicants") or {}).get("applicant")):
+            if not isinstance(party, dict) or party.get("@data-format") != "epodoc":
+                continue
+            names = party.get("applicant-name", {})
+            if isinstance(names, dict):
+                applicants.append(txt(names.get("name")))
+        classes = bib.get("classifications-ipcr", {}) or {}
+        ipc = ([txt(c.get("text")).strip() for c in as_list(classes.get("classification-ipcr"))
+                if isinstance(c, dict)] if isinstance(classes, dict) else [])
+        publications = bib.get("publication-reference", {}) or {}
+        refs = as_list(publications.get("document-id")) if isinstance(publications, dict) else []
+        date = next((txt(p.get("date")) for p in refs if isinstance(p, dict) and p.get("date")), "")
+        output.append({
+            "id": pn, "title": title,
+            "url": "https://worldwide.espacenet.com/patent/search?q=pn%3D" + pn,
+            "source": "EPO OPS",
+            "date": ("%s-%s-%s" % (date[:4], date[4:6], date[6:8])) if len(date) == 8 else date,
+            "abstract": abstract, "body": abstract,
+            "meta": {"publication_number": pn, "applicants": applicants, "ipc": ipc,
+                     "office": doc.get("@country", "")}
+        })
+    return output
 
 
 # JPO 特許情報取得API (experimental) -----------------------------------------
