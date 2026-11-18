@@ -614,7 +614,26 @@ def source_plan(req):
     body = req.json(limit=2048)
     if not isinstance(body, dict) or set(body) != {"topic"}:
         raise _err(400, "調査テーマのみを指定してください")
-    return plan(body["topic"])
+    preview = plan(body["topic"])
+    # Where an operator has already imported an official classification
+    # catalogue, provide up to eight local-only indexed matches as context.
+    # These are NOT added to the public CQL allowlist automatically.
+    preview["local_classification_matches"] = []
+    if (req.app.store.fts and req.app.store.collection_ids_of_kind(["classification"])):
+        results = req.app.searcher.search(body["topic"], None, 8, "keyword",
+                                          kinds=["classification"], rerank=False)["results"]
+        seen = set()
+        for item in results:
+            code = str(item.get("ext_id") or "")[:80]
+            if not code or code in seen:
+                continue
+            seen.add(code)
+            preview["local_classification_matches"].append({
+                "code": code, "title": str(item.get("title") or "")[:160],
+                "collection": str(item.get("collection") or "")[:80],
+                "verified_for_external_search": False,
+            })
+    return preview
 
 
 @route("GET", "/api/v1/source-storage", "read")
