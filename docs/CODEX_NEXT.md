@@ -248,7 +248,12 @@ K7a次Codex: WIPO IPC 2026.01の本物の公式有効記号XML（XSD v2）をダ
 ### K7a 次のOSS bulk実装（2026-11-18）
 
 1. [patent-bulk-open-source-k7a.md](patent-bulk-open-source-k7a.md)の実調査を参照。USPTO ODP公式Product Files read-onlyカタログと13テスト0failを実装済み。ユーザー環境へuspto_api_keyを登録したら、実ODP公開製品/ファイル一覧に1回だけ接続して、API responseのschemaと期間・size・limitsを確認する。偽のデータを正常扱いしない。
-2. 今回の1つ後の段階として、**ユーザーが選んだ1〜5ファイルのみ**Linux PCにbounded staging、HTTP Range/If-Range/206/ETag、hash、.part、容量・空き容量の強制上限、受取ファイルを直接外部へ公開しない、導入時のみmanual確認を実装。bulk-file-loaderのスケジューラ/常駐worker/webhookは持ち込まない。QNAP TS-253beのディスク書込最小化。
+2. **後続K7aで限定実装済み**：ユーザーが選んだ1ファイルのみLinux PC優先のサーバー専用領域へ最大512MiB（合計2GiB）手動stage。HTTP Range/If-Range/206/ETag、SHA256、.part、空き容量、flock、明示停止/再開。バルク複数ファイル一括選択や実USPTOキー検証は未完了。次はZIP展開・内容選別/差分DB保存。bulk-file-loaderの自動scheduler/webhookは移植しない。
 3. 特許ZIPをストリーム処理して、IPC/CPC・国・年で必要文献だけ分割し、重複ID/family/citation dedup。ZipSlip, Symlink, BOM/XML entity, ZIP爆弾, memory explosion防止。本文/図面の圧縮保存は一件ずつ人間の承認による二段階取得。
 4. Google BigQueryはquery dry-runでbytes/costを出してから。CPC/ドイツDPMA/JPO bulkを安全な固定official registryへ順次追加。対象の無料枠・アカウント登録を実際のAPI結果で確認し、認証キーはGitHub/CIへ入力しない。
 5. main実ファイル/docs/manifest/tests/runtime、PR #39までの依存stack、ui.html default/Vue read-only/not default/backend authoritative/level_0_manual_only/no execution/no raw serving/no fallback/redirect/no startup npm buildを検査。今回追加した一時テストWorkflowは削除済みのため再追加を恒久化しない。全Python/ControlDeck/QNAP/iPhone/actual-keyを検証してから初めてmerge/releaseを判断する。
+
+
+### 最新K7a次指示 — 実USPTOバルクZIPの解析/IPC選別（2026-11-18）
+
+[手動ダウンロード設計と受入ゲート](patent-bulk-manual-staging-k7a.md)を最優先参照。USPTO ODPの製品IDに紐付けられた公開ZIPを管理者が1件だけ手動取得するまで実装済み（backend-only、ControlDeck Hostは新権限なし）。新しいZIP内の記号辞書/公報XML/JSONを正式資料で解析する前に、実キー登録後の小さいサンプルZIPのHTTP/302/206/ETag、公式ライセンス、SHA256取得元照合を実測。ZIPを公開せず、ZipSlip/symlink/ZipBomb/DTD/XML ENTITYを検査し、IPC/CPC・国・公開年で対象だけ一件ずつDBに投入する。Linux PCで重処理、QNAPへは必要な正規化文献のみ。無制限自動DL/cron/ControlDeck実行/外部LLMへの未公開情報送信禁止。PR #39依存やmainのdocs/manifest/runtimeと同等、test 0 fail、実Linux/ControlDeck/QNAP/iOSの実機テスト後にのみmerge/release検討。
