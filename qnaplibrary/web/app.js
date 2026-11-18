@@ -905,7 +905,8 @@ async function scopedSourceCard(main, connectors) {
   const testLabels = {wipo_ipc_titles:"WIPO IPC英語分類名（キー不要）",
     wipo_ipc_symbols:"WIPO IPC有効記号（キー不要）",
     epo_ops:"EPO OPS書誌（キー必要）", jpo:"JPO審査経過（キー必要）",
-    uspto:"USPTO ODP（キー必要）", openalex:"OpenAlex研究論文（無料キー任意）"};
+    uspto:"USPTO ODP（キー必要）", uspto_bulk_catalog:"USPTOバルクファイル一覧（キー必要）",
+    openalex:"OpenAlex研究論文（無料キー任意）"};
   const refreshTests = guard(async () => {
     const status = await api("GET", "/api/v1/source-tests");
     clear(testRows);
