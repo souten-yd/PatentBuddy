@@ -11,16 +11,27 @@ MAX_HISTORY = 50
 MAX_SAMPLE = 5000
 
 
-def start(store, source, code, requested):
-    """Record only a public IPC code; never store private search text or API keys."""
-    if source != "epo_ops" or not isinstance(code, str) or len(code) != 4:
+def start(store, source, code, requested, *, scope=None):
+    """Record a bounded, public IPC scope only; never persist private search text."""
+    from .source_scope import build_scope
+    scope = scope or build_scope(ipc=code, limit=requested)
+    if (source != "epo_ops" or scope["ipc"] != code
+            or scope["limit"] != requested or type(requested) is not int
+            or not 1 <= requested <= 25):
         raise ValueError("取得ソースまたは分類が不正です")
-    if type(requested) is not int or not 1 <= requested <= 25:
-        raise ValueError("取得数が上限外です")
+    # Revalidate all persisted fields so callers cannot forge the run history.
+    checked = build_scope(ipc=code, publication_country=scope["publication_country"],
+                          year_from=scope["publication_year_from"],
+                          year_to=scope["publication_year_to"],
+                          first=scope["first_result"], limit=requested)
     with store.tx() as db:
         cursor = db.execute(
-            "INSERT INTO source_acquisition_runs(source,classification,requested,status,started) "
-            "VALUES(?,?,?,'running',?)", (source, code, requested, time.time()))
+            "INSERT INTO source_acquisition_runs("
+            "source,classification,publication_country,publication_year_from,"
+            "publication_year_to,first_result,requested,status,started) "
+            "VALUES(?,?,?,?,?,?,?,'running',?)",
+            (source, code, checked["publication_country"], checked["publication_year_from"],
+             checked["publication_year_to"], checked["first_result"], requested, time.time()))
         return cursor.lastrowid
 
 
@@ -46,7 +57,8 @@ def list_recent(store, limit=30):
     if type(limit) is not int or not 1 <= limit <= MAX_HISTORY:
         raise ValueError("履歴は1〜50件にしてください")
     rows = store.q(
-        "SELECT id,source,classification,requested,received,added,response_bytes,"
+        "SELECT id,source,classification,publication_country,publication_year_from,"
+        "publication_year_to,first_result,requested,received,added,response_bytes,"
         "status,started,finished,failure_code "
         "FROM source_acquisition_runs ORDER BY id DESC LIMIT ?", (limit,))
     now = time.time()
