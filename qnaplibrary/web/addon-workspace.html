@@ -30,7 +30,15 @@
  <h2>収集する技術分野を決める</h2>
  <p class="hint">例：インバータ、電気、機械。IPC候補を表示するだけで、外部へ検索語を送信しません。収集は別途管理者の明示承認が必要です。</p>
  <form id="source-plan-form"><label for="source-topic">調査する技術</label><div class="row"><input id="source-topic" maxlength="120" required placeholder="例：インバータ"><button id="source-plan-go" type="submit">IPC候補を調べる</button></div></form>
+ <div id="source-quick-presets" class="row" aria-label="調査分野の選択肢"></div>
  <p id="source-plan-status" class="hint" role="status">調査分野を指定してください。</p><div id="source-plan-results"></div>
+ <details id="source-ai-details" class="workspace-disclosure">
+   <summary>ローカルAIに分類を簡単に聞く（任意）</summary>
+   <p class="hint">質問は検証済みローカルAIのみに送ります。分類結果は未確認です。</p>
+   <div class="row"><label for="source-ai-provider">ローカルモデル</label><select id="source-ai-provider"></select><button id="source-ai-ask" type="button" disabled>AIに聞く</button></div>
+   <p id="source-ai-status" class="hint" role="status">ローカルAIを確認しています。</p>
+   <div id="source-ai-candidates"></div>
+ </details>
  <details id="source-scope" class="workspace-disclosure">
    <summary>EPOの公開国・公開年・取得位置を絞る（検索式の確認のみ）</summary>
    <p class="hint">実際の取得はResearchDataHub管理画面から明示承認して実行します。公開日と出願日・優先日は異なります。</p>
@@ -39,6 +47,8 @@
    <div class="row"><label for="source-year-from">公開年から</label><input id="source-year-from" type="number" min="1900" max="2100" value="2020"><label for="source-year-to">公開年まで</label><input id="source-year-to" type="number" min="1900" max="2100" value="2026"></div>
    <div class="row"><label for="source-page-first">取得開始位置</label><input id="source-page-first" type="number" min="1" max="2000" value="1"><label for="source-page-limit">件数</label><input id="source-page-limit" type="number" min="1" max="25" value="10"><button id="source-scope-preview" class="secondary" type="button">検索式を確認</button></div>
    <p id="source-scope-status" class="hint" role="status">外部APIへは送信されません。</p>
+   <button id="source-ipc-browse" type="button" class="secondary">公式IPCの下位記号を確認</button>
+   <p id="source-ipc-browse-status" class="hint" role="status">WIPO公式IPC辞書が登録されている場合だけ表示します。</p>
  </details>
  <div class="row"><h3>保存容量</h3><button id="source-storage-refresh" class="secondary" type="button">容量を確認</button></div>
  <p id="source-storage-status" class="hint" role="status">必要なときだけ容量情報を取得します。</p>
