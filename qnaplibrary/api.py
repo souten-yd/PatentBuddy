@@ -655,6 +655,72 @@ def source_scope_preview(req):
                        first=body.get("first", 1))
 
 
+
+# Choice-first IPC search and optional local-only AI classification help.
+@route("GET", "/api/v1/source-assistant/options", "read")
+def source_assistant_options(req):
+    from .source_advisor import quick_presets, local_models
+    return {"presets": quick_presets(),
+            "models": local_models(req.app.providers, req.app.config),
+            "privacy": "ローカル認証済みAI以外は利用不可。外部モデルへの代替接続なし。",
+            "automatic_execution": False}
+
+
+@route("POST", "/api/v1/source-assistant/ask", "read")
+def source_assistant_ask(req):
+    from .source_advisor import advise
+    b = req.json(limit=2048)
+    if not isinstance(b, dict) or set(b) != {"question", "provider"}:
+        raise _err(400, "質問とローカルAIモデルのみを指定してください")
+    if not req.app.source_advice_lock.acquire(blocking=False):
+        raise _err(429, "ローカルAIによる分類問い合わせが実行中です")
+    try:
+        try:
+            return advise(b["question"], b["provider"], req.app.providers, req.app.config)
+        except LLMError:
+            raise _err(502, "ローカルAIで分類候補を作れませんでした。モデル・接続を確認してください") from None
+    finally:
+        req.app.source_advice_lock.release()
+
+
+@route("GET", "/api/v1/ipc-catalog", "read")
+def ipc_catalog_status(req):
+    from .official_ipc import status
+    return status(req.app.store)
+
+
+@route("POST", "/api/v1/ipc-catalog/import", "admin")
+def ipc_catalog_import(req):
+    """Explicit fetch of one WIPO fixed-edition section, never arbitrary URLs."""
+    from .official_ipc import section_url, install, MAX_SOURCE_BYTES
+    from .source_storage import usage
+    b = req.json(limit=1024)
+    if not isinstance(b, dict) or set(b) != {"section", "confirm_public_source"}:
+        raise _err(400, "分類セクションと公式データ取得確認を指定してください")
+    if b["confirm_public_source"] is not True:
+        raise _err(400, "WIPO公式分類データの取得を承認してください")
+    url = section_url(b["section"])
+    stats = usage(req.app.store)
+    if stats["soft_limit_reached"] or stats["disk_free_bytes"] < 128*1024*1024:
+        raise _err(409, "空き容量またはソフト上限を確認してください")
+    try:
+        raw = connectors.http_get(url, timeout=45, pace=2.0)
+    except connectors.ConnectorError:
+        raise _err(502, "WIPO公式分類データを取得できませんでした") from None
+    if len(raw) > MAX_SOURCE_BYTES:
+        raise _err(413, "WIPOの分類セクションデータが許容サイズを超えました")
+    return install(req.app.store, raw, b["section"])
+
+
+@route("POST", "/api/v1/ipc-catalog/lookup", "read")
+def ipc_catalog_lookup(req):
+    from .official_ipc import lookup
+    b = req.json(limit=512)
+    if not isinstance(b, dict) or set(b) != {"prefix"}:
+        raise _err(400, "IPC分類コードの先頭文字を指定してください")
+    return lookup(req.app.store, b["prefix"])
+
+
 @route("GET", "/api/v1/source-storage", "read")
 def source_storage_usage(req):
     from .source_storage import usage, policy
