@@ -162,9 +162,15 @@ el('source-plan-form').onsubmit = async event => {
       card.textContent = candidate.code + ' · ' + candidate.label + '（未確認の候補） / EPO式: ' + candidate.cql_preview;
       holder.append(card);
     }
+    for (const match of (result.local_classification_matches || []).slice(0, 8)) {
+      const line = document.createElement('p');
+      line.textContent = '保存済み分類辞書: ' + match.code + ' · ' + match.title +
+        '（未承認／外部検索対象ではありません）';
+      holder.append(line);
+    }
     el('source-plan-status').textContent = result.candidates.length
       ? result.candidates.length + '分類を提案しました。辞書と原典で照合し、公開情報だけを外部検索してください。'
-      : '対応する初期候補がありません。ResearchDataHubの分類辞書で検索し、IPC/CPCを確認してください。';
+      : '初期候補はありません。分類辞書からの追加候補も確認してください。';
   } catch (error) {
     el('source-plan-status').textContent = '分類候補を取得できません: ' + error.message;
   } finally { button.disabled = false; }
