@@ -858,8 +858,10 @@ function makeForceGraph(svg, data, onSelect, initialFocus) {
       group.classList.toggle('is-selected', nodeId === focusId);
       group.classList.toggle('is-neighbor', adjacent.has(nodeId));
       group.classList.toggle('is-filter-match', Boolean(filterTerm) && matched);
-      group.classList.toggle('is-filtered', Boolean(filterTerm) && !matched);
-      group.classList.toggle('is-dimmed', (Boolean(filterTerm) && !matched) ||
+      group.classList.toggle('is-filtered', Boolean(filterTerm) && !matched &&
+        nodeId !== focusId);
+      group.classList.toggle('is-dimmed', (Boolean(filterTerm) && !matched &&
+        nodeId !== focusId) ||
         (nodeId !== center && nodeId !== focusId && !adjacent.has(nodeId)));
     }
     for (const entry of lines) {
