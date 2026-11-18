@@ -161,9 +161,42 @@ def extract_pdf(source, cancel=None, force_pages=(), progress=None, scratch_pare
                     .decode('utf-8', 'replace').splitlines()[0][:200]
                     for tool in ('pdfinfo', 'pdftotext', 'pdfimages')}
         images = []
+        figure_preview = {"status": "not_requested", "candidates": []}
         if image_directory is not None:
-            from .pdf_images import extract_images
+            from .pdf_images import extract_images, MAX_IMAGES, MAX_TOTAL_BYTES
             images = extract_images(pdf, image_directory, image_listing, cancel, _run)
+            # Optional PC-only geometry hints, never an AI/legal determination.
+            # A PDF image object is not necessarily a standalone patent figure.
+            try:
+                from .pdf_figure_regions import scan as scan_figure_regions, crop as crop_figure_region
+                figure_preview = scan_figure_regions(pdf, limit_pages=min(count, 12))
+                figure_preview["status"] = "unreviewed"
+                added_bytes = sum(item["size_bytes"] for item in images)
+                max_id = max((item["id"] for item in images), default=-1)
+                for candidate in figure_preview["candidates"][:12]:
+                    _check_cancel(cancel)
+                    if len(images) >= MAX_IMAGES or max_id + 1 >= MAX_IMAGES:
+                        figure_preview["truncated"] = True
+                        break
+                    try:
+                        result = crop_figure_region(pdf, page_number=candidate["page"],
+                                                    bbox_points=candidate["bbox_points"], dpi=120)
+                    except ValueError:
+                        continue
+                    if added_bytes + result["size_bytes"] > MAX_TOTAL_BYTES:
+                        figure_preview["truncated"] = True
+                        break
+                    max_id += 1
+                    (Path(image_directory) / ("%d.png" % max_id)).write_bytes(result["png"])
+                    images.append({"id": max_id, "page": candidate["page"],
+                                   "kind": "figure_candidate", "width": result["width"],
+                                   "height": result["height"], "sha256": result["sha256"],
+                                   "size_bytes": result["size_bytes"],
+                                   "method": "local_pdf_page_crop", "review_status": "unreviewed",
+                                   "bbox_points": result["bbox_points"]})
+                    added_bytes += result["size_bytes"]
+            except RuntimeError:
+                figure_preview = {"status": "optional_local_geometry_unavailable", "candidates": []}
         started = time.monotonic()
         pages, total = [], 0
         for page in range(1, count + 1):
@@ -204,7 +237,8 @@ def extract_pdf(source, cancel=None, force_pages=(), progress=None, scratch_pare
                 progress(page, count)
         _check_cancel(cancel)
         return {'sha256': digest.hexdigest(), 'size_bytes': size, 'page_count': count,
-                'pages': pages, 'images': images, 'tool_versions': versions, 'schema_version': 1}
+                'pages': pages, 'images': images, 'figure_preview': figure_preview,
+                'tool_versions': versions, 'schema_version': 1}
 
 
 def _worker():
