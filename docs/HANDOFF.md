@@ -363,3 +363,8 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - 実施検証：GitHub実ソースとObsidian/Sigma/SQLiteの仕様照合、V8 JS syntax PASS、HTML ID欠落/重複0、CSS括弧整合。100,500文献の**独立SQLite smoke**でkeyset50件ずつ重複なし/index使用/Count上限/原文非SELECTをPASS。新規LiveServerの`tests/test_knowledge_atlas.py`と`tests/test_knowledge_atlas_workspace.py`は**追加しただけで未実行**。実CtrlDeck/QNAP/Linux/iPhone/物理I/O/本物のAI動作は未検証。
 - 今回WebGLは**未導入**。多数の文献を同時描画する必要が実測で出た時だけSigma.js+Graphology/ForceAtlas2 Workerをオフラインbuild時に同梱するK7検討。ユーザーのAI必須方針を引き継ぎ、次K7にlocal-only embeddings/候補関連検索→原文の人間審査を含める。AI生成候補を未承認のまま事実関係に昇格させない。
 - 全K1a〜K6c PR #29→#39は依存stack、現main正式版0.5.12。実CI/verify/QPKG/Host実機を通過してからmainへ依存順merge/Release。
+
+
+### K7a 新ブランチ: 分野限定収集・容量表示・PDF図面候補（2026-11-18）
+
+K6c Draft PR #39をbaseに scoped-sources-storage-figures-k7a を作成。実装: qnaplibrary/source_planner.py、source_storage.py、pdf_figure_regions.py、API/Host Bridge/ControlDeck資料タブ、PDF取込および保存バリデータ、tests/test_source_planner_storage_figures.py。オンライン外部資料の総取り込みではなく、ユーザーが入力した「インバータ」「電気」「機械」から少数のIPC分類候補を提示し、外部には承認した固定分類文字列だけを送る。EPO取得は管理者専用で1回最大25件。ディスク表示はSQLite/WAL/SHMの物理サイズと文献/PDF/画像カウント、上限はソフト上限。PDF図候補は原本ページ+bboxを持つ未確認圧縮PNG。実装詳細と次Codex・未実施テストは [source-collector-k7a.md](source-collector-k7a.md)。GitHub実JSの構文PASS・HTML ID重複0、独立合成PDFでrectangle→crop smoke PASS、正式全repo unittest/ControlDeck実機/EPO live/本番配布は未実行。旧Draft stackは未マージ・未リリース。
