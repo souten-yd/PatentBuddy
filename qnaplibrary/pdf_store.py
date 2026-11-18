@@ -124,8 +124,29 @@ def validate_images(extraction, images):
         if (item.get('sha256') != digest or item.get('size_bytes') != len(raw)
                 or item.get('width') != width or item.get('height') != height
                 or type(item.get('page')) is not int or not 1 <= item['page'] <= extraction['page_count']
-                or item.get('method') != 'pdfimages_png' or item.get('review_status') != 'unreviewed'):
+                or item.get('method') not in ('pdfimages_png', 'local_pdf_page_crop')
+                or item.get('review_status') != 'unreviewed'):
             raise StoreError('画像の内容・ページと抽出根拠が一致しません')
+        if item.get('method') == 'local_pdf_page_crop':
+            if item.get('kind') != 'figure_candidate':
+                raise StoreError('切り抜きの出所が不正です')
+            # The worker must keep its page coordinate proof. A candidate is
+            # never a reviewed figure, even if the crop is stored.
+            box = item.get('bbox_points')
+            if (not isinstance(box, list) or len(box) != 4 or
+                    any(type(v) not in (float, int) for v in box)):
+                raise StoreError('図面の座標根拠が不正です')
+            try:
+                # Check order and finiteness independently of the page dimensions.
+                import math
+                if (not all(math.isfinite(v) for v in box)
+                        or box[0] < 0 or box[1] < 0
+                        or box[2] - box[0] < 10 or box[3] - box[1] < 10):
+                    raise ValueError()
+            except ValueError:
+                raise StoreError('図面の座標根拠が不正です') from None
+        elif 'bbox_points' in item:
+            raise StoreError('埋め込み画像に切り抜き座標を付与しないでください')
         size += len(raw)
         if size > MAX_TOTAL_BYTES:
             raise StoreError('画像の合計は32MiB以内にしてください')
