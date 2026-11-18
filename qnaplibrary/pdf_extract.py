@@ -109,13 +109,15 @@ def _ocr_words(tsv):
     }
 
 
-def extract_pdf(source, cancel=None, force_pages=(), progress=None, scratch_parent=None, image_directory=None):
+def extract_pdf(source, cancel=None, force_pages=(), progress=None, scratch_parent=None, image_directory=None, max_figure_crops=12):
     """Return all pages or raise; no partial-success or silent truncation.
 
     force_pages uses 1-based page numbers. OCR confidence is an engine score,
     not a probability of correctness; all output remains unreviewed.
     """
     cancel = cancel or threading.Event()
+    if type(max_figure_crops) is not int or not 0 <= max_figure_crops <= 12:
+        raise PDFError('図面候補の枚数は0〜12です')
     forced = set(force_pages)
     if any(type(p) is not int or p < 1 for p in forced):
         raise PDFError('OCRページ番号は1以上の整数で指定してください')
@@ -168,12 +170,14 @@ def extract_pdf(source, cancel=None, force_pages=(), progress=None, scratch_pare
             # Optional PC-only geometry hints, never an AI/legal determination.
             # A PDF image object is not necessarily a standalone patent figure.
             try:
+                if max_figure_crops == 0:
+                    raise RuntimeError('figure crop disabled by policy')
                 from .pdf_figure_regions import scan as scan_figure_regions, crop as crop_figure_region
                 figure_preview = scan_figure_regions(pdf, limit_pages=min(count, 12))
                 figure_preview["status"] = "unreviewed"
                 added_bytes = sum(item["size_bytes"] for item in images)
                 max_id = max((item["id"] for item in images), default=-1)
-                for candidate in figure_preview["candidates"][:12]:
+                for candidate in figure_preview["candidates"][:max_figure_crops]:
                     _check_cancel(cancel)
                     if len(images) >= MAX_IMAGES or max_id + 1 >= MAX_IMAGES:
                         figure_preview["truncated"] = True
@@ -195,8 +199,9 @@ def extract_pdf(source, cancel=None, force_pages=(), progress=None, scratch_pare
                                    "method": "local_pdf_page_crop", "review_status": "unreviewed",
                                    "bbox_points": result["bbox_points"]})
                     added_bytes += result["size_bytes"]
-            except RuntimeError:
-                figure_preview = {"status": "optional_local_geometry_unavailable", "candidates": []}
+            except RuntimeError as error:
+                figure_preview = {"status": ("disabled_by_policy" if max_figure_crops == 0
+                                             else "optional_local_geometry_unavailable"), "candidates": []}
         started = time.monotonic()
         pages, total = [], 0
         for page in range(1, count + 1):
