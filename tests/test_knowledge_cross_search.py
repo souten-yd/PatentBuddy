@@ -232,8 +232,11 @@ class CrossKnowledgeTests(unittest.TestCase):
             with self.subTest(scope=scope):
                 self.assertEqual(client.call('POST', '/api/v1/knowledge/search',
                                              {'q': '温度'})[0], expected)
+                # Empty comparison is invalid input (400) for authenticated
+                # readers, while non-read scopes are rejected first (403).
+                compare_expected = 400 if scope in ('ro', 'rw') else 403
                 self.assertEqual(client.call('POST', '/api/v1/knowledge/compare',
-                                             {'items': []})[0], expected)
+                                             {'items': []})[0], compare_expected)
         self.assertEqual(Client(self.live.base).call(
             'POST', '/api/v1/knowledge/search', {'q': '温度'})[0], 401)
         self.assertEqual(self.admin.call(
