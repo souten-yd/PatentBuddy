@@ -961,10 +961,11 @@ async function scopedSourceCard(main, connectors) {
           result.files_previewed + "件 / 合計" +
           (result.file_bytes_total / (1024*1024)).toFixed(1) +
           "MiB。必要な1ファイルのみ手動で保存できます（ZIP展開なし）。";
+        const listedProduct = bulkProduct.value;
         for (const item of result.files) {
           const stateLabel = h("span", { class: "small muted", role: "status" }, "取得していません");
           const stateUrl = "/api/v1/uspto-bulk/transfer/status?product=" +
-            encodeURIComponent(bulkProduct.value) + "&file_name=" + encodeURIComponent(item.file_name);
+            encodeURIComponent(listedProduct) + "&file_name=" + encodeURIComponent(item.file_name);
           let currentState = "not_downloaded";
           const updateState = async () => {
             const state = await api("GET", stateUrl);
@@ -983,6 +984,14 @@ async function scopedSourceCard(main, connectors) {
           const saveBtn = h("button", { class:"btn", disabled: item.over_advisory_cap,
             onclick: guard(async () => {
               const last = await updateState();
+              if (last.state === "completed") {
+                stateLabel.textContent = "保存済みです。重複ダウンロードを避けるため再取得しません。";
+                return;
+              }
+              if (last.state === "running") {
+                stateLabel.textContent = "取得中です。進捗更新か停止を使用してください。";
+                return;
+              }
               const restarting = last.state === "interrupted" && !last.can_resume;
               const reDownload = last.state === "completed" || restarting ||
                 (last.state === "failed" && !last.can_resume);
@@ -993,7 +1002,7 @@ async function scopedSourceCard(main, connectors) {
               saveBtn.disabled = true;
               try {
                 const started = await api("POST", "/api/v1/uspto-bulk/transfer/start", {
-                  product: bulkProduct.value, file_name: item.file_name,
+                  product: listedProduct, file_name: item.file_name,
                   expected_bytes: item.bytes, confirmed: true, restart: reDownload
                 });
                 stateLabel.textContent = started.state + " / " + item.file_name +
@@ -1005,7 +1014,7 @@ async function scopedSourceCard(main, connectors) {
             if (!confirm("現在取得中の " + item.file_name + " を停止しますか？" +
               " 検証可能な途中ファイルは再開用に保持します。")) return;
             const state = await api("POST", "/api/v1/uspto-bulk/transfer/cancel",
-              {product: bulkProduct.value, file_name: item.file_name, confirmed: true});
+              {product: listedProduct, file_name: item.file_name, confirmed: true});
             stateLabel.textContent = "停止を要求しました / " +
               ((state.bytes_done || 0) / (1024*1024)).toFixed(1) + "MiB";
           })}, "停止");
