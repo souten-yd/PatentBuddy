@@ -659,7 +659,7 @@ async function scopedSourceCard(main, connectors) {
         h("th", {}, "受信／新規"), h("th", {}, "応答量")),
       log.items.map(v => h("tr", {}, h("td", { class: "small" }, fmtDate(v.started)),
         h("td", {}, v.source + " · " + v.classification),
-        h("td", {}, v.status === "succeeded" ? "成功" : v.status === "failed" ? "失敗 (" + v.failure_code + ")" : "処理中"),
+        h("td", {}, v.status === "succeeded" ? "成功" : v.status === "failed" ? "失敗 (" + v.failure_code + ")" : v.possibly_interrupted ? "中断の可能性" : "処理中"),
         h("td", {}, v.received + " / " + v.added),
         h("td", {}, sizeMiB(v.response_bytes)))))));
     else history.append(h("p", { class: "small muted" }, "分類別取得の履歴はありません。既存の汎用コネクタ履歴は含みません。"));
