@@ -52,3 +52,9 @@ Existing connector does **not** demonstrate successful runtime API access. No pr
 - ResearchDataHub管理者画面には固定的なソースリストと接続状況（キー設定の有無）を表示し、手動確認後の単発テスト機能を実装。キー未設定のEPO/JPO/USPTOについては「登録して導入時入力」と表示し、実接続成功扱いにしない。OpenAlexの匿名テストは無料キーなしでも試せるが正常を保証しない。
 - 一時的なDraftブランチ用GitHub CIで対象29テストは2skip/0fail、全repo325テストは1fail（唯一、`release.yml`以外の一時CI追加に対するリポジトリの明示ルール）。検証後一時CIは削除。**削除後の全テストを再実行してはいないため全件PASSとは宣言しない。**
 - EPO/JPO/USPTO OAuth/キー本番認証は導入時にユーザーが登録・設定するまで未実施。外部機密送信はしない。
+
+## K7a bulk OSS integration (2026-11-18)
+
+[OSS採用基準・安全な段階的バルク取得計画](patent-bulk-open-source-k7a.md)を追加。現在のUSPTO公式ODPバルク3製品（PTGRXML/PTFWPRD/PTFWPRE）の**ファイル名・サイズ・対象期間のみ**を管理者が単発で読み取るpreview APIを追加。導入時に既存uspto_api_keyを入力して初めて照会可能。バルクZIP本体のダウンロード・抽出・差分適用・自動収集は今回**未実装**。コード参照元はMITライセンスのpatent-dev/bulk-file-loaderとpyUSPTO（実ファイルをコピーせず仕様のみ参考）。個別OSSのメンテ状況・他ソースの導入優先度はリンク先に記録。
+
+CIで新規USPTOバルク台帳+既存接続13テスト、0fail、Python+JS構文PASS。https://github.com/souten-yd/PatentBuddy/actions/runs/44236606303 。一時CI workflowは検証後削除。認証済みUSPTO ODP実APIはまだ未検証であるため「利用可能」と宣言しない。
