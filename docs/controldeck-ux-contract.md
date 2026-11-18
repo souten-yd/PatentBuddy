@@ -79,3 +79,9 @@ ControlDeck Hostのshell/nav/theme/accent/Bridge認証を増設しない。保�
 [実装詳細](workspace-ux-k6b.md)。ControlDeck Host本体のPageHeader/Theme/Mobile設計（2026-11-18 main実ファイル）に準じ、PatentBuddy Embedded Workspaceに**ローカルコンテンツ切替**「資料 / 知識 / アイデア」のみを追加。HostのGlobal nav/戻る/認証/下部ナビ・`ui.html` defaultは触らない。作業ステップは`role=tablist/tab/tabpanel`で矢印/開始/終了キー対応、非表示は確実にhidden。編集中Ideaはタブ/証拠参照で破棄されず、別Idea案で上書きする時だけ確認する。K2 approved knowledge→検索語のフォーム設定とK4→K5、引用確認→元画面へ戻るリンクを実装するが**自動検索・自動Graph/Idea保存しない**。
 
 PC幅では検索/資料一覧2カラム、詳細・Mapフル幅。iPhone 320〜767pxは1列、390px以下はステップ説明を簡略化。Host theme tokens/zinc/accent、16px入力/44pxヒット、focus-visible/safe-area/reduced-motion、textContentとversioned quote/明確な推論ラベルを維持。静的検証はPASSだが実機/Node CLI・全Python・QNAP/Linux build未検証のためDraft。
+
+## K6c：Obsidian風Knowledge Atlas/ローカルAIのHost UX契約（2026-11-18）
+
+[仕様詳細](knowledge-atlas-k6c.md)。Knowledge AtlasをStep02知識の冒頭へ配置し、最大61 nodeのglobal overviewをObsidian風のdrag/pan/zoom/選択focus/neighbor highlight/label-searchで操作できる。分野→50件document keyset page→特定文献のK3 local mapへdrilldown。Globalの線は保存先・所属関係で技術的類似性ではない。K3b人手確認仮説は点線/明示opt-in、K2承認済みAI提案も推論のままで事実へ変換しない。
+
+Global/Local Inspectorの文献Nodeに人間確認付き「ローカルAIで知識抽出」を設け、既存ControlDeck Hostのprovenance付きlocal-only Jobからのみ実行。自動実行・Graph/Ideaの自動保存・クラウドfallback禁止。iOS 320pxでもマップを表示し、タッチNode/Backgroundのdrag、＋/−、全体へ戻る、地図上の検索、ARIA tab/Enter選択、Reduced Motionを提供。Host shell/nav/theme/accent/Bridge/level_0_manual_only/no execution/default UIに変更なし。SVGは停止する短いフォース計算だけを行い、位置をDBへ保存しない。
