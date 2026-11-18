@@ -23,7 +23,8 @@ def start(store, source, code, requested, *, scope=None):
     checked = build_scope(ipc=code, publication_country=scope["publication_country"],
                           year_from=scope["publication_year_from"],
                           year_to=scope["publication_year_to"],
-                          first=scope["first_result"], limit=requested)
+                          first=scope["first_result"], limit=requested,
+                          official_verified=scope.get("official_catalog_verified", False))
     with store.tx() as db:
         cursor = db.execute(
             "INSERT INTO source_acquisition_runs("
