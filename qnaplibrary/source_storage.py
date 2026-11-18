@@ -21,7 +21,7 @@ def validate_policy(data):
         raise ValueError("すべての容量設定を指定してください")
     for key, low, high in (("soft_limit_mib", 128, 1048576),
                            ("max_results_per_fetch", 1, 25),
-                           ("max_figures_per_pdf", 0, 200)):
+                           ("max_figures_per_pdf", 0, 12)):
         value = data[key]
         if type(value) is not int or not low <= value <= high:
             raise ValueError(key + " が範囲外です")
