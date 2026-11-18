@@ -761,6 +761,42 @@ def ipc_catalog_lookup(req):
     return lookup(req.app.store, b["prefix"])
 
 
+@route("GET", "/api/v1/uspto-bulk/options", "read")
+def uspto_bulk_product_options(req):
+    """Official ODP product choices, offline, no API key required."""
+    from .patent_bulk_catalog import product_options
+    return product_options()
+
+
+@route("POST", "/api/v1/uspto-bulk/preview", "admin")
+def uspto_bulk_catalog_preview(req):
+    """Admin-confirmed, metadata-only USPTO ODP bulk file inventory.
+
+    No raw URLs accepted, no archive downloaded, no documents modified.
+    The API key is entered separately at installation in existing secret store.
+    """
+    from .patent_bulk_catalog import preview
+    b = req.json(limit=1024)
+    required = {"product", "confirmed"}
+    optional = {"limit", "date_from", "date_to"}
+    if not isinstance(b, dict) or not required <= set(b) or not set(b) <= required | optional:
+        raise _err(400, "USPTO公式製品・手動確認と任意の件数/期間のみ指定できます")
+    if b["confirmed"] is not True:
+        raise _err(400, "USPTOへ問い合わせる前に確認してください")
+    if not req.app.source_fetch_lock.acquire(blocking=False):
+        raise _err(429, "他の取得・接続テストが実行中です")
+    try:
+        try:
+            return preview(req.app.config.secret("uspto_api_key"),
+                           product_id=b["product"], limit=b.get("limit", 3),
+                           date_from=b.get("date_from"), date_to=b.get("date_to"))
+        except connectors.ConnectorError:
+            # Never reflect raw provider responses: errors may include tokens.
+            raise _err(502, "USPTOのバルクデータ一覧を取得できませんでした") from None
+    finally:
+        req.app.source_fetch_lock.release()
+
+
 @route("GET", "/api/v1/source-tests", "read")
 def source_test_options(req):
     from .source_probes import readiness
