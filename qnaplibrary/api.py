@@ -797,6 +797,77 @@ def uspto_bulk_catalog_preview(req):
         req.app.source_fetch_lock.release()
 
 
+@route("GET", "/api/v1/uspto-bulk/transfer/status", "read")
+def uspto_bulk_transfer_status(req):
+    """Private progress/receipt only. Never serve the staged ZIP bytes."""
+    product = req.arg("product")
+    file_name = req.arg("file_name")
+    if (product is None) != (file_name is None):
+        raise _err(400, "製品とファイル名を両方指定してください")
+    from .patent_bulk_transfer import BulkTransferError
+    try:
+        return req.app.uspto_bulk_transfer.status(product, file_name)
+    except BulkTransferError:
+        raise _err(400, "対象ファイルが不正です") from None
+
+
+@route("POST", "/api/v1/uspto-bulk/transfer/start", "admin")
+def uspto_bulk_transfer_start(req):
+    """Explicit single-file download, checked against a fresh official listing.
+
+    Long streaming runs in a short-lived, manually created daemon thread.
+    No recurring jobs, no autonomous retry and no Host execution bridge.
+    """
+    from .patent_bulk_catalog import preview
+    from .patent_bulk_transfer import BulkTransferError, MAX_FILE_BYTES
+    b = req.json(limit=1024)
+    needed = {"product", "file_name", "expected_bytes", "confirmed"}
+    extra = {"restart", "date_from", "date_to"}
+    if not isinstance(b, dict) or not needed <= set(b) or not set(b) <= needed | extra:
+        raise _err(400, "公式製品・ファイル・サイズ・明示承認のみ指定してください")
+    if b["confirmed"] is not True:
+        raise _err(400, "公開ZIPのダウンロードを明示的に承認してください")
+    if type(b["expected_bytes"]) is not int or not 1 <= b["expected_bytes"] <= MAX_FILE_BYTES:
+        raise _err(413, "1ファイルの許可上限は512MiBです")
+    lock = req.app.source_fetch_lock
+    if not lock.acquire(blocking=False):
+        raise _err(429, "別の取得処理が実行中です")
+    delegated = False
+    try:
+        listing = preview(req.app.config.secret("uspto_api_key"),
+                          product_id=b["product"], limit=10,
+                          date_from=b.get("date_from"), date_to=b.get("date_to"))
+        match = [item for item in listing["files"] if item["file_name"] == b["file_name"]]
+        if len(match) != 1 or match[0]["bytes"] != b["expected_bytes"]:
+            raise _err(409, "公式の最新一覧と選択ファイル・サイズが一致しません。再確認してください")
+        state = req.app.uspto_bulk_transfer.start(
+            product=b["product"], name=b["file_name"], expected_bytes=b["expected_bytes"],
+            key=req.app.config.secret("uspto_api_key"), source_lock=lock,
+            restart=b.get("restart", False))
+        delegated = True  # lock ownership moves to the explicitly started worker
+        return state
+    except connectors.ConnectorError:
+        raise _err(502, "USPTO公式ファイル一覧を再確認できません") from None
+    except BulkTransferError:
+        raise _err(400, "指定ファイルを安全に取得できません") from None
+    finally:
+        if not delegated:
+            lock.release()
+
+
+@route("POST", "/api/v1/uspto-bulk/transfer/cancel", "admin")
+def uspto_bulk_transfer_cancel(req):
+    from .patent_bulk_transfer import BulkTransferError
+    b = req.json(limit=512)
+    if (not isinstance(b, dict) or set(b) != {"product", "file_name", "confirmed"}
+            or b["confirmed"] is not True):
+        raise _err(400, "停止対象の製品・ファイル名と承認が必要です")
+    try:
+        return req.app.uspto_bulk_transfer.cancel(b["product"], b["file_name"])
+    except BulkTransferError:
+        raise _err(409, "対象を停止できません") from None
+
+
 @route("GET", "/api/v1/source-tests", "read")
 def source_test_options(req):
     from .source_probes import readiness
