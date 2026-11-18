@@ -641,6 +641,20 @@ def source_plan(req):
     return preview
 
 
+@route("POST", "/api/v1/source-scope/preview", "read")
+def source_scope_preview(req):
+    """Offline, deterministic EPO publication scope preview, no network calls."""
+    from .source_scope import build_scope
+    body = req.json(limit=2048)
+    allowed = {"ipc", "publication_country", "year_from", "year_to", "first", "limit"}
+    if not isinstance(body, dict) or not {"ipc", "limit"}.issubset(body) or not set(body) <= allowed:
+        raise _err(400, "IPC分類、件数、公開国・公開年・取得開始位置だけ指定してください")
+    return build_scope(ipc=body["ipc"], limit=body["limit"],
+                       publication_country=body.get("publication_country", "ALL"),
+                       year_from=body.get("year_from"), year_to=body.get("year_to"),
+                       first=body.get("first", 1))
+
+
 @route("GET", "/api/v1/source-storage", "read")
 def source_storage_usage(req):
     from .source_storage import usage, policy
@@ -673,17 +687,23 @@ def source_storage_policy_put(req):
 @route("POST", "/api/v1/source-acquisitions", "admin")
 def source_acquisition(req):
     """Explicit, one-shot official EPO classification retrieval. No recurring watch."""
-    from .source_planner import accepted_ipc
+    from .source_scope import build_scope
     from .source_storage import policy, usage
     body = req.json(limit=2048)
-    if not isinstance(body, dict) or set(body) != {"ipc", "limit", "public_only_confirmed"}:
-        raise _err(400, "IPC・件数・公開検索の確認が必要です")
+    required = {"ipc", "limit", "public_only_confirmed"}
+    optional = {"publication_country", "year_from", "year_to", "first"}
+    if not isinstance(body, dict) or not required <= set(body) or not set(body) <= required | optional:
+        raise _err(400, "IPC・件数・公開検索の確認が必要です。追加条件は公開国・公開年・開始位置のみです")
     if body["public_only_confirmed"] is not True:
         raise _err(400, "公開分類だけを外部へ送ることを明示承認してください")
-    query = accepted_ipc(body["ipc"])
+    scope = build_scope(ipc=body["ipc"], limit=body["limit"],
+                        publication_country=body.get("publication_country", "ALL"),
+                        year_from=body.get("year_from"), year_to=body.get("year_to"),
+                        first=body.get("first", 1))
+    query = scope["cql"]
     rules = policy(req.app.store)
-    limit = body["limit"]
-    if type(limit) is not int or not 1 <= limit <= rules["max_results_per_fetch"]:
+    limit = scope["limit"]
+    if limit > rules["max_results_per_fetch"]:
         raise _err(400, "1回の取得上限を超えています")
     from . import source_history
     lock = req.app.source_fetch_lock
@@ -698,10 +718,11 @@ def source_acquisition(req):
             raise _err(409, "保存容量のソフト上限に達しました。容量管理を確認してください")
         if before["disk_free_bytes"] < 128 * 1024 * 1024:
             raise _err(409, "保存先の空き容量が128MiB未満です")
-        receipt_id = source_history.start(req.app.store, "epo_ops", body["ipc"], limit)
+        receipt_id = source_history.start(req.app.store, "epo_ops", body["ipc"], limit, scope=scope)
         try:
             docs = connectors.epo_search(query, req.app.config.secret("epo_ops_key"),
-                                         req.app.config.secret("epo_ops_secret"), limit)
+                                         req.app.config.secret("epo_ops_secret"), limit,
+                                         start=scope["first_result"])
         except connectors.ConnectorError:
             source_history.finish(req.app.store, receipt_id, "failed", failure="provider_error")
             receipt_id = None
@@ -733,6 +754,9 @@ def source_acquisition(req):
         return {"source": "epo_ops", "ipc": body["ipc"], "requested": limit,
                 "received": len(docs), "added": result["added"],
                 "collection_id": collection["id"], "receipt_id": receipt_id,
+                "scope": scope, "next_first_result_hint": (
+                    scope["last_result"] + 1 if len(docs) == limit
+                    and scope["last_result"] < 2000 else None),
                 "manual_only": True, "storage": usage(req.app.store)}
     finally:
         lock.release()
