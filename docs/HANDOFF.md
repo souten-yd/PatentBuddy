@@ -378,3 +378,4 @@ K7a UX: 自然文→手動ローカルAI提案 または WIPO IPC公式階層→
 
 
 K7a 外部取得実証（2026-11-18）: Draft #40にOpenAlex小規模metadata connector/任意無料キー secret、WIPO実形式XMLパーサ修正、英語タイトル取込、管理画面のソース別接続テストUIを追加。GitHub Actions一時検証でWIPO H分類タイトル66/記号10,607を実取得・実SQLite import・H02M browse PASS、OpenAlex匿名1件成功と後続429を観測。対象29 tests/2skip/0fail。全325 tests/1fail（規約で禁止される一時CIファイル）、一時CIは検証後削除。残ゲート: 削除後のfull verify-k6再実行、実EPO/JPO/USPTOキー、Host/Ubuntu/QNAP/iOS実機、PyMuPDF。根拠は [source-smoke-evidence-2026-11-18.md](source-smoke-evidence-2026-11-18.md)。設定キーをGitHub/CIで保持せず、設置時に利用者自身が「外部キー」に登録する。
+K7a OSS一括取得評価（2026-11-18）: [patent-bulk-open-source-k7a.md](patent-bulk-open-source-k7a.md)。bulk-file-loader/pyUSPTO等の実READMEとコードを参照、USPTO ODP product APIを限定的に実装。新 qnaplibrary/patent_bulk_catalog.py、auth/admin preview /api/v1/uspto-bulk/preview、管理Webの製品/サイズ表示、source_probes単発チェック、mock unit13件PASS（Actions Run 44236606303）。秘密キーは導入時入力。ZIP本体・diff import/auto scheduler追加なし。既存 release-only workflow規約維持のため一時CI削除。Draft #40依存stack、未マージ未リリース。
