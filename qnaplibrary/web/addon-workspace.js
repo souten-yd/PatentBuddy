@@ -1226,12 +1226,16 @@ function renderAtlasInspector(data, id) {
   inspector.append(heading, kind);
   if (item.kind === 'collection') {
     const count = document.createElement('p');
-    count.textContent = (item.count_is_lower_bound ? '少なくとも ' : '') +
-      item.document_count.toLocaleString('ja-JP') + '件の文献が含まれます。';
+    count.textContent = data.scope === 'catalog_page'
+      ? 'このページには新しい文献を最大50件表示しています。'
+      : ((item.count_is_lower_bound ? '少なくとも ' : '') +
+         item.document_count.toLocaleString('ja-JP') + '件の文献が含まれます。');
     inspector.append(count);
     const note = document.createElement('p');
     note.className = 'hint';
-    note.textContent = '地図には新しい最大5件だけを表示しています。すべての資料を示しているわけではありません。';
+    note.textContent = data.scope === 'catalog_page'
+      ? '全件は一度に読み込みません。下の「続きの文献」でページ単位に探索できます。'
+      : '全体図には新しい最大5件だけを表示しています。分野内を開くとさらに詳しく探索できます。';
     inspector.append(note);
     const open = document.createElement('button');
     open.type = 'button';
@@ -1251,6 +1255,14 @@ function renderAtlasInspector(data, id) {
       }
     };
     inspector.append(open);
+    if (data.scope !== 'catalog_page') {
+      const explore = document.createElement('button');
+      explore.type = 'button';
+      explore.className = 'atlas-drilldown';
+      explore.textContent = 'この分野の文献マップを開く';
+      explore.onclick = () => void loadAtlas(0, item.collection_id);
+      inspector.append(explore);
+    }
   }
   if (Number.isInteger(item.document_id)) {
     const open = document.createElement('button');
@@ -1289,7 +1301,7 @@ function renderAtlasInspector(data, id) {
   advisory.textContent = 'この線は資料の所属だけを示します。AIの類似性判定や特許性は意味しません。';
   inspector.append(advisory);
 }
-async function loadAtlas(cursor = 0) {
+async function loadAtlas(cursor = 0, collectionId = 0) {
   if (atlasLoading) return;
   atlasLoading = true;
   const request = ++atlasRequest;
@@ -1297,11 +1309,13 @@ async function loadAtlas(cursor = 0) {
   refresh.disabled = true;next.disabled = true;
   el('atlas-status').textContent = 'コレクションと文献のインデックスを取得しています…';
   try {
-    const data = await api('knowledge/atlas?cursor=' + cursor + '&limit=10');
+    const data = await api('knowledge/atlas?cursor=' + cursor +
+      '&limit=' + (collectionId ? 50 : 10) + '&collection_id=' + collectionId);
     if (request !== atlasRequest) return;
     if (!Array.isArray(data.nodes) || !Array.isArray(data.edges) ||
         data.nodes.length > 61 || data.edges.length > 60 ||
-        data.read_only !== true || data.scope !== 'catalog_sample') {
+        data.read_only !== true ||
+        data.scope !== (collectionId ? 'catalog_page' : 'catalog_sample')) {
       throw new Error('Atlas data contract mismatch');
     }
     atlasLoaded = true;
@@ -1312,11 +1326,17 @@ async function loadAtlas(cursor = 0) {
     renderAtlasInspector(data, data.root);
     next.hidden = !Number.isInteger(data.next_cursor);
     next.dataset.cursor = String(data.next_cursor || '');
-    el('atlas-status').textContent =
-      '表示中：保存先 ' + data.nodes.filter(n => n.kind === 'collection').length +
-      '件、文献サンプル ' + data.nodes.filter(n => n.kind === 'document').length +
-      '件。大量の文献は個別に開いて探索します。' +
-      (data.truncated ? ' 全体の一部のみを表示中。' : '');
+    next.dataset.collectionId = String(collectionId);
+    next.textContent = collectionId ? '続きの文献を表示' : '次の分野を表示';
+    refresh.textContent = collectionId ? '全体アトラスへ戻る' : '全体を読み直す';
+    el('atlas-status').textContent = (collectionId ? '保存先の文献を探索中：' :
+      '全体の見取り図：') +
+      '分野 ' + data.nodes.filter(n => n.kind === 'collection').length +
+      '件、文献 ' + data.nodes.filter(n => n.kind === 'document').length +
+      '件を表示。' +
+      (data.next_cursor ? ' ボタンで次ページを調べられます。' :
+        ' この範囲の続きはありません。') +
+      (data.truncated ? ' 全資料の一部のみ表示しています。' : '');
   } catch (_) {
     if (request !== atlasRequest) return;
     atlasLoaded = false;
@@ -1331,7 +1351,10 @@ async function loadAtlas(cursor = 0) {
 el('atlas-reload').onclick = () => void loadAtlas(0);
 el('atlas-next').onclick = () => {
   const cursor = Number(el('atlas-next').dataset.cursor);
-  if (Number.isInteger(cursor) && cursor > 0) void loadAtlas(cursor);
+  const collectionId = Number(el('atlas-next').dataset.collectionId || 0);
+  if (Number.isInteger(cursor) && cursor > 0 &&
+      Number.isInteger(collectionId) && collectionId >= 0)
+    void loadAtlas(cursor, collectionId);
 };
 el('atlas-zoom-in').onclick = () => atlasForceView?.zoom(1.2);
 el('atlas-zoom-out').onclick = () => atlasForceView?.zoom(1/1.2);
