@@ -183,6 +183,15 @@ CREATE TABLE IF NOT EXISTS watch_hits(
   UNIQUE(watch_id, doc_id));
 CREATE TABLE IF NOT EXISTS notify_log(key TEXT PRIMARY KEY, sent REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY, ts REAL NOT NULL, actor TEXT NOT NULL, action TEXT NOT NULL, detail TEXT NOT NULL DEFAULT '');
+-- Fixed-edition official IPC symbol catalogue, manually requested and provenance-audited.
+CREATE TABLE IF NOT EXISTS official_ipc_catalogs(
+ edition TEXT NOT NULL, section TEXT NOT NULL, source_sha256 TEXT NOT NULL,
+ symbol_count INTEGER NOT NULL, imported_at REAL NOT NULL,
+ PRIMARY KEY(edition,section));
+CREATE TABLE IF NOT EXISTS official_ipc_symbols(
+ edition TEXT NOT NULL, section TEXT NOT NULL, symbol TEXT NOT NULL,
+ PRIMARY KEY(edition,section,symbol));
+CREATE INDEX IF NOT EXISTS official_ipc_symbol_lookup ON official_ipc_symbols(edition,section,symbol);
 -- History for explicit public IPC data acquisitions only; no source queries or credentials.
 CREATE TABLE IF NOT EXISTS source_acquisition_runs(
  id INTEGER PRIMARY KEY,
