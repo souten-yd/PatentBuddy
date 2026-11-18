@@ -114,3 +114,9 @@ K1a Draft PR #29に原文範囲・source revision・Host local_only証跡形式�
 
 - [Draft PR #38](https://github.com/souten-yd/PatentBuddy/pull/38)で、縦長一画面を「資料 / 知識 / アイデア」の3ステップに再編。K2承認知識の成立条件→K4横断検索（人が手動実行）→2〜3件比較→K5 Idea手動作成、証拠引用確認と戻る/編集中のフォーム保持を直接結合する。PC資料検索・一覧2カラム、iPhone単列、PDF任意開示、接続・Jobs件数、ARIAタブとHostテーマ。新API/DB/LLM/Autonomous/UI default変更なし。[UI/UX詳細](workspace-ux-k6b.md)。
 - JavaScript V8静的構文、DOM ID/HTML tag構造はPASS。Python静的テストコードは追加済みだが**未実行**、本体API/Ubuntu-QNAP/iPhone E2Eも未実施。次は全stack `verify-k6.sh`＋実ブラウザーで実利用シナリオを通してから正式マージ/リリース。
+
+## K6c：大規模文献向けObsidian型Knowledge AtlasとAI連携（2026-11-18）
+
+- [Draft PR #39](https://github.com/souten-yd/PatentBuddy/pull/39)でObsidian公式Graph Viewを参考に、フォース配置・ノードドラッグ/パン/ズーム/近傍ハイライト/名前フィルタ・iPhoneタッチ表示・型別線種/Inspectorを導入。大規模資料は全体の保存先最大10×新しい文献最大5件→選択保存先の最大50件ページ→K3原文/審査済み知識へ段階展開（既存SQLite read-only）。文献メタデータのみ取得、COUNTは1001 index item上限でNAS低I/O重視。[実装/ベンチ/K7詳細](knowledge-atlas-k6c.md)。
+- Local AIはGlobal/Localの文献Nodeから**ユーザー確認付きの既存ControlDeck Host knowledgeジョブ**を実行。結果は未確認推論のままK2人間承認が必要。Semantic Graph relationの自動断定なし。**次K7**でlocal-only embedding＋AI候補の関連文献探索を必須タスクとし、実bench後にWebGL Sigma.js/Graphology（build時同梱・CDNなし）も検討。
+- 静的JS/DOM/CSS・独立SQLite 100,500文献のkeyset index smokeはPASSだが、実Python全テスト/本物のAI/ControlDeck/QNAP/iPhone/正式配布は未実施。PRはDraft・未マージ・未リリース。
