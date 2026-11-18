@@ -99,9 +99,13 @@ class EpoConnectorContracts(unittest.TestCase):
         self.assertEqual(get.call_args.kwargs["headers"]["X-OPS-Range"], "26-27")
         self.assertIn("q=ic%3DH02M", get.call_args.args[0])
         self.assertNotIn("Range=", get.call_args.args[0])
-        for start, limit in [(0, 1), (2000, 25), (1, 101), (True, 10)]:
+        for start, limit in [(0, 1), (2000, 25), (True, 10), (1, "invalid")]:
             with self.assertRaises(connectors.ConnectorError):
                 connectors.epo_search("ic=H02M", "key", "secret", limit, start=start)
+        with patch.object(connectors, "_epo_auth", return_value="fake"), patch.object(
+                connectors, "http_get", return_value=json.dumps(payload).encode()) as get:
+            connectors.epo_search("ic=H02M", "key", "secret", "5")
+        self.assertEqual(get.call_args.kwargs["headers"]["X-OPS-Range"], "1-5")
 
 
 if __name__ == "__main__":
