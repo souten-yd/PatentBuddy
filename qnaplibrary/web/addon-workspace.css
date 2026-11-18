@@ -385,3 +385,132 @@ button:focus-visible,[role="tab"]:focus-visible,summary:focus-visible,textarea:f
 @media(max-width:767px) {
  .idea-support-fields {display:flex;flex-direction:column;gap:0}
 }
+
+/* K6c — Obsidian-inspired, interactive Knowledge Atlas.
+ * Graph is a transient, bounded viewer. All colors follow ControlDeck Host
+ * zinc/accent palette; no external CDN / dark-only hardcoded brand theme. */
+.knowledge-atlas {margin:0 0 23px;padding:18px;background:var(--pb-surface);
+  border:1px solid var(--pb-border);border-radius:17px;min-width:0}
+.atlas-title {display:flex;align-items:flex-start;justify-content:space-between;
+  gap:14px;flex-wrap:wrap;margin-bottom:12px}
+.atlas-title h3 {font-size:19px;font-weight:700;line-height:1.3;margin:0 0 6px;
+  letter-spacing:-.015em;color:var(--pb-text)}
+.atlas-title p {max-width:650px;line-height:1.6;margin:0}
+.atlas-scope {display:inline-block;vertical-align:middle;font-size:11px;
+  font-weight:500;color:var(--pb-muted);margin-left:9px}
+.atlas-title button {min-height:44px;white-space:nowrap}
+.atlas-legend {display:flex;align-items:center;flex-wrap:wrap;gap:8px 18px;
+  margin:12px 0;font-size:12px;color:var(--pb-muted)}
+.atlas-legend span {display:inline-flex;align-items:center;gap:7px}
+.atlas-legend span::before {content:"";width:9px;height:9px;display:inline-block;
+  border-radius:50%;border:2px solid var(--pb-muted);flex:none}
+.atlas-legend-collection::before {background:var(--pb-accent);border-color:var(--pb-accent)!important}
+.atlas-legend-document::before {background:var(--pb-surface)}
+.atlas-legend-inference::before {border-style:dashed!important}
+.atlas-layout {display:grid;grid-template-columns:minmax(0,1.65fr) minmax(235px,.7fr);
+  gap:12px;min-width:0}
+.atlas-stage,.map-visual {position:relative;min-width:0;overflow:hidden;
+  border:1px solid var(--pb-border);border-radius:14px;
+  background:radial-gradient(ellipse at 47% 45%,color-mix(in srgb,var(--pb-accent) 10%,transparent),transparent 72%),var(--pb-bg)}
+.atlas-stage {min-height:455px}
+#atlas-svg,#map-svg {display:block;width:100%;height:455px;max-height:none;
+  touch-action:none;cursor:grab;outline:none}
+#atlas-svg:active,#map-svg:active {cursor:grabbing}
+#atlas-svg:focus-visible,#map-svg:focus-visible {outline:2px solid var(--pb-accent);outline-offset:-3px}
+.map-viewport-tools {position:absolute;top:10px;right:10px;display:flex;flex-wrap:wrap;
+  justify-content:flex-end;gap:5px;z-index:2;max-width:calc(100% - 18px);
+  pointer-events:none}
+.map-viewport-tools button {pointer-events:auto;min-width:42px;min-height:42px;
+  border-radius:9px;padding:6px 10px;font-size:13px;background:var(--pb-surface);
+  color:var(--pb-text);border:1px solid var(--pb-border);box-shadow:none}
+.map-viewport-tools button:hover {border-color:var(--pb-accent)}
+.map-gesture-hint {position:absolute;left:11px;bottom:8px;right:11px;
+  text-align:center;pointer-events:none;font-size:11px;line-height:1.5;
+  color:var(--pb-muted);margin:0;padding:3px 6px;border-radius:6px;
+  background:color-mix(in srgb,var(--pb-bg) 86%,transparent)}
+.atlas-inspector {min-width:0;align-self:stretch;padding:16px;
+  border:1px solid var(--pb-border);border-radius:13px;background:var(--pb-bg);
+  overflow-wrap:anywhere}
+.atlas-inspector h4 {font-size:16px;line-height:1.4;margin:0 0 10px}
+.atlas-inspector p {font-size:13px;line-height:1.6;margin:8px 0}
+.atlas-inspector button {width:100%;min-height:44px;text-align:center;margin-top:9px;white-space:normal}
+.atlas-ai-action {border-color:var(--pb-accent)!important}
+.atlas-pagination {display:flex;align-items:center;justify-content:space-between;
+  gap:11px;flex-wrap:wrap;margin-top:10px}
+#atlas-status {font-size:12px;margin:0;line-height:1.6;flex:1 1 280px}
+#atlas-next {min-height:44px}
+.atlas-disclaimer {border-top:1px solid var(--pb-border);margin:12px 0 0;
+  padding:12px 0 0;font-size:12px;color:var(--pb-muted);line-height:1.6}
+#knowledge-map .map-workspace {grid-template-columns:minmax(0,1.7fr) minmax(230px,.7fr)}
+#knowledge-map .map-visual {grid-column:1;grid-row:1}
+#knowledge-map .map-inspector {grid-column:2;grid-row:1/span 2}
+#knowledge-map .map-list {grid-column:1;grid-row:2;max-height:190px;
+  overflow-y:auto;overscroll-behavior:contain}
+#knowledge-map #map-svg {height:400px}
+#knowledge-map .map-visual {min-height:400px}
+/* Graph styling: low-contrast edges, colored kinds, clear focus, explainable AI. */
+.graph-edges .map-line {stroke:var(--pb-muted);stroke-width:1.15;opacity:.24;
+  transition:opacity .15s ease,stroke-width .15s ease}
+.graph-edges .map-line.is-active {opacity:.8;stroke-width:2.1}
+.graph-edges .map-line.is-dimmed {opacity:.08}
+.graph-edges .map-line-factual {stroke:var(--pb-accent)}
+.graph-edges .map-line-catalog {stroke:var(--pb-muted);opacity:.31}
+.graph-edges .map-line-source {stroke-dasharray:4 5}
+.graph-edges .map-line-hypothesis {stroke:var(--pb-accent);stroke-dasharray:6 5;opacity:.37}
+.graph-nodes .map-point {cursor:grab;outline:none;transition:opacity .12s ease}
+.graph-nodes .map-point:active {cursor:grabbing}
+.graph-nodes .map-point circle {stroke-width:2;fill:var(--pb-surface);
+  stroke:var(--pb-muted);transition:stroke-width .14s ease,fill .14s ease}
+.graph-nodes .map-point.is-root circle {fill:var(--pb-accent);
+  stroke:var(--pb-accent);stroke-width:2.5}
+.graph-nodes .map-node-collection circle {fill:color-mix(in srgb,var(--pb-accent) 50%,var(--pb-surface));
+  stroke:var(--pb-accent)}
+.graph-nodes .map-node-document circle {fill:var(--pb-surface);stroke:var(--pb-muted)}
+.graph-nodes .map-node-principle circle,
+.graph-nodes .map-node-mechanism circle,
+.graph-nodes .map-node-implementation circle {stroke:var(--pb-accent)}
+.graph-nodes .map-point.is-inference circle {stroke-dasharray:3 3}
+.graph-nodes .map-point.is-stale {opacity:.35}
+.graph-nodes .map-point.is-dimmed {opacity:.23}
+.graph-nodes .map-point.is-selected circle,
+.graph-nodes .map-point:focus-visible circle {stroke:var(--pb-accent);stroke-width:4;
+  fill:color-mix(in srgb,var(--pb-accent) 32%,var(--pb-surface))}
+.graph-nodes .map-node-label {fill:var(--pb-text);font-size:12px;font-weight:550;
+  paint-order:stroke;stroke:var(--pb-bg);stroke-width:3;stroke-linejoin:round;
+  pointer-events:none;opacity:0;transition:opacity .12s ease}
+.graph-nodes .map-point.is-root .map-node-label,
+.graph-nodes .map-node-collection .map-node-label,
+.graph-nodes .map-point.is-selected .map-node-label,
+.graph-nodes .map-point.is-neighbor .map-node-label,
+.graph-nodes .map-point:hover .map-node-label,
+.graph-nodes .map-point:focus-visible .map-node-label {opacity:1}
+.graph-nodes .map-point.is-dimmed .map-node-label {opacity:0}
+@media(max-width:767px) {
+ .knowledge-atlas {padding:11px;border-radius:12px}
+ .atlas-title {gap:9px}
+ .atlas-title h3 {font-size:18px}
+ .atlas-title button {width:100%}
+ .atlas-layout {display:flex;flex-direction:column;gap:9px}
+ .atlas-stage {min-height:330px}
+ #atlas-svg {height:340px;display:block}
+ #knowledge-map .map-visual {display:block;min-height:330px}
+ #knowledge-map #map-svg {height:330px;display:block}
+ #knowledge-map .map-workspace {display:flex;flex-direction:column}
+ #knowledge-map .map-inspector {width:100%}
+ #knowledge-map .map-list {max-height:none;overflow:visible}
+ .atlas-inspector {padding:12px}
+ .atlas-pagination {align-items:stretch}
+ #atlas-next {width:100%}
+ .map-viewport-tools {top:7px;right:7px}
+ .map-viewport-tools button {min-height:44px;min-width:44px;padding:6px}
+ .map-gesture-hint {font-size:10px}
+}
+@media(max-width:390px) {
+ .map-viewport-tools button {font-size:11px;min-width:42px}
+ .atlas-legend {gap:8px 11px;font-size:11px}
+}
+@media(prefers-reduced-motion:reduce) {
+ .graph-edges .map-line,.graph-nodes .map-point,.graph-nodes .map-node-label {
+   transition:none
+ }
+}
