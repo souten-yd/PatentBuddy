@@ -606,6 +606,67 @@ def analytics(req):
     return out
 
 
+# Topic-first source planning and metadata-only storage management (K7a).
+# Scope previews are private and do not call any external provider.
+@route("POST", "/api/v1/source-plan", "read")
+def source_plan(req):
+    from .source_planner import plan
+    body = req.json(limit=2048)
+    if not isinstance(body, dict) or set(body) != {"topic"}:
+        raise _err(400, "調査テーマのみを指定してください")
+    return plan(body["topic"])
+
+
+@route("GET", "/api/v1/source-storage", "read")
+def source_storage_usage(req):
+    from .source_storage import usage, policy
+    if req.arg("counts", "0") not in ("0", "1"):
+        raise _err(400, "counts が不正です")
+    return {"usage": usage(req.app.store, include_counts=req.arg("counts", "0") == "1"),
+            "policy": policy(req.app.store)}
+
+
+@route("PUT", "/api/v1/source-storage/policy", "admin")
+def source_storage_policy_put(req):
+    from .source_storage import save_policy
+    value = req.json(limit=2048)
+    return {"policy": save_policy(req.app.store, value)}
+
+
+@route("POST", "/api/v1/source-acquisitions", "admin")
+def source_acquisition(req):
+    """Explicit, one-shot official EPO classification retrieval. No recurring watch."""
+    from .source_planner import accepted_ipc
+    from .source_storage import policy, usage
+    body = req.json(limit=2048)
+    if not isinstance(body, dict) or set(body) != {"ipc", "limit", "public_only_confirmed"}:
+        raise _err(400, "IPC・件数・公開検索の確認が必要です")
+    if body["public_only_confirmed"] is not True:
+        raise _err(400, "公開分類だけを外部へ送ることを明示承認してください")
+    query = accepted_ipc(body["ipc"])
+    rules = policy(req.app.store)
+    limit = body["limit"]
+    if type(limit) is not int or not 1 <= limit <= rules["max_results_per_fetch"]:
+        raise _err(400, "1回の取得上限を超えています")
+    before = usage(req.app.store)
+    # Even in the soft-limit implementation, never initiate a new download
+    # with insufficient database budget. Existing import paths are unchanged.
+    if before["soft_limit_reached"] or (
+            before["total_database_files_bytes"] + 1024 * 1024 > before["soft_limit_bytes"]):
+        raise _err(409, "保存容量のソフト上限に達しました。容量管理を確認してください")
+    # The query is generated from a static allowlist, never the user's
+    # unpublished theme or arbitrary AI-suggested query.
+    docs = connectors.epo_search(query, req.app.config.secret("epo_ops_key"),
+                                 req.app.config.secret("epo_ops_secret"), limit)
+    if len(docs) > limit or len(json.dumps(docs, ensure_ascii=False).encode()) > 1024 * 1024:
+        raise _err(413, "取得結果の件数または容量が上限を超えました")
+    collection = req.app.store.ensure_collection("patent-ipc-" + body["ipc"], "patent")
+    result = req.app.store.add_documents(collection["id"], docs, actor="source-acquisition")
+    return {"source": "epo_ops", "ipc": body["ipc"], "requested": limit,
+            "received": len(docs), "added": result["added"], "collection_id": collection["id"],
+            "manual_only": True, "storage": usage(req.app.store)}
+
+
 @route("GET", "/api/v1/stats", "read")
 def stats(req):
     return {"store": req.app.store.stats(), "vectors": req.app.searcher.vectors.info(), "version": VERSION,
