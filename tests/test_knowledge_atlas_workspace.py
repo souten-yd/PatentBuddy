@@ -35,6 +35,7 @@ class KnowledgeAtlasWorkspaceTests(unittest.TestCase):
             'atlas-fit', 'atlas-reflow', 'map-svg', 'map-inspector', 'map-list',
             'map-zoom-in', 'map-zoom-out', 'map-fit', 'map-reflow',
             'map-hops', 'map-links', 'map-unreviewed', 'map-refresh',
+            'map-node-find', 'atlas-node-find',
         ):
             self.assertIn(element, self.parsed.ids)
         self.assertIn('role="status"', self.html)
@@ -73,6 +74,12 @@ class KnowledgeAtlasWorkspaceTests(unittest.TestCase):
             'atlasForceView?.reflow()',
         ):
             self.assertIn(text, js)
+        self.assertIn("let filterTerm = ''", js)
+        self.assertIn('function filter(query)', js)
+        self.assertIn('is-filter-match', js)
+        self.assertIn('is-filtered', js)
+        self.assertIn("'map-node-find').oninput =", js)
+        self.assertIn("'atlas-node-find').oninput =", js)
         self.assertIn('pointer-events:none', self.css)
         self.assertIn('touch-action:none', self.css)
         self.assertIn('is-neighbor', self.css)
