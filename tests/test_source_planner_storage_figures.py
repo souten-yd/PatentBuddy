@@ -129,7 +129,7 @@ class SourceHistoryTests(unittest.TestCase):
                 self.assertTrue(sample["has_older_documents"])
                 self.assertTrue(sample["not_physical_storage"])
                 self.assertEqual(sample["documents_examined"], 2)
-                self.assertGreater(sum(x["logical_payload_bytes_in_sample"] for x in sample["items"]), 0)
+                self.assertGreater(sum(x["metadata_bytes_in_sample"] for x in sample["items"]), 0)
                 for size in (0, 5001, True):
                     with self.assertRaises(ValueError):
                         source_history.by_source_sample(store, size)
