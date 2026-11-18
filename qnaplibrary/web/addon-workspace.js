@@ -215,7 +215,7 @@ el('source-storage-refresh').onclick = async () => {
     for (const item of rows.slice(0, 6)) {
       const row = document.createElement('p');
       row.textContent = item.source + ' ' + item.classification + ' · ' +
-        (item.status === 'succeeded' ? '成功' : item.status === 'failed' ? '失敗' : '進行中') +
+        (item.status === 'succeeded' ? '成功' : item.status === 'failed' ? '失敗' : item.possibly_interrupted ? '中断の可能性' : '進行中') +
         ' · 取得' + item.received + '件 / 新規' + item.added + '件';
       recent.append(row);
     }
