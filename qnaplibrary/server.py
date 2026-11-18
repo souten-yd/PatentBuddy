@@ -582,7 +582,7 @@ class Handler(BaseHTTPRequestHandler):
                             # Read-only private preview: no source requests or save.
                             result = client.data("POST", "/api/v1/source-plan", body)
                         elif method == "GET" and path == "/addon/v1/source-storage":
-                            result = client.data("GET", "/api/v1/source-storage?counts=1")
+                            result = client.data("GET", "/api/v1/source-storage?counts=1&breakdown=1")
                         elif method == "GET" and path == "/addon/v1/source-acquisitions":
                             result = client.data("GET", "/api/v1/source-acquisitions?limit=20")
                         elif method == "GET" and path == "/addon/v1/collections":
