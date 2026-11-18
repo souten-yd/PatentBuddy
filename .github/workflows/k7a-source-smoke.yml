@@ -42,6 +42,10 @@ jobs:
           from qnaplibrary.connectors import openalex_works
 
           # No credentials, no saving to user DB, no arbitrary targets.
+          works = openalex_works("inverter", limit=1)
+          if not works:
+              raise AssertionError("OpenAlex returned no work")
+          print("PASS: openalex public search 1 result", flush=True)
           for name, url, parser in (
               ("wipo_titles_H", section_title_url("H"), parse_titles),
               ("wipo_symbols_H", section_url("H"), parse_valid_symbols),
@@ -49,10 +53,18 @@ jobs:
               print("fetch:", name, url, flush=True)
               with urllib.request.urlopen(url, timeout=40) as response:
                   raw = response.read(3 * 1024 * 1024 + 1)
-              result = parser(raw, "H")
-              print("PASS:", name, len(result), "records, bytes:", len(raw), flush=True)
-          works = openalex_works("inverter", limit=1)
-          if not works:
-              raise AssertionError("OpenAlex returned no work")
-          print("PASS: openalex public search 1 result", flush=True)
+              try:
+                  result = parser(raw, "H")
+                  print("PASS:", name, len(result), "records, bytes:", len(raw), flush=True)
+              except Exception as error:
+                  import xml.etree.ElementTree as ET
+                  print("FAIL:", name, type(error).__name__, str(error), flush=True)
+                  if name == "wipo_symbols_H":
+                      root = ET.fromstring(raw)
+                      print("WIPO XML root:", root.tag, root.attrib, flush=True)
+                      nodes = list(root.iter())
+                      print("WIPO XML first nodes:",
+                            [(node.tag, dict(list(node.attrib.items())[:6]),
+                              (node.text or "").strip()[:70]) for node in nodes[:10]], flush=True)
+                  raise
           PY
