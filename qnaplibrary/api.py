@@ -620,8 +620,13 @@ def source_plan(req):
     # These are NOT added to the public CQL allowlist automatically.
     preview["local_classification_matches"] = []
     if (req.app.store.fts and req.app.store.collection_ids_of_kind(["classification"])):
-        results = req.app.searcher.search(body["topic"], None, 8, "keyword",
-                                          kinds=["classification"], rerank=False)["results"]
+        try:
+            results = req.app.searcher.search(body["topic"], None, 8, "keyword",
+                                              kinds=["classification"], rerank=False)["results"]
+        except (ValueError, store_mod.StoreError):
+            # A malformed local FTS query cannot force network fallback.
+            results = []
+            preview["local_index_warning"] = "分類辞書の検索形式を確認してください"
         seen = set()
         for item in results:
             code = str(item.get("ext_id") or "")[:80]
