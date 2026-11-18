@@ -510,9 +510,13 @@ def run(connector_id, params, secrets, settings=None):
     if connector_id == "uspto":
         return uspto_search(p.get("query", ""), secrets("uspto_api_key"), p.get("limit") or 25)
     if connector_id == "openalex":
+        count = p.get("limit", 10)
+        if (type(count) is str and not count.isdecimal()
+                or type(count) not in (int, str)):
+            raise ConnectorError("OpenAlexの取得件数が不正です")
+        count = int(count)
         return openalex_works(p.get("query", ""), secrets("openalex_api_key") or "",
-                              int(p.get("limit") or 10),
-                              p.get("year_from"), p.get("year_to"))
+                              count, p.get("year_from"), p.get("year_to"))
     if connector_id == "estat":
         return estat(p.get("query", ""), secrets("estat_app_id"), p.get("limit") or 50)
     if connector_id == "edinet":
