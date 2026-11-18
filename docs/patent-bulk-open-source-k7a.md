@@ -40,4 +40,9 @@ MIT/Apacheのコードを将来複製する場合はLICENSE/NOTICEを同梱。�
 5. backend authoritative、ui.html default、Vue read-only/not default、runtime level_0_manual_only、no execution、no raw serving/fallback/redirect、no startup npm build、ローカルAI機密限定を維持。PR #39など依存変更も含むmainコードのレビューと実機統合テストが完了するまでmerge/releaseしない。
 
 
-**最新のK7a検証**: [手動ダウンロードとCodex向け実装条件](patent-bulk-manual-staging-k7a.md)。一時Actions https://github.com/souten-yd/PatentBuddy/actions/runs/44240112831 にて対象22件と全339件（skip3）・Linuxビルド・隔離PDF図面テストが合格。総容量/プロセスlock/起動時無書込みの追加テストも別CIで合格済み。実キーを使ったODP本番ファイルは未取得。実ユーザーZIPの解析やDB取り込みは次工程。
+**最新のK7a検証**: [手動ダウンロードとCodex向け実装条件](patent-bulk-manual-staging-k7a.md)。一時Actions https://github.com/souten-yd/PatentBuddy/actions/runs/44240112831 にて対象22件と全342件（skip3）・Linuxビルド・隔離PDF図面テストが合格。総容量/プロセスlock/起動時無書込みの追加テストも別CIで合格済み。実キーを使ったODP本番ファイルは未取得。実ユーザーZIPの解析やDB取り込みは次工程。
+
+
+### K7a最終受入証跡（2026-11-18）
+
+直近のGitHub Actions Run https://github.com/souten-yd/PatentBuddy/actions/runs/44240713777 で、対象テスト**25件0fail**、全体**342件0fail/3skip**、K6安全/バージョン/UI構文・Linux build・隔離PyMuPDF PASS。QPKG実パッケージ生成（WITH_QPKG=1）、実USPTO認証/公式ZIP、Linux/ControlDeck/QNAP/iPhone導入は未実施。追加した一時workflowは削除済み、既存release.ymlだけを維持。PR #40はDraft・未マージ・未リリース。
