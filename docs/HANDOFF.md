@@ -387,3 +387,6 @@ K7a manual USPTO ZIP stage（2026-11-18）：[patent-bulk-manual-staging-k7a.md]
 ### K7a最終受入証跡（2026-11-18）
 
 直近のGitHub Actions Run https://github.com/souten-yd/PatentBuddy/actions/runs/44240713777 で、対象テスト**25件0fail**、全体**342件0fail/3skip**、K6安全/バージョン/UI構文・Linux build・隔離PyMuPDF PASS。QPKG実パッケージ生成（WITH_QPKG=1）、実USPTO認証/公式ZIP、Linux/ControlDeck/QNAP/iPhone導入は未実施。追加した一時workflowは削除済み、既存release.ymlだけを維持。PR #40はDraft・未マージ・未リリース。
+
+
+K7aサンプル実証（2026-11-18）: GitHub Actions https://github.com/souten-yd/PatentBuddy/actions/runs/44311874751 で公開特許11件のHTML実取得成功/0fail。固定11件の公報ID/タイトル/公開年/分類/関連メタデータ/図面表示/キーワードとSHA256を[fixture](../tests/fixtures/k7a_public_patents_20261118.json)へ保存し、ChatGPT会話向け10グラフのPDFレポートを生成。著作物本文/PDFはrepoへ格納せず、AI推論/未公開技術送信なし。分類コード231、DC.relation164（正式被引用件数ではない）。手動再現コマンドと注意・Codex受入条件は[public-patent-pilot-2026-11-18.md](public-patent-pilot-2026-11-18.md)。公式USPTO ZIP本番キー試験、ZIPストリーム解析、AI本格解析はまだ未実施。
