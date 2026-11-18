@@ -659,8 +659,8 @@ def source_scope_preview(req):
 # Choice-first IPC search and optional local-only AI classification help.
 @route("GET", "/api/v1/source-assistant/options", "read")
 def source_assistant_options(req):
-    from .source_advisor import quick_presets, local_models
-    return {"presets": quick_presets(),
+    from .source_advisor import local_models
+    return {"classification_browse": "/api/v1/ipc-catalog/browse",
             "models": local_models(req.app.providers, req.app.config),
             "privacy": "ローカル認証済みAI以外は利用不可。外部モデルへの代替接続なし。",
             "automatic_execution": False}
@@ -710,6 +710,15 @@ def ipc_catalog_import(req):
     if len(raw) > MAX_SOURCE_BYTES:
         raise _err(413, "WIPOの分類セクションデータが許容サイズを超えました")
     return install(req.app.store, raw, b["section"])
+
+
+@route("POST", "/api/v1/ipc-catalog/browse", "read")
+def ipc_catalog_browse(req):
+    from .official_ipc import browse
+    b = req.json(limit=512)
+    if not isinstance(b, dict) or set(b) != {"parent"}:
+        raise _err(400, "IPC分類の親階層のみを指定してください")
+    return browse(req.app.store, b["parent"])
 
 
 @route("POST", "/api/v1/ipc-catalog/lookup", "read")
