@@ -650,12 +650,34 @@ class Store:
                 yield self.doc_row(r)
 
     # search -------------------------------------------------------------
-    def fts_search(self, query, collection_ids=None, limit=50):
+    @staticmethod
+    def _search_date_filter(date_from, date_to):
+        if not (date_from or date_to):
+            return "", []
+        conditions = ["d.doc_date <> ''"]
+        args = []
+        if date_from:
+            conditions.append("substr(d.doc_date,1,10) >= ?")
+            args.append(date_from)
+        if date_to:
+            conditions.append("substr(d.doc_date,1,10) <= ?")
+            args.append(date_to)
+        return (" AND c.doc_id IN (SELECT d.id FROM documents d WHERE "
+                + " AND ".join(conditions) + ")", args)
+
+    def dated_chunk_ids(self, date_from, date_to):
+        condition, args = self._search_date_filter(date_from, date_to)
+        return {row[0] for row in self.q("SELECT c.id FROM chunks c WHERE 1=1" + condition, args)}
+
+    def fts_search(self, query, collection_ids=None, limit=50, *, date_from=None, date_to=None):
         """BM25 over chunks. Returns [(chunk_id, score)] best first (score: higher is better)."""
         coll_sql, args = "", []
         if collection_ids:
             coll_sql = " AND c.collection_id IN (%s)" % ",".join("?" * len(collection_ids))
             args = list(collection_ids)
+        date_sql, date_args = self._search_date_filter(date_from, date_to)
+        coll_sql += date_sql
+        args += date_args
         if self.fts:
             expr = textproc.parse_query(query)
             if not expr:

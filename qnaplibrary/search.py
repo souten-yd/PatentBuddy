@@ -71,7 +71,7 @@ class VectorIndex:
             return {"vectors": len(self._ids), "dim": self._dim, "model": self._model,
                     "numpy": _np is not None, "ram_mb": round(len(self._ids) * self._dim * 4 / 1048576, 1)}
 
-    def search(self, qvec, collection_ids=None, limit=50, candidates=None):
+    def search(self, qvec, collection_ids=None, limit=50, candidates=None, eligible_ids=None):
         with self._lock:
             self._load()
             if not self._ids or not qvec or len(qvec) != self._dim:
@@ -83,9 +83,12 @@ class VectorIndex:
                 scores = self._mat @ _np.asarray(q, dtype=_np.float32)
                 idx = range(len(self._ids))
                 pairs = [(self._ids[i], float(scores[i])) for i in idx
-                         if allowed is None or self._colls[i] in allowed]
+                         if (allowed is None or self._colls[i] in allowed)
+                         and (eligible_ids is None or self._ids[i] in eligible_ids)]
             else:
-                if candidates is not None and len(self._ids) > PURE_PYTHON_FULL_SCAN:
+                if eligible_ids is not None:
+                    idx = [self._pos[c] for c in eligible_ids if c in self._pos]
+                elif candidates is not None and len(self._ids) > PURE_PYTHON_FULL_SCAN:
                     idx = [self._pos[c] for c in candidates if c in self._pos]
                 else:
                     idx = range(len(self._ids))
@@ -131,7 +134,7 @@ class Searcher:
                 return {"results": [], "trace": dict(trace, results=0, ms=0.0, note="no collection of kind %s" % kinds)}
         limit = max(1, min(int(limit or 20), 200))
         pool = max(limit * 5, 50)
-        bm25 = self.store.fts_search(query, coll_ids, pool) if mode in ("hybrid", "keyword") else []
+        bm25 = self.store.fts_search(query, coll_ids, pool, date_from=date_from, date_to=date_to) if mode in ("hybrid", "keyword") else []
         trace["stages"].append({"stage": "bm25", "hits": len(bm25), "ms": round((time.time() - t0) * 1000, 1)})
         if mode in ("hybrid", "keyword") and len(bm25) < min(limit, 5) and self.store.fts:
             # natural-language questions rarely match as exact phrases: rank by shared tokens instead
@@ -139,7 +142,7 @@ class Searcher:
             if loose:
                 t1 = time.time()
                 have = {c for c, _ in bm25}
-                extra = [(c, s_) for c, s_ in self.store.fts_search(loose, coll_ids, pool) if c not in have]
+                extra = [(c, s_) for c, s_ in self.store.fts_search(loose, coll_ids, pool, date_from=date_from, date_to=date_to) if c not in have]
                 bm25 = bm25 + extra
                 trace["stages"].append({"stage": "bm25_loose", "hits": len(extra), "ms": round((time.time() - t1) * 1000, 1)})
         dense = []
@@ -157,7 +160,12 @@ class Searcher:
             if qvec:
                 t2 = time.time()
                 backend = self.backend_fn() if self.backend_fn else None
-                if backend is not None:
+                if date_from or date_to:
+                    eligible = self.store.dated_chunk_ids(date_from, date_to)
+                    dense = self.vectors.search(qvec, coll_ids, pool, eligible_ids=eligible)
+                    trace["stages"].append({"stage": "vector_date_filter_local", "hits": len(dense),
+                                            "ms": round((time.time() - t2) * 1000, 1)})
+                elif backend is not None:
                     try:
                         dense = backend.search(qvec, coll_ids, self.model_fn() if self.model_fn else None, pool)
                         trace["stages"].append({"stage": "qdrant", "hits": len(dense), "ms": round((time.time() - t2) * 1000, 1)})
