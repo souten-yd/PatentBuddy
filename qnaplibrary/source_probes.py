@@ -10,13 +10,14 @@ from .official_ipc_titles import section_title_url, parse_titles
 from .official_ipc import section_url, parse_valid_symbols
 
 SOURCE_IDS = ("wipo_ipc_titles", "wipo_ipc_symbols", "epo_ops",
-              "jpo", "uspto", "openalex")
+              "jpo", "uspto", "uspto_bulk_catalog", "openalex")
 REQUIRED_KEYS = {
     "wipo_ipc_titles": (),
     "wipo_ipc_symbols": (),
     "epo_ops": ("epo_ops_key", "epo_ops_secret"),
     "jpo": ("jpo_username", "jpo_password"),
     "uspto": ("uspto_api_key",),
+    "uspto_bulk_catalog": ("uspto_api_key",),
     "openalex": (),
 }
 
@@ -78,6 +79,12 @@ def probe(name, secret, *, public_sample="", section="H"):
             # Fixed generic PUBLIC technical query; the account must be enabled.
             docs = connectors.uspto_search("inverter", secret("uspto_api_key"), limit=1)
             count = len(docs)
+        elif name == "uspto_bulk_catalog":
+            from .patent_bulk_catalog import preview
+            # One official file entry at most; metadata only, no archive.
+            listing = preview(secret("uspto_api_key"),
+                              product_id="PTFWPRD", limit=1)
+            count = listing["files_previewed"]
         else:
             # Low-cost, first-page scientific metadata only. Anonymous mode
             # can work as a demo, but a free key is preferred for normal use.
