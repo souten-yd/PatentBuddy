@@ -30,6 +30,8 @@ class AnalysisJobs:
             for value in values:
                 if value['status'] in ('queued', 'running'):
                     value.update(status='interrupted', phase='interrupted', message='アドオンが再起動しました。再実行できます。')
+                # "deferred" deliberately remains deferred. Reboot never
+                # starts inference or creates Host jobs automatically.
                 self.jobs[value['id']] = value
 
     def _save(self):
@@ -50,22 +52,30 @@ class AnalysisJobs:
             self.jobs[identifier].update(values)
             self._save()
 
-    def start(self, headers, doc_id, kind, resume_id=None):
+    def start(self, headers, doc_id, kind, resume_id=None, defer_if_unavailable=False):
         if isinstance(doc_id, bool) or not isinstance(doc_id, int) or not 0 < doc_id <= 9223372036854775807 or kind not in ('summary', 'claims', 'knowledge'):
             raise AddonError(400, '文献と分析方法を選択してください')
         if resume_id is not None and (not isinstance(resume_id, str) or not re.fullmatch(r"[a-f0-9]{32}", resume_id)):
             raise AddonError(400, "再実行IDが不正です")
+        if type(defer_if_unavailable) is not bool:
+            raise AddonError(400, "分析保留の指定が不正です")
+        # Host identity and existing permissions MUST be checked even to
+        # register a deferred job; no unauthenticated offline job creation.
         session = HostSession(self.client, headers)
-        if not session.local_available():
-            raise AddonError(503, 'Hostのローカル限定AIを利用できません')
-        if kind == 'knowledge':
-            # Fail before document retrieval and before creating any Host job.
+        # Only save a metadata-only request when the *local* model is absent.
+        # Never select cloud inference as an alternative.
+        local_ready = session.local_available()
+        if kind == 'knowledge' and local_ready:
             # Old Hosts cannot prove their model/process revision.
-            if not session.provenance_available():
+            local_ready = session.provenance_available()
+            if not local_ready and not defer_if_unavailable:
                 raise AddonError(503, 'ControlDeckを更新してください（モデル版の検証が必要です）')
-            if not self.client.knowledge_write_ready():
+            if local_ready and not self.client.knowledge_write_ready():
                 raise AddonError(503, 'ResearchDataHubの知識保存用の専用認証を確認してください')
-        # Fetch and validate before creating a Host Job, and never silently truncate.
+        if not local_ready and not defer_if_unavailable:
+            raise AddonError(503, 'Hostのローカル限定AIを利用できません')
+        # Fetch and validate before persisting a pending job. The actual source
+        # body stays on the authoritative ResearchDataHub, never in JSON state.
         document = self.client.data('GET', '/api/v1/documents/%d' % doc_id)
         body = document.get('body')
         if not isinstance(body, str) or not body.strip() or len(body) > 100000 or not document.get('revision'):
@@ -76,18 +86,44 @@ class AnalysisJobs:
             active = [x for x in self.jobs.values() if x['status'] in ('queued', 'running')]
             if len(active) >= 2 or any(x['owner'] == session.owner for x in active):
                 raise AddonError(429, '実行中の分析が完了してから再度実行してください')
+            old = None
             if resume_id:
                 old = self.jobs.get(resume_id)
-                if not old or old['owner'] != session.owner or old['status'] not in ('interrupted', 'failed', 'canceled'):
+                if not old or old['owner'] != session.owner or old['status'] not in ('deferred', 'interrupted', 'failed', 'canceled'):
                     raise AddonError(403, '再実行できるジョブがありません')
                 if old['doc_id'] != doc_id or old['kind'] != kind:
                     raise AddonError(400, '再実行する文献と分析方法が一致しません')
-                if old.get('host_job_id'):
+                # An unreachable local model must not create duplicate jobs.
+                if not local_ready and old['status'] == 'deferred':
+                    return self._public(old)
+                if local_ready and old.get('host_job_id'):
                     session.job_id = old['host_job_id']
                     session.finish('canceled')
                     session.job_id = None
+            if not local_ready:
+                existing = next((x for x in self.jobs.values()
+                    if x['owner'] == session.owner and x['doc_id'] == doc_id
+                    and x['kind'] == kind and x['status'] == 'deferred'), None)
+                if existing:
+                    return self._public(existing)
+                # Never evict an unprocessed deferred request for a new one.
+                if len(self.jobs) >= 32:
+                    raise AddonError(429, '保存済みのジョブを整理してください（保留依頼は自動削除しません）')
+                value = {'id': uuid.uuid4().hex, 'host_job_id': None,
+                         'owner': session.owner, 'doc_id': doc_id, 'kind': kind,
+                         'source_revision': document['revision'], 'status': 'deferred',
+                         'phase': 'waiting_for_local_ai', 'created': time.time(),
+                         'message': 'ローカルAIが利用できません。依頼を保存しました。利用可能になったら手動で再開してください。'}
+                self.jobs[value['id']] = value
+                try:
+                    self._save()
+                except OSError:
+                    self.jobs.pop(value['id'], None)
+                    raise AddonError(503, '分析依頼の保存に失敗しました') from None
+                return self._public(value)
             while len(self.jobs) >= 32:
-                victim = next((k for k, v in self.jobs.items() if v['status'] not in ('queued', 'running')), None)
+                victim = next((k for k, v in self.jobs.items()
+                              if v['status'] not in ('queued', 'running', 'deferred')), None)
                 if victim is None:
                     raise AddonError(429, 'ジョブの上限に達しました')
                 del self.jobs[victim]
