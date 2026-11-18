@@ -640,7 +640,7 @@ async function scopedSourceCard(main, connectors) {
       toast("取得容量の設定を保存しました");
       await refresh();
     }) }, "設定を保存"));
-  const sample = h("p", { class: "small muted" }, "ソース別データ量は直近最大2,000文献の論理ペイロード参考値。物理DB容量をソース別に割り当てた値ではありません。");
+  const sample = h("p", { class: "small muted" }, "ソース別参考量は直近最大2,000文献のタイトル・メタデータに限定した容量です。本文・PDF・画像・索引は含まず、全体DB物理占有量を出典別に分けた値ではありません。");
   const refresh = guard(async () => {
     cap.textContent = "容量・履歴を取得しています…";
     const [st, log] = await Promise.all([
@@ -668,9 +668,9 @@ async function scopedSourceCard(main, connectors) {
     clear(list);
     if (breakdown?.items?.length) list.append(h("div", { class: "scrollx" },
       h("table", {},
-        h("tr", {}, h("th", {}, "出典"), h("th", {}, "標本の文献数"), h("th", {}, "本文・メタデータの参考量")),
+        h("tr", {}, h("th", {}, "出典"), h("th", {}, "標本の文献数"), h("th", {}, "タイトル・メタの参考量")),
         breakdown.items.map(v => h("tr", {}, h("td", {}, v.source), h("td", {}, v.documents_in_sample),
-          h("td", {}, sizeMiB(v.logical_payload_bytes_in_sample)))))));
+          h("td", {}, sizeMiB(v.metadata_bytes_in_sample)))))));
     list.append(h("p", { class: "small muted" },
       "標本 " + (breakdown?.documents_examined ?? 0) + "件" +
       (breakdown?.has_older_documents ? "（古い文献は標本外。合計値ではありません）" : "（標本に含まれる文献のみ）")));
