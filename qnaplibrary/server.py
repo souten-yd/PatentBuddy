@@ -469,10 +469,13 @@ class Handler(BaseHTTPRequestHandler):
                         elif method == "DELETE" and re.fullmatch(r"/addon/v1/jobs/[a-f0-9]{32}", path):
                             result = self.server.app.jobs.forget(path.rsplit('/', 1)[1], identity)
                         elif method == "POST" and path == "/addon/v1/jobs":
-                            body = Request(self, method, path, {}, {}).json()
-                            if not isinstance(body, dict):
-                                raise AddonError(400, "分析条件を指定してください")
-                            result = self.server.app.jobs.start(self.headers, body.get("doc_id"), body.get("kind"), body.get("resume_id"))
+                            body = Request(self, method, path, {}, {}).json(limit=512)
+                            if not isinstance(body, dict) or not {"doc_id", "kind"} <= set(body) or not set(body) <= {"doc_id", "kind", "resume_id", "defer_if_unavailable"}:
+                                raise AddonError(400, "分析条件とAI停止時の保留指定のみ入力できます")
+                            result = self.server.app.jobs.start(
+                                self.headers, body.get("doc_id"), body.get("kind"),
+                                body.get("resume_id"),
+                                defer_if_unavailable=body.get("defer_if_unavailable", False))
                         elif method == "POST" and re.fullmatch(r"/addon/v1/jobs/[a-f0-9]{32}/reconcile", path):
                             Request(self, method, path, {}, {}).json()
                             result = self.server.app.jobs.reconcile(self.headers, path.split('/')[-2])
