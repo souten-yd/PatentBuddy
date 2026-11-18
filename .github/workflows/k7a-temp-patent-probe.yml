@@ -1,43 +1,23 @@
-name: K7a temporary public patent research pilot
+name: K7a temporary public-patent fixture and K6 regression
 on:
   push:
     branches: [feat/scoped-sources-storage-figures-k7a]
 permissions:
   contents: read
 jobs:
-  public-sample:
+  pilot-offline:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 16
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Fetch exactly pinned public patent document samples (no credentials)
+      - name: Remove test-only workflow in working tree for release-only rule
+        run: rm -f .github/workflows/k7a-temp-patent-probe.yml
+      - name: Real patent fixture integrity and offline parser tests
         run: |
-          python scripts/patent_public_sample_report.py --fetch --output /tmp/patent-public-sample.json
-          python - <<'PY'
-          import json
-          p=json.load(open('/tmp/patent-public-sample.json'))
-          assert len(p['records']) >= 8, 'too few real public patent pages retrieved'
-          assert len({x['publication'] for x in p['records']}) == len(p['records'])
-          print('ANALYSIS_SUMMARY',json.dumps({
-              'n':len(p['records']), 'errors':p['errors'],
-              'publications':[x['publication'] for x in p['records']],
-              'title_count':sum(bool(x['title']) for x in p['records']),
-              'total_cpc_rows':sum(x['classification_count_capped'] for x in p['records']),
-              'total_ref_meta':sum(x['references_metadata_count'] for x in p['records']),
-          },ensure_ascii=False))
-          PY
-      - name: Unit and offline repeatability
-        run: |
-          rm -f .github/workflows/k7a-temp-patent-probe.yml
-          python scripts/patent_public_sample_report.py --input /tmp/patent-public-sample.json --output /tmp/duplicate-run.json
-          python - <<'PY'
-          import json
-          a=json.load(open('/tmp/patent-public-sample.json'))
-          b=json.load(open('/tmp/duplicate-run.json'))
-          assert a == b
-          assert a['automatic_refresh'] is False
-          print('OFFLINE_REPEATABLE_PASS')
-          PY
+          python -m unittest tests.test_patent_public_sample_report tests.test_addon_jobs -v
+          python -m compileall -q scripts/patent_public_sample_report.py qnaplibrary
+      - name: K6 entire repository safety and Linux artifact gate
+        run: bash scripts/verify-k6.sh
