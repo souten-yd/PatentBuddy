@@ -645,6 +645,7 @@ def source_plan(req):
 def source_scope_preview(req):
     """Offline, deterministic EPO publication scope preview, no network calls."""
     from .source_scope import build_scope
+    from .official_ipc import verified_subclass
     body = req.json(limit=2048)
     allowed = {"ipc", "publication_country", "year_from", "year_to", "first", "limit"}
     if not isinstance(body, dict) or not {"ipc", "limit"}.issubset(body) or not set(body) <= allowed:
@@ -652,7 +653,8 @@ def source_scope_preview(req):
     return build_scope(ipc=body["ipc"], limit=body["limit"],
                        publication_country=body.get("publication_country", "ALL"),
                        year_from=body.get("year_from"), year_to=body.get("year_to"),
-                       first=body.get("first", 1))
+                       first=body.get("first", 1),
+                       official_verified=verified_subclass(req.app.store, body["ipc"]))
 
 
 
@@ -763,6 +765,7 @@ def source_storage_policy_put(req):
 def source_acquisition(req):
     """Explicit, one-shot official EPO classification retrieval. No recurring watch."""
     from .source_scope import build_scope
+    from .official_ipc import verified_subclass
     from .source_storage import policy, usage
     body = req.json(limit=2048)
     required = {"ipc", "limit", "public_only_confirmed"}
@@ -774,7 +777,8 @@ def source_acquisition(req):
     scope = build_scope(ipc=body["ipc"], limit=body["limit"],
                         publication_country=body.get("publication_country", "ALL"),
                         year_from=body.get("year_from"), year_to=body.get("year_to"),
-                        first=body.get("first", 1))
+                        first=body.get("first", 1),
+                        official_verified=verified_subclass(req.app.store, body["ipc"]))
     query = scope["cql"]
     rules = policy(req.app.store)
     limit = scope["limit"]
