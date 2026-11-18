@@ -41,15 +41,25 @@ def parse_titles(raw, section):
     except UnicodeDecodeError:
         raise ValueError("公式IPC分類名はUTF-8形式でなければなりません") from None
     titles = {}
-    for i, line in enumerate(data.splitlines()):
+    previous_heading = None
+    for line in data.splitlines():
         if len(line) > 6000:
             raise ValueError("分類名が異常に長い行があります")
         if not line:
             continue
         if "\t" not in line:
-            raise ValueError("WIPOのIPCタイトル表の形式が不正です")
+            # WIPO's authentic title list sometimes wraps a long GROUP title
+            # over multiple physical lines. Do not reject an entire section.
+            # Heading continuations are bounded before storing.
+            if previous_heading is not None:
+                joined = titles[previous_heading] + " " + line.strip()
+                if len(joined.encode("utf-8")) > MAX_TITLE_BYTES:
+                    raise ValueError("見出しの分類名が大きすぎます")
+                titles[previous_heading] = joined
+            continue
         code, title = line.split("\t", 1)
         code, title = code.strip(), title.strip()
+        previous_heading = None
         # WIPO includes e.g. H02M0001440000 group titles. Only the heading
         # level is used here; never mistake raw group keys for IPC subclasses.
         if not CODE.fullmatch(code):
@@ -61,6 +71,7 @@ def parse_titles(raw, section):
         if code in titles:
             raise ValueError("公式分類名のコードが重複しています")
         titles[code] = title
+        previous_heading = code
         if len(titles) > MAX_ENTRIES_PER_SECTION:
             raise ValueError("セクション内の分類名が多すぎます")
     if section not in titles or not any(len(code) == 3 for code in titles) or not any(
