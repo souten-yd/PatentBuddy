@@ -205,3 +205,15 @@ def browse(store, parent="", *, limit=60, after=""):
             "next_after": items[-1]["code"] if len(rows) > limit and next_level == "group" else None,
             "version": EDITION, "titles": "not_in_valid_symbols_feed",
             "manual_only": True}
+
+
+
+def verified_subclass(store, code):
+    """Check installed official IPC symbol list, not LLM output or user claims."""
+    if not isinstance(code, str) or not re.fullmatch(r"[A-H][0-9]{2}[A-Z]", code):
+        return False
+    row = store.one(
+        "SELECT 1 FROM official_ipc_symbols WHERE edition=? AND section=? "
+        "AND symbol>=? AND symbol<? LIMIT 1",
+        (EDITION, code[0], code, code + "\uffff"))
+    return bool(row)
