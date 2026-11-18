@@ -18,7 +18,7 @@ from .llm import LLMError
 ROUTES = []
 SECRET_NAMES = ("openrouter_api_key", "epo_ops_key", "epo_ops_secret", "jpo_username", "jpo_password",
                 "uspto_api_key", "openai_api_key", "smtp_password", "qdrant_api_key",
-                "estat_app_id", "edinet_api_key")
+                "estat_app_id", "edinet_api_key", "openalex_api_key")
 
 
 def route(method, pattern, auth="admin"):
