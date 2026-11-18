@@ -762,66 +762,285 @@ function mapItemStatus(node) {
   if (node.status === 'reviewed_graph_node') return '根拠で確認されたグラフの構成要素';
   return '参照文献';
 }
-function drawKnowledgeMap(data, select) {
-  const svg = el('map-svg');
+// Obsidian-style interactive force-directed view for a BOUNDED client slice.
+// No CDN, no new graph truth or persistence. Max nodes are enforced server-side.
+// The global Atlas and per-document map share exactly this renderer.
+let localForceView = null;
+let atlasForceView = null;
+function makeForceGraph(svg, data, onSelect, initialFocus) {
+  if (svg._forceDestroy) svg._forceDestroy();
   svg.replaceChildren();
-  const nodes = data.nodes;
-  const byId = new Map(nodes.map(n => [n.id, n]));
-  // Bounded, deterministic radial layout: zero remote libraries or CDN.
-  const distances = new Map([[data.root, 0]]);
-  for (let depth = 0; depth < data.hops; depth++) {
-    for (const edge of data.edges) {
-      if (distances.get(edge.source) === depth && !distances.has(edge.target)) {
-        distances.set(edge.target, depth + 1);
-      }
+  const WIDTH = 960, HEIGHT = 600;
+  svg.setAttribute('viewBox', '0 0 ' + WIDTH + ' ' + HEIGHT);
+  const nodes = (Array.isArray(data.nodes) ? data.nodes : []).filter(node =>
+    node && typeof node.id === 'string' && typeof node.label === 'string').slice(0, 84);
+  const lookup = new Map(nodes.map(node => [node.id, node]));
+  const edges = (Array.isArray(data.edges) ? data.edges : []).filter(edge =>
+    lookup.has(edge.source) && lookup.has(edge.target) &&
+    edge.source !== edge.target).slice(0, 160);
+  const degrees = new Map(nodes.map(n => [n.id, 0]));
+  const neighbors = new Map(nodes.map(n => [n.id, new Set()]));
+  for (const edge of edges) {
+    degrees.set(edge.source, degrees.get(edge.source) + 1);
+    degrees.set(edge.target, degrees.get(edge.target) + 1);
+    neighbors.get(edge.source).add(edge.target);
+    neighbors.get(edge.target).add(edge.source);
+  }
+  const distance = new Map([[data.root, 0]]);
+  for (let i = 0; i < 3; i++) {
+    for (const edge of edges) {
+      if (distance.has(edge.source) && !distance.has(edge.target))
+        distance.set(edge.target, distance.get(edge.source) + 1);
     }
   }
-  const levels = [[], [], []];
+  const groups = new Map();
   for (const node of nodes) {
-    levels[Math.min(distances.get(node.id) ?? 2, 2)].push(node);
+    const level = Math.min(distance.get(node.id) ?? 3, 3);
+    if (!groups.has(level)) groups.set(level, []);
+    groups.get(level).push(node);
   }
   const points = new Map();
-  for (const [depth, level] of levels.entries()) {
-    level.forEach((node, index) => {
-      const angle = -Math.PI / 2 + (2 * Math.PI * index) / level.length;
-      const rx = depth === 1 ? 190 : depth === 2 ? 327 : 0;
-      const ry = depth === 1 ? 145 : depth === 2 ? 202 : 0;
-      points.set(node.id, [380 + Math.cos(angle) * rx, 235 + Math.sin(angle) * ry]);
+  for (const [depth, group] of groups) {
+    group.forEach((node, index) => {
+      // Stable initial placement; force relaxation improves it visually.
+      const angle = -Math.PI / 2 + 2 * Math.PI * index / Math.max(1, group.length);
+      const radius = [0, 155, 280, 360][depth];
+      points.set(node.id, {
+        x: WIDTH / 2 + Math.cos(angle) * radius,
+        y: HEIGHT / 2 + Math.sin(angle) * radius * .77,
+        vx: 0, vy: 0, pinned: node.id === data.root,
+      });
     });
   }
-  for (const edge of data.edges) {
-    const from = points.get(edge.source), to = points.get(edge.target);
-    if (!from || !to) continue;
+  const camera = {x: 0, y: 0, zoom: 1};
+  const scene = mapElement('g', {class: 'graph-scene'});
+  const edgeLayer = mapElement('g', {class: 'graph-edges'});
+  const nodeLayer = mapElement('g', {class: 'graph-nodes'});
+  scene.append(edgeLayer, nodeLayer);
+  svg.append(scene);
+  const lines = [], visualNodes = new Map();
+  let focusId = lookup.has(initialFocus) ? initialFocus : data.root;
+  let hoverId = null, request = 0, destroyed = false, pointer = null;
+  const media = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+  const reduced = media?.matches || document.documentElement.classList.contains('reduce-motion');
+  const format = value => Number.isFinite(value) ? value.toFixed(2) : '0';
+  function cameraDraw() {
+    scene.setAttribute('transform',
+      'translate(' + format(camera.x) + ',' + format(camera.y) + ') scale(' + format(camera.zoom) + ')');
+  }
+  function draw() {
+    if (destroyed) return;
+    cameraDraw();
+    for (const entry of lines) {
+      const a = points.get(entry.edge.source), b = points.get(entry.edge.target);
+      entry.el.setAttribute('x1', format(a.x));
+      entry.el.setAttribute('y1', format(a.y));
+      entry.el.setAttribute('x2', format(b.x));
+      entry.el.setAttribute('y2', format(b.y));
+    }
+    for (const [id, group] of visualNodes) {
+      const p = points.get(id);
+      group.setAttribute('transform',
+        'translate(' + format(p.x) + ',' + format(p.y) + ')');
+    }
+  }
+  function focus(id) {
+    if (!lookup.has(id)) return;
+    focusId = id;
+    const center = hoverId || focusId;
+    const adjacent = neighbors.get(center) || new Set();
+    for (const [nodeId, group] of visualNodes) {
+      group.classList.toggle('is-selected', nodeId === focusId);
+      group.classList.toggle('is-neighbor', adjacent.has(nodeId));
+      group.classList.toggle('is-dimmed', nodeId !== center &&
+        nodeId !== focusId && !adjacent.has(nodeId));
+    }
+    for (const entry of lines) {
+      entry.el.classList.toggle('is-active',
+        entry.edge.source === center || entry.edge.target === center);
+      entry.el.classList.toggle('is-dimmed',
+        entry.edge.source !== center && entry.edge.target !== center);
+    }
+  }
+  for (const edge of edges) {
     const line = mapElement('line', {
-      x1: from[0], y1: from[1], x2: to[0], y2: to[1],
-      class: edge.basis === 'factual' ? 'map-line map-line-factual' :
-        edge.basis === 'inferred' ? 'map-line map-line-hypothesis' :
-        'map-line map-line-source',
+      class: 'map-line ' + (edge.basis === 'factual' ? 'map-line-factual' :
+        edge.basis === 'inferred' ? 'map-line-hypothesis' :
+        edge.basis === 'catalog_index' ? 'map-line-catalog' : 'map-line-source'),
     });
-    svg.append(line);
+    const title = mapElement('title');
+    title.textContent = edge.basis === 'inferred' ?
+      '人が確認した技術仮説（技術的事実ではありません）' :
+      edge.basis === 'catalog_index' ? '資料の保存先・所属関係' :
+      edge.basis === 'provenance_only' ? '原文と知識候補の出典関係' :
+      '根拠付きの関係';
+    line.append(title);
+    edgeLayer.append(line);
+    lines.push({edge, el: line});
   }
   for (const node of nodes) {
-    const xy = points.get(node.id);
-    if (!xy) continue;
-    const selected = node.id === selectedMapId;
+    const id = node.id;
     const group = mapElement('g', {
-      class: 'map-point' + (selected ? ' is-selected' : '') +
+      class: 'map-point map-node-' + String(node.kind || 'concept').replace(/[^a-z_-]/g, '') +
         (node.stale ? ' is-stale' : '') +
-        (node.id.startsWith('k:') ? ' is-inference' : ''),
-      transform: 'translate(' + xy[0].toFixed(1) + ',' + xy[1].toFixed(1) + ')',
+        (node.basis === 'model_inference' ? ' is-inference' : '') +
+        (node.id === data.root ? ' is-root' : ''),
+      'data-node-id': id, 'role': 'button', 'tabindex': '0',
+      'aria-label': (MAP_KIND_LABELS[node.kind] || node.kind || '知識') +
+        '：' + node.label + '。' + mapItemStatus(node) + '。Enterで詳細を表示',
     });
-    const circle = mapElement('circle', {r: node.id === data.root ? 29 : 20});
-    const label = mapElement('text', {x: 0, y: node.id === data.root ? 46 : 34,
-      'text-anchor': 'middle'});
-    const summary = String(node.label || node.kind || '').slice(0, 14);
-    label.textContent = summary + (String(node.label || '').length > 14 ? '…' : '');
-    const tooltip = mapElement('title');
-    tooltip.textContent = String(node.label || '') + ' — ' + mapItemStatus(node);
-    group.append(circle, label, tooltip);
-    group.addEventListener('click', () => select(node.id));
-    svg.append(group);
+    const circle = mapElement('circle', {
+      r: node.id === data.root ? 22 :
+        node.kind === 'collection' ? 15 : Math.min(15, 8 + Math.sqrt(degrees.get(id) || 0) * 2),
+    });
+    const label = mapElement('text', {x: 0, y: node.id === data.root ? 37 : 27,
+      'text-anchor': 'middle', class: 'map-node-label'});
+    const limit = node.id === data.root ? 25 : node.kind === 'collection' ? 17 : 13;
+    const summary = Array.from(String(node.label || '')).slice(0, limit).join('');
+    label.textContent = summary + (Array.from(node.label || '').length > limit ? '…' : '');
+    const title = mapElement('title');
+    title.textContent = node.label + ' — ' + mapItemStatus(node);
+    group.append(circle, label, title);
+    group.addEventListener('pointerenter', () => {hoverId = id;focus(focusId);});
+    group.addEventListener('pointerleave', () => {hoverId = null;focus(focusId);});
+    group.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault(); onSelect(id); focus(id);
+      }
+    });
+    nodeLayer.append(group);
+    visualNodes.set(id, group);
   }
+  function settle() {
+    const items = [...points];
+    const forces = new Map(items.map(([id]) => [id, [0, 0]]));
+    // Small bounded client slice only: quadratic repulsion is capped at 84.
+    for (let i = 0; i < items.length; i++) {
+      const [aid, a] = items[i];
+      for (let j = i + 1; j < items.length; j++) {
+        const [bid, b] = items[j];
+        let dx = a.x - b.x, dy = a.y - b.y;
+        if (dx === 0 && dy === 0) {dx = (i + 1) * .015;dy = (j + 1) * .011;}
+        const scale = 1450 / (dx * dx + dy * dy + 120);
+        const fx = dx * scale, fy = dy * scale;
+        forces.get(aid)[0] += fx;forces.get(aid)[1] += fy;
+        forces.get(bid)[0] -= fx;forces.get(bid)[1] -= fy;
+      }
+    }
+    for (const edge of edges) {
+      const a = points.get(edge.source), b = points.get(edge.target);
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const d = Math.max(1, Math.hypot(dx, dy));
+      const target = edge.basis === 'catalog_index' ? 105 : 145;
+      const k = (d - target) * .012;
+      const fx = dx / d * k, fy = dy / d * k;
+      forces.get(edge.source)[0] += fx;forces.get(edge.source)[1] += fy;
+      forces.get(edge.target)[0] -= fx;forces.get(edge.target)[1] -= fy;
+    }
+    for (const [id, p] of points) {
+      if (p.pinned) {p.vx = 0;p.vy = 0;continue;}
+      const [fx, fy] = forces.get(id);
+      p.vx = Math.max(-10, Math.min(10, (p.vx + fx + (WIDTH/2-p.x)*.0015)*.74));
+      p.vy = Math.max(-10, Math.min(10, (p.vy + fy + (HEIGHT/2-p.y)*.0015)*.74));
+      p.x = Math.max(22, Math.min(WIDTH-22, p.x+p.vx));
+      p.y = Math.max(20, Math.min(HEIGHT-20, p.y+p.vy));
+    }
+  }
+  function reflow() {
+    if (request) cancelAnimationFrame(request);
+    if (reduced || document.hidden) {
+      for (let i = 0; i < 80; i++) settle();
+      draw();
+      return;
+    }
+    let tick = 0;
+    const animate = () => {
+      if (destroyed) return;
+      // Stops automatically: no continual GPU/CPU load on QNAP clients.
+      for (let i = 0; i < 2; i++) settle();
+      draw();
+      if (++tick < 55) request = requestAnimationFrame(animate);
+      else request = 0;
+    };
+    request = requestAnimationFrame(animate);
+  }
+  function zoom(factor, centerX=WIDTH/2, centerY=HEIGHT/2) {
+    const next = Math.max(.4, Math.min(4, camera.zoom * factor));
+    camera.x = centerX - (centerX-camera.x) * next/camera.zoom;
+    camera.y = centerY - (centerY-camera.y) * next/camera.zoom;
+    camera.zoom = next;
+    cameraDraw();
+  }
+  function fit() {camera.x=0;camera.y=0;camera.zoom=1;cameraDraw();}
+  function svgPoint(event) {
+    const ctm = svg.getScreenCTM();
+    if (!ctm) return null;
+    const pt = svg.createSVGPoint();
+    pt.x = event.clientX;pt.y = event.clientY;
+    return pt.matrixTransform(ctm.inverse());
+  }
+  svg.onwheel = event => {
+    const p = svgPoint(event);
+    if (!p) return;
+    event.preventDefault();
+    zoom(event.deltaY < 0 ? 1.12 : 1/1.12, p.x, p.y);
+  };
+  svg.onpointerdown = event => {
+    if (!event.isPrimary || event.button !== 0) return;
+    const point = svgPoint(event);
+    if (!point) return;
+    const target = event.target.closest?.('[data-node-id]');
+    const id = target?.getAttribute('data-node-id');
+    pointer = {
+      pointerId:event.pointerId, id:lookup.has(id) ? id : null,
+      startX:point.x, startY:point.y, oldX:camera.x, oldY:camera.y,
+      moved:false,
+    };
+    event.preventDefault();
+    try {svg.setPointerCapture(event.pointerId);} catch (_) {}
+  };
+  svg.onpointermove = event => {
+    if (!pointer || pointer.pointerId !== event.pointerId) return;
+    const p = svgPoint(event);if (!p) return;
+    const dx = p.x-pointer.startX,dy=p.y-pointer.startY;
+    if (Math.hypot(dx,dy)>4) pointer.moved=true;
+    if (pointer.id) {
+      const item=points.get(pointer.id);
+      item.pinned=true;
+      item.x=Math.max(20,Math.min(WIDTH-20,item.x+dx/camera.zoom));
+      item.y=Math.max(20,Math.min(HEIGHT-20,item.y+dy/camera.zoom));
+      pointer.startX=p.x;pointer.startY=p.y;
+      draw();
+    } else {
+      camera.x=pointer.oldX+dx;
+      camera.y=pointer.oldY+dy;
+      cameraDraw();
+    }
+  };
+  const finish = event => {
+    if (!pointer || pointer.pointerId !== event.pointerId) return;
+    const chosen=pointer.id, moved=pointer.moved;
+    pointer=null;
+    try {svg.releasePointerCapture(event.pointerId);} catch (_) {}
+    if (chosen && !moved) {focus(chosen);onSelect(chosen);}
+  };
+  svg.onpointerup=finish;
+  svg.onpointercancel=event => {
+    if (pointer?.pointerId===event.pointerId) pointer=null;
+  };
+  function destroy() {
+    destroyed=true;
+    if (request) cancelAnimationFrame(request);
+    svg.onwheel=svg.onpointerdown=svg.onpointermove=svg.onpointerup=svg.onpointercancel=null;
+  }
+  svg._forceDestroy=destroy;
+  fit();focus(focusId);draw();reflow();
+  return {focus,zoom,fit,reflow,destroy};
 }
+function drawKnowledgeMap(data, select) {
+  localForceView = makeForceGraph(el('map-svg'), data, select, selectedMapId);
+}
+
 function renderMapInspector(data, nodeId) {
   const box = el('map-inspector');
   box.replaceChildren();
@@ -928,7 +1147,7 @@ function renderKnowledgeMap(data) {
   const select = id => {
     selectedMapId = id;
     renderMapInspector(data, id);
-    drawKnowledgeMap(data, select);
+    localForceView?.focus(id);
     for (const button of list.querySelectorAll('button')) {
       button.setAttribute('aria-pressed', String(button.dataset.nodeId === id));
     }
@@ -943,6 +1162,7 @@ function renderKnowledgeMap(data) {
     button.onclick = () => select(node.id);
     list.append(button);
   }
+  drawKnowledgeMap(data, select);
   select(selectedMapId);
   el('map-status').textContent = '出典と知識 ' + data.nodes.length + '件、接続 ' +
     data.edges.length + '件、' + data.hops + '段階（' +
