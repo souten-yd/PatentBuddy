@@ -72,6 +72,8 @@ def _write_json(path, data):
     _safe_file(path)
     temporary = path.with_name(path.name + ".new")
     _safe_file(temporary)
+    if temporary.exists():
+        temporary.unlink()  # clean orphaned metadata staging from a prior crash
     with open(temporary, "x", encoding="utf-8") as stream:
         json.dump(data, stream, ensure_ascii=True, sort_keys=True)
         stream.flush()
@@ -218,19 +220,35 @@ class ManualBulkTransfer:
             if self._current is not None:
                 self._current.update(values)
 
+    def _can_resume(self, product, name, expected):
+        try:
+            paths = self._paths(product, name)
+            if not paths:
+                return False
+            part, meta_path = paths[:2]
+            if not part.is_file() or not meta_path.is_file():
+                return False
+            meta = _read_json(meta_path)
+            size = part.stat().st_size
+            return (0 < size < expected and meta.get("expected_bytes") == expected and
+                    bool(ALLOWED_ETAG.fullmatch(meta.get("etag", ""))))
+        except (OSError, ValueError, TypeError):
+            return False
+
     def _run(self, product, name, expected, key, source_lock, restart):
         try:
             self._download(product, name, expected, key, restart)
         except BulkTransferError as exc:
             self._update(state="cancelled" if self._cancel.is_set() else "failed",
-                         reason=str(exc), can_resume=True)
+                         reason=str(exc), can_resume=self._can_resume(product, name, expected))
         except (OSError, TimeoutError, urllib.error.URLError, ValueError):
             self._update(state="cancelled" if self._cancel.is_set() else "failed",
-                         reason="ネットワークまたは保存先エラー", can_resume=True)
+                         reason="ネットワークまたは保存先エラー",
+                         can_resume=self._can_resume(product, name, expected))
         except Exception:
             # Never surface a credential-containing upstream exception.
             self._update(state="failed", reason="公式ファイルの取得に失敗しました",
-                         can_resume=True)
+                         can_resume=self._can_resume(product, name, expected))
         finally:
             source_lock.release()
 
@@ -308,6 +326,9 @@ class ManualBulkTransfer:
                     chunk = response.read(min(BUFFER_BYTES, expected - total))
                     if not chunk:
                         raise BulkTransferError("途中で転送が切断されました")
+                    if total == 0 and not chunk.startswith((b"PK\x03\x04", b"PK\x05\x06",
+                                                             b"PK\x07\x08")):
+                        raise BulkTransferError("ZIP以外の応答はファイルに保存できません")
                     stream.write(chunk)
                     digest.update(chunk)
                     total += len(chunk)
