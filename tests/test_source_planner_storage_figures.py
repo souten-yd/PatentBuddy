@@ -208,3 +208,37 @@ class SourceHistoryTests(unittest.TestCase):
             item["bbox_points"] = coords
             with self.assertRaises(ValueError):
                 pdf_store.validate_images(payload, {0: png()})
+
+
+
+class PDFIsolatedWorkerTests(unittest.TestCase):
+    def test_sandboxed_worker_png_crop_and_no_disk_staging_leaks(self):
+        try:
+            import fitz
+        except ImportError:
+            self.skipTest("Optional local PC PyMuPDF not installed")
+        import threading
+        from qnaplibrary import pdf_extract
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            images = root / "images"
+            images.mkdir()
+            path = root / "sample.pdf"
+            pdf = fitz.open()
+            page = pdf.new_page(width=600, height=800)
+            page.draw_rect(fitz.Rect(100, 150, 340, 400))
+            pdf.save(str(path))
+            pdf.close()
+            preview, crops = pdf_extract._geometry_candidates(
+                path, images, start_index=0, limit=2, cancel=threading.Event())
+            self.assertEqual(preview["status"], "unreviewed", preview)
+            self.assertTrue(crops)
+            self.assertEqual(crops[0]["method"], "local_pdf_page_crop")
+            self.assertTrue((images / "0.png").read_bytes().startswith(b"\x89PNG\r\n\x1a\n"))
+            self.assertFalse((images / "figure-worker-report.json").exists())
+            canceled = threading.Event()
+            canceled.set()
+            with self.assertRaises(pdf_extract.PDFError):
+                pdf_extract._geometry_candidates(path, images, 2, 1, canceled)
+            self.assertFalse((images / "2.png").exists())
+            self.assertFalse((images / "figure-worker-report.json").exists())
