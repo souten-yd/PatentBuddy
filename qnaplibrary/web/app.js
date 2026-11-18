@@ -596,8 +596,19 @@ async function chatView(main) {
 // Scoped patent research: sources and capacity are managed only from the
 // authenticated ResearchDataHub admin UI. Host read-only view cannot acquire.
 async function scopedSourceCard(main, connectors) {
+  const assistant = await api("GET", "/api/v1/source-assistant/options");
   const epoReady = connectors.some(c => c.id === "epo_ops" && c.configured);
-  const topic = h("input", { class: "wide", maxlength: 120, placeholder: "例：インバータ、電気、機械" });
+  const topic = h("input", { class: "wide", maxlength: 120, placeholder: "例：インバータの冷却、モータ制御" });
+  const quickChoices = h("div", { class: "row" }, assistant.presets.map(preset =>
+    h("button", { class: "btn", onclick: guard(async () => {
+      topic.value = preset.topic;
+      await suggest();
+    }) }, preset.label)));
+  const localModel = sel(assistant.models.map(model => [model.id, model.label]), assistant.models[0]?.id || "");
+  const aiStatus = h("p", { class: "small muted", role: "status" },
+    assistant.models.length ? "AIは必要な時だけ手動で問い合わせます。候補は未確認です。" :
+      "検証済みのローカルAIがありません。定番の分野選択だけで調査できます。");
+  const aiCandidates = h("div", {});
   const selectCode = sel([["", "先に分類候補を調べてください"]], "");
   const max = h("input", { type: "number", min: 1, max: 25, step: 1, value: 10 });
   const publicationCountry = sel([["ALL", "全公開国"], ["JP", "日本(JP)"], ["US", "米国(US)"],
@@ -713,10 +724,72 @@ async function scopedSourceCard(main, connectors) {
     previewSignature = "";
     acquisition.disabled = true;
     scopePreview.textContent = "IPC候補を選択してから検索条件を確認してください。";
+    if (plan.candidates.length) selectCode.value = plan.candidates[0].code;
     feedback.textContent = plan.candidates.length
-      ? "候補 " + plan.candidates.length + "件。技術範囲を確認し公開分類のみを収集してください。"
+      ? "候補 " + plan.candidates.length + "件。最上位候補を仮選択しました。公開範囲を確認してください。"
       : "対象の分類がありません。IPC/CPC分類辞書の導入が必要です。";
   });
+  const aiAsk = guard(async () => {
+    if (!assistant.models.length || !topic.value.trim()) throw Error("調査内容とローカルAIを確認してください");
+    aiStatus.textContent = "ローカルAIに分類の候補を問い合わせています…";
+    aiButton.disabled = true;
+    try {
+      const result = await api("POST", "/api/v1/source-assistant/ask",
+        {question: topic.value.trim(), provider: localModel.value});
+      clear(aiCandidates);
+      aiCandidates.append(h("p", { class: "small muted" },
+        result.reason + (result.clarify ? " / 確認したい点: " + result.clarify : "")));
+      for (const candidate of result.codes) {
+        const button = h("button", { class: "btn", onclick: () => {
+          if (![...selectCode.options].some(x => x.value === candidate.code)) {
+            selectCode.append(h("option", { value: candidate.code },
+              candidate.code + " / " + candidate.label + "（AIによる未確認提案）"));
+          }
+          selectCode.value = candidate.code;
+          invalidatePreview();
+          feedback.textContent = candidate.code + "を選びました。検索式を確認して公開条件を承認してください。";
+        } }, candidate.code + " · " + candidate.label);
+        aiCandidates.append(button);
+      }
+      aiStatus.textContent = result.codes.length
+        ? "候補を選択すると検索条件に反映します。AIの判断を確定情報とは扱いません。"
+        : "初期の分類候補に該当しません。公式分類辞書で再確認してください。";
+    } catch (error) {
+      aiStatus.textContent = "ローカルAIに確認できません: " + error.message;
+    } finally {aiButton.disabled = false;}
+  });
+  const aiButton = h("button", { class: "btn", disabled: assistant.models.length === 0,
+    onclick: aiAsk }, "ローカルAIに分類を聞く");
+  const catalogSection = sel([["H", "H:電気"], ["F", "F:機械工学"], ["B", "B:処理・運輸"],
+    ["G", "G:物理"], ["A", "A:生活"], ["C", "C:化学"], ["D", "D:繊維"], ["E", "E:建設"]], "H");
+  const catalogInfo = h("p", { class: "small muted" },
+    "WIPO公式IPC 2026.01の記号一覧を必要なセクションだけ取り込みます。名称・説明は含まれません。");
+  const catalogResults = h("div", {});
+  const importCatalog = h("button", { class: "btn", onclick: guard(async () => {
+    if (!confirm("WIPO公式IPC 2026.01の " + catalogSection.value +
+      " セクションを1回取得し、分類記号だけをSQLiteへ保存しますか？")) return;
+    importCatalog.disabled = true;
+    try {
+      const result = await api("POST", "/api/v1/ipc-catalog/import",
+        {section: catalogSection.value, confirm_public_source: true});
+      catalogInfo.textContent = result.edition + " " + result.section + ": " +
+        result.count + "記号、SHA-256 " + result.sha256.slice(0, 14) +
+        (result.unchanged ? "（変更なし）" : "（取り込みました）");
+    } finally {importCatalog.disabled = false;}
+  }) }, "WIPO公式IPC辞書を取り込む");
+  const browseCodes = h("button", { class: "btn", onclick: guard(async () => {
+    if (!selectCode.value) throw Error("先にIPC候補を選択してください");
+    const result = await api("POST", "/api/v1/ipc-catalog/lookup",
+      {prefix: selectCode.value});
+    clear(catalogResults);
+    catalogResults.append(h("p", { class: "small muted" }, "WIPO " + result.edition +
+      " 版の分類記号です。詳細定義・分類名を含まないため原典確認が必要です。"));
+    for (const candidate of result.items.slice(0, 30)) {
+      catalogResults.append(h("span", { class: "tag" }, candidate.symbol));
+    }
+    if (!result.items.length) catalogResults.append(h("p", {},
+      "該当する記号は未収録です。該当セクションのIPC辞書を取り込んでください。"));
+  }) }, "下位の公式IPC記号を見る");
   const canAcquire = () => {
     acquisition.disabled = !epoReady || !selectCode.value || !approved.checked ||
       signature() !== previewSignature;
@@ -773,9 +846,19 @@ async function scopedSourceCard(main, connectors) {
   const panel = h("details", { class: "card" },
     h("summary", {}, "技術分野からの限定収集・容量／ソース管理"),
     h("p", { class: "small muted" }, "無料枠と公式規約の範囲で手動取得します。最初にIPC候補を選び、公開国と公開年で絞ってください。公開日による範囲指定であり、出願日・優先日ではありません。最大2000結果まで、25件ずつ手動取得します。"),
-    field("調査分野（この入力は外部に送信しません）", topic),
+    h("p", { class: "small muted" }, "分野を選ぶか自然文で入力してください。外部に問い合わせずIPC候補を作ります。"),
+    quickChoices,
+    field("調査したい技術（自然文でも可・未公開の内容はローカルのみ）", topic),
     h("div", { class: "row" }, h("button", { class: "btn", onclick: suggest }, "IPC候補を確認"), selectCode),
     candidateRows,
+    h("details", {}, h("summary", {}, "AIに簡単に分類を相談（任意・ローカルのみ）"),
+      assistant.models.length ? h("div", { class: "row" }, localModel, aiButton) : aiStatus,
+      assistant.models.length ? aiStatus : null, aiCandidates,
+      h("p", { class: "small muted" }, "AIの回答は未確認の候補です。外部検索は自動実行しません。")),
+    h("details", {}, h("summary", {}, "WIPO公式IPC辞書・下位分類（任意）"),
+      h("p", { class: "small muted" }, "出典: WIPO IPC 2026.01。分類名・日本語解説は別途確認してください。"),
+      h("div", { class: "row" }, catalogSection, importCatalog, browseCodes),
+      catalogInfo, catalogResults),
     h("div", { class: "row" },
       field("公開国", publicationCountry),
       field("公開年の開始（西暦）", yearStart),
