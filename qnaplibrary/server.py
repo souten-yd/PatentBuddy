@@ -503,20 +503,23 @@ class Handler(BaseHTTPRequestHandler):
                             result = client.data("POST", "/api" + path[len("/addon"):], body)
                         elif method == "GET" and path == "/addon/v1/knowledge/atlas":
                             query = parse_qs(parts.query, keep_blank_values=True)
-                            if (set(query) - {'cursor', 'limit'} or
+                            if (set(query) - {'cursor', 'limit', 'collection_id'} or
                                     any(len(v) != 1 for v in query.values())):
                                 raise AddonError(400, '知識アトラスのページ指定が不正です')
                             cursor = query.get('cursor', ['0'])[0]
                             limit = query.get('limit', ['10'])[0]
-                            if (not cursor.isascii() or not cursor.isdecimal() or
-                                    len(cursor) > 19 or
+                            collection = query.get('collection_id', ['0'])[0]
+                            if (not all(x.isascii() and x.isdecimal() and len(x) <= 19
+                                        for x in (cursor, collection)) or
                                     not limit.isascii() or not limit.isdecimal() or
-                                    len(limit) > 2 or not 1 <= int(limit) <= 10 or
-                                    int(cursor) > 2**63 - 1):
+                                    len(limit) > 2 or not 1 <= int(limit) <=
+                                    (50 if int(collection) else 10) or
+                                    int(cursor) > 2**63 - 1 or
+                                    int(collection) > 2**63 - 1):
                                 raise AddonError(400, '知識アトラスの範囲が不正です')
                             result = client.data(
                                 "GET", "/api/v1/knowledge/atlas?cursor=" + cursor +
-                                "&limit=" + limit)
+                                "&limit=" + limit + "&collection_id=" + collection)
                         elif method == "GET" and re.fullmatch(r"/addon/v1/documents/[1-9][0-9]{0,17}/knowledge-map", path):
                             query = parse_qs(parts.query, keep_blank_values=True)
                             if (set(query) - {'hops', 'include_unreviewed', 'include_links'}
