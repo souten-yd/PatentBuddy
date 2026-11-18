@@ -257,3 +257,11 @@ K7a次Codex: WIPO IPC 2026.01の本物の公式有効記号XML（XSD v2）をダ
 ### 最新K7a次指示 — 実USPTOバルクZIPの解析/IPC選別（2026-11-18）
 
 [手動ダウンロード設計と受入ゲート](patent-bulk-manual-staging-k7a.md)を最優先参照。USPTO ODPの製品IDに紐付けられた公開ZIPを管理者が1件だけ手動取得するまで実装済み（backend-only、ControlDeck Hostは新権限なし）。新しいZIP内の記号辞書/公報XML/JSONを正式資料で解析する前に、実キー登録後の小さいサンプルZIPのHTTP/302/206/ETag、公式ライセンス、SHA256取得元照合を実測。ZIPを公開せず、ZipSlip/symlink/ZipBomb/DTD/XML ENTITYを検査し、IPC/CPC・国・公開年で対象だけ一件ずつDBに投入する。Linux PCで重処理、QNAPへは必要な正規化文献のみ。無制限自動DL/cron/ControlDeck実行/外部LLMへの未公開情報送信禁止。PR #39依存やmainのdocs/manifest/runtimeと同等、test 0 fail、実Linux/ControlDeck/QNAP/iOSの実機テスト後にのみmerge/release検討。
+
+
+### K7a 公開特許11件実取得パイロット後の作業（2026-11-18）
+
+1. [実公報パイロット](public-patent-pilot-2026-11-18.md)と[固定fixture](../tests/fixtures/k7a_public_patents_20261118.json)を確認。公開特許11件を個別ページから実取得・SHAで追跡し、年/国/種別/IPC/関連表示/図面/技術指標の10グラフを作成。Google PatentsのHTMLメタは分析用の表示指標であり、正式XMLから検証されるまで引用回数/法的ファミリー/優先日/出願人として確定扱いしない。
+2. 次のPRはZIP文献の**公式XML/JSONスキーマ**の検証→安全なストリーミング解析→IPC/CPC/国/年による絞り込み→SQLiteへ小バッチの冪等保存と中断チェックポイント→AI無しの10チャート集計を優先。任意のAI質問はローカルだけに手動で保留/再開。モデル未起動でも資料検索とグラフ表示を止めない。
+3. 年別チャートでサンプル選別バイアスとNULL/解析不能率を併記する。正式な引用系はforward/backwardの方向とファミリー重複を確実に分離すること。本文と請求項の法的解釈を勝手に自動で確定しない。
+4. ユーザーのUSPTO/EPO/JPOキーは導入時に設定。実APIから1〜3件の公開記録を確認し、本番の再開/コスト/RateLimit/ライセンスを検証。ControlDeckのUI defaultやVue/runtime semantics、実行capability、raw source serving、backend authoritativeを改変しない。#40と依存PRはテストと受入までDraft/未リリース。
