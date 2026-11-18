@@ -581,6 +581,13 @@ class Handler(BaseHTTPRequestHandler):
                                 raise AddonError(400, "調査テーマのみを指定してください")
                             # Read-only private preview: no source requests or save.
                             result = client.data("POST", "/api/v1/source-plan", body)
+                        elif method == "POST" and path == "/addon/v1/source-scope/preview":
+                            body = Request(self, method, path, {}, {}).json(limit=2048)
+                            allowed = {"ipc", "publication_country", "year_from", "year_to", "first", "limit"}
+                            if not isinstance(body, dict) or not {"ipc", "limit"} <= set(body) or not set(body) <= allowed:
+                                raise AddonError(400, "分類・公開国・公開年・取得範囲のプレビューだけを指定してください")
+                            # Existing authenticated read token only. No external call.
+                            result = client.data("POST", "/api/v1/source-scope/preview", body)
                         elif method == "GET" and path == "/addon/v1/source-storage":
                             result = client.data("GET", "/api/v1/source-storage?counts=1&breakdown=1")
                         elif method == "GET" and path == "/addon/v1/source-acquisitions":
