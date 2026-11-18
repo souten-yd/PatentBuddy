@@ -389,6 +389,76 @@ def sec_filings(cik, user_agent, forms="10-K,10-Q,8-K", limit=40):
     return docs
 
 
+# OpenAlex scientific-work metadata (official, free public API) ----------------
+def openalex_works(query, api_key="", limit=10, year_from=None, year_to=None):
+    """One explicit, bounded first-page public-metadata request. No PDF download."""
+    from datetime import date
+    if (not isinstance(query, str) or not 2 <= len(query.strip()) <= 120
+            or any(ord(c) < 32 or ord(c) == 127 for c in query)):
+        raise ConnectorError("OpenAlexの公開検索語は2〜120文字で指定してください")
+    if type(limit) is not int or not 1 <= limit <= 25:
+        raise ConnectorError("OpenAlexは1回25件以下です")
+    if not isinstance(api_key, str) or len(api_key) > 256:
+        raise ConnectorError("OpenAlexキーの形式が不正です")
+    if (year_from is None) != (year_to is None):
+        raise ConnectorError("OpenAlexの公開年範囲が不正です")
+    if year_from is not None and (
+            type(year_from) is not int or type(year_to) is not int
+            or not 1900 <= year_from <= year_to <= date.today().year
+            or year_to - year_from > 10):
+        raise ConnectorError("OpenAlexの公開年は11暦年以下です")
+    params = {"search": query.strip(), "per-page": limit,
+              "select": "id,title,publication_date,publication_year,doi,cited_by_count,referenced_works,authorships,primary_location"}
+    if year_from is not None:
+        params["filter"] = "from_publication_date:%04d-01-01,to_publication_date:%04d-12-31" % (year_from, year_to)
+    if api_key:
+        params["api_key"] = api_key
+    # Fixed origin; no arbitrary endpoint, deep crawling, or cursor paging.
+    url = "https://api.openalex.org/works?" + urllib.parse.urlencode(params)
+    try:
+        raw = http_get(url, headers={"Accept": "application/json"}, pace=2.0)
+        if len(raw) > 1024 * 1024:
+            raise ConnectorError("OpenAlexの応答が1MiBを超えています")
+        root = json.loads(raw.decode("utf-8"))
+        entries = root.get("results")
+        if not isinstance(entries, list) or len(entries) > limit:
+            raise ValueError("results")
+    except (ValueError, UnicodeError, AttributeError, TypeError):
+        raise ConnectorError("OpenAlexの取得データ形式が不正です") from None
+    docs = []
+    for item in entries:
+        if not isinstance(item, dict):
+            raise ConnectorError("OpenAlexの書誌レコードが不正です")
+        work_id = str(item.get("id") or "")
+        if not re.fullmatch(r"https://openalex\.org/W[0-9]{1,15}", work_id):
+            continue
+        title = str(item.get("title") or "").strip()
+        if not title:
+            continue
+        authors = []
+        for a in (item.get("authorships") or [])[:12]:
+            if isinstance(a, dict) and isinstance(a.get("author"), dict):
+                authors.append(str(a["author"].get("display_name") or "")[:150])
+        references = [str(x) for x in (item.get("referenced_works") or [])[:25]
+                      if isinstance(x, str) and re.fullmatch(r"https://openalex\.org/W[0-9]+", x)]
+        doi = item.get("doi")
+        docs.append({
+            "id": "openalex:" + work_id.rsplit("/", 1)[-1],
+            "title": title[:500], "body": title[:500],
+            "source": "OpenAlex", "url": work_id,
+            "date": str(item.get("publication_date") or "")[:10],
+            "meta": {
+                "openalex_id": work_id,
+                "doi": doi if isinstance(doi, str) and doi.startswith("https://doi.org/") else None,
+                "publication_year": item.get("publication_year"),
+                "cited_by_count": item.get("cited_by_count"),
+                "authors": authors, "referenced_works_sample": references,
+                "metadata_only": True
+            },
+        })
+    return docs
+
+
 CATALOG = [
     {"id": "gdelt", "label": "GDELT 世界ニュース", "kind": "news", "key": None,
      "params": [{"name": "query", "label": "検索語（英語推奨, 例: semiconductor export）"},
@@ -407,6 +477,10 @@ CATALOG = [
     {"id": "uspto", "label": "USPTO Open Data Portal", "kind": "patent", "key": ["uspto_api_key"],
      "params": [{"name": "query", "label": "検索語"}, {"name": "limit", "label": "最大件数", "default": 25}],
      "note": "data.uspto.gov で API キー取得。実験的。"},
+    {"id": "openalex", "label": "OpenAlex（研究論文・引用関係）", "kind": "paper", "key": None,
+     "params": [{"name": "query", "label": "公開する検索語（英語推奨・未公開情報禁止）"},
+                {"name": "limit", "label": "最大件数", "default": 10}],
+     "note": "無料の登録キーは任意。キーなしは少量デモ用。APIキーは導入後に設定 > 外部キーで入力。1回最大25件、本文/PDF自動取得なし。"},
     {"id": "estat", "label": "e-Stat（政府統計の表一覧）", "kind": "market", "key": ["estat_app_id"],
      "params": [{"name": "query", "label": "検索語（例: 半導体 生産）"}, {"name": "limit", "label": "最大件数", "default": 50}],
      "note": "e-stat.go.jp で無料のアプリケーションID登録が必要。表の名称・調査年月・URL を保存。"},
@@ -435,6 +509,10 @@ def run(connector_id, params, secrets, settings=None):
                             p.get("base_url") or "https://ip-data.jpo.go.jp")
     if connector_id == "uspto":
         return uspto_search(p.get("query", ""), secrets("uspto_api_key"), p.get("limit") or 25)
+    if connector_id == "openalex":
+        return openalex_works(p.get("query", ""), secrets("openalex_api_key") or "",
+                              int(p.get("limit") or 10),
+                              p.get("year_from"), p.get("year_to"))
     if connector_id == "estat":
         return estat(p.get("query", ""), secrets("estat_app_id"), p.get("limit") or 50)
     if connector_id == "edinet":
