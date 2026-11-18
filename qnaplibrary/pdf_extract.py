@@ -129,6 +129,7 @@ def _geometry_candidates(pdf, image_directory, start_index, limit, cancel):
                 raise PDFError('図面画像と抽出根拠が一致しません')
             result.append(candidate)
         return {'status': 'unreviewed',
+                'embedded_labels': response.get('embedded_labels', []),
                 'pages_scanned': response.get('pages_scanned', 0),
                 'candidates': response.get('candidates', [])[:60],
                 'truncated': response.get('truncated', False)}, result
@@ -252,6 +253,15 @@ def extract_pdf(source, cancel=None, force_pages=(), progress=None, scratch_pare
                 if room > 0:
                     figure_preview, crops = _geometry_candidates(
                         pdf, Path(image_directory), next_id, room, cancel)
+                    labels = figure_preview.pop('embedded_labels', [])
+                    by_id = {item['id']: item for item in images if item['kind'] == 'image'}
+                    for entry in labels[:200] if isinstance(labels, list) else []:
+                        if not isinstance(entry, list) or len(entry) != 3 or not all(type(v) is int for v in entry):
+                            continue
+                        index, page, number = entry
+                        item = by_id.get(index)
+                        if item and item['page'] == page and 1 <= number <= 999:
+                            item['caption_figure_candidate'] = number
                     remaining = MAX_TOTAL_BYTES - sum(x["size_bytes"] for x in images)
                     for candidate in crops:
                         _check_cancel(cancel)

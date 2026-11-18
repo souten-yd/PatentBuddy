@@ -8,6 +8,9 @@ Uses PyMuPDF if installed on the PC; never downloads models or remote data.
 """
 import hashlib
 import math
+import re
+import unicodedata
+from collections import defaultdict
 from pathlib import Path
 
 MAX_PDF = 50 * 1024 * 1024
@@ -138,6 +141,46 @@ def crop(path, *, page_number, bbox_points, dpi=120):
 
 
 
+def embedded_figure_labels(pdf, directory, first):
+    """Match standalone native captions to one nearby, pixel-identical embedded image."""
+    fitz = _fitz()
+    if not first:
+        return []
+    matches = defaultdict(list)
+    with _open(pdf) as doc:
+        for page in doc:
+            captions = []
+            for block in page.get_text("blocks"):
+                label = unicodedata.normalize("NFKC", block[4]).strip()
+                match = re.fullmatch(r"(?:【図([1-9][0-9]{0,2})】|FIG\.?\s*([1-9][0-9]{0,2}))", label, re.I)
+                if match:
+                    captions.append((block, int(match[1] or match[2])))
+            if not captions:
+                continue
+            placements = page.get_image_info(hashes=True)
+            proposals = defaultdict(list)
+            for block, number in captions:
+                nearby = [item for item in placements
+                          if abs(item["bbox"][0] - block[0]) <= 12
+                          and 0 <= item["bbox"][1] - block[3] <= 18]
+                if len(nearby) == 1 and sum(n == number for _, n in captions) == 1:
+                    proposals[nearby[0]["digest"]].append(number)
+            for digest, numbers in proposals.items():
+                if len(numbers) == 1 and sum(item["digest"] == digest for item in placements) == 1:
+                    matches[digest].append((page.number + 1, numbers[0]))
+    labels = []
+    if matches:
+        for index in range(first):
+            path = directory / ("%d.png" % index)
+            if path.is_file():
+                pix = fitz.Pixmap(str(path))
+                for page, number in matches.get(pix.digest, []):
+                    labels.append([index, page, number])
+                    if len(labels) >= 200:
+                        return labels
+    return labels
+
+
 def _isolated_worker():
     """Private PC PDF geometry worker; only invoked with exact arguments by parent.
 
@@ -171,6 +214,10 @@ def _isolated_worker():
         print(json.dumps({"status": "optional_pdf_geometry_unavailable", "images": [],
                           "candidates": [], "truncated": False}), flush=True)
         return
+    try:
+        labels = embedded_figure_labels(pdf, directory, first)
+    except (RuntimeError, ValueError):
+        labels = []
     images = []
     for candidate in candidates["candidates"][:count]:
         try:
@@ -193,7 +240,7 @@ def _isolated_worker():
         "status": "unreviewed", "pages_scanned": candidates["pages_scanned"],
         "candidates": candidates["candidates"][:60],
         "truncated": candidates["truncated"] or len(candidates["candidates"]) > count,
-        "images": images,
+        "images": images, "embedded_labels": labels,
     }, ensure_ascii=False, separators=(",", ":")), flush=True)
 
 

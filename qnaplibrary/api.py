@@ -1669,7 +1669,13 @@ def pdf_import(req):
 @route('GET', '/api/v1/documents/{did}/pdf-extraction', 'read')
 def pdf_extraction(req):
     from . import pdf_store
-    return pdf_store.extraction_for(req.app.store, int(req.params['did']))
+    from .pdf_classification import candidates
+    evidence = pdf_store.extraction_for(req.app.store, int(req.params['did']))
+    evidence.pop('classification_candidates', None)
+    rows = candidates(req.app.store, evidence['pages'])
+    if rows:
+        evidence['classification_candidates'] = rows
+    return evidence
 
 
 @route('GET', '/api/v1/documents/{did}/original.pdf', 'read')

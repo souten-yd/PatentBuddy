@@ -2238,6 +2238,19 @@ async function openDocument(id) {
   const source = document.createElement('p'); source.className = 'hint';
   source.textContent = `原本 SHA-256: ${evidence.sha256} · ${evidence.page_count}ページ · OCR結果は未確認です`;
   box.append(heading, download, source);
+  if (evidence.classification_candidates?.length) {
+    const group = document.createElement('details');
+    const title = document.createElement('summary');
+    title.textContent = '表紙の分類記号候補（公報への付与は未確認）';
+    group.append(title);
+    for (const row of evidence.classification_candidates) {
+      const line = document.createElement('p');
+      const status = {match: '辞書一致', absent: '辞書に該当なし', unavailable: '辞書未導入'}[row.dictionary];
+      line.textContent = `p.1 ${row.source === 'ocr' ? 'OCR' : '本文'}「${row.raw}」→ ${row.symbol} · IPC ${row.edition} ${status}`;
+      group.append(line);
+    }
+    box.append(group);
+  }
   if (evidence.images?.length) {
     const gallery = document.createElement('div'); gallery.id = 'pdf-image-viewer';
     const label = document.createElement('label'); label.textContent = 'PDF内の画像';
@@ -2245,7 +2258,8 @@ async function openDocument(id) {
     const placeholder = document.createElement('option'); placeholder.value = ''; placeholder.textContent = `${evidence.images.length}点から選択`; select.append(placeholder);
     for (const item of evidence.images) {
       const option = document.createElement('option'); option.value = String(item.id);
-      option.textContent = `ページ ${item.page} / 画像 ${item.id + 1} (${item.width}×${item.height})`; select.append(option);
+      const figure = Number.isInteger(item.caption_figure_candidate) ? `図${item.caption_figure_candidate}候補` : '図番号未特定';
+      option.textContent = `${figure} / ページ ${item.page} / 画像 ${item.id + 1} (${item.width}×${item.height})`; select.append(option);
     }
     const view = document.createElement('img'); view.hidden = true;
     const caption = document.createElement('p'); caption.className = 'hint';

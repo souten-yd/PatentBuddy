@@ -127,6 +127,11 @@ def validate_images(extraction, images):
                 or item.get('method') not in ('pdfimages_png', 'local_pdf_page_crop')
                 or item.get('review_status') != 'unreviewed'):
             raise StoreError('画像の内容・ページと抽出根拠が一致しません')
+        if 'caption_figure_candidate' in item:
+            candidate = item['caption_figure_candidate']
+            if (type(candidate) is not int or not 1 <= candidate <= 999
+                    or item.get('kind') != 'image' or item.get('method') != 'pdfimages_png'):
+                raise StoreError('図番号候補の形式が不正です')
         if item.get('method') == 'local_pdf_page_crop':
             if item.get('kind') != 'figure_candidate':
                 raise StoreError('切り抜きの出所が不正です')
