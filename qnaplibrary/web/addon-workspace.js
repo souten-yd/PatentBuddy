@@ -1101,6 +1101,14 @@ function renderMapInspector(data, nodeId) {
       catch (error) { el('map-status').textContent = '文献を開けませんでした: ' + error.message; }
     };
     box.append(open);
+    if (node.kind === 'document') {
+      const ai = document.createElement('button');
+      ai.type = 'button';
+      ai.className = 'secondary atlas-ai-action';
+      ai.textContent = 'ローカルAIで知識を抽出';
+      ai.onclick = () => void startLocalKnowledgeAI(node.document_id, ai, 'map-status');
+      box.append(ai);
+    }
   }
   const adjacent = data.edges.filter(e => e.source === node.id || e.target === node.id);
   if (adjacent.length) {
@@ -1209,6 +1217,23 @@ let atlasSelectedId = 'atlas:root';
 let atlasLoading = false;
 let atlasLoaded = false;
 let atlasRequest = 0;
+async function startLocalKnowledgeAI(docId, button, statusId) {
+  if (!Number.isInteger(docId) || docId < 1) return;
+  if (!window.confirm('この文献の知識をControlDeckのローカルAIで抽出しますか？ 結果は未確認のAI推論として保存され、人間のレビューが必要です。')) return;
+  button.disabled = true;
+  el(statusId).textContent = 'ローカルAIの知識抽出を明示的に開始しています…';
+  try {
+    // Reuse the existing Host-owned local-only model job with provenance.
+    // Never send unpublished patent source through a new remote provider.
+    await api('jobs', {doc_id: docId, kind: 'knowledge'});
+    el(statusId).textContent = 'ローカルAIの抽出ジョブを登録しました。人間によるレビュー前には技術的事実になりません。';
+    el('workspace-activity').open = true;
+    await loadJobs();
+  } catch (_) {
+    el(statusId).textContent =
+      'ローカルAIの抽出を開始できませんでした。ControlDeckのローカルモデル・権限・接続を確認してください。';
+  } finally {button.disabled = false;}
+}
 function renderAtlasInspector(data, id) {
   const inspector = el('atlas-inspector');
   inspector.replaceChildren();
@@ -1279,19 +1304,7 @@ function renderAtlasInspector(data, id) {
     ai.type = 'button';
     ai.className = 'secondary atlas-ai-action';
     ai.textContent = 'ローカルAIで知識エッセンスを抽出';
-    ai.onclick = async () => {
-      if (!window.confirm('この文献の知識候補をローカルAIで抽出しますか？ 出力は未確認の推論として保存され、承認操作が必要です。')) return;
-      ai.disabled = true;
-      el('atlas-status').textContent = 'ローカルAIへの明示的な分析要求を登録しています…';
-      try {
-        await api('jobs', {doc_id: item.document_id, kind: 'knowledge'});
-        el('atlas-status').textContent = 'ローカルAIの知識抽出ジョブを登録しました。処理状況から進捗を確認できます。';
-        el('workspace-activity').open = true;
-        await loadJobs();
-      } catch (_) {
-        el('atlas-status').textContent = 'AI抽出を開始できません。ControlDeckのローカルモデル・権限・接続を確認してください。';
-      } finally {ai.disabled = false;}
-    };
+    ai.onclick = () => void startLocalKnowledgeAI(item.document_id, ai, 'atlas-status');
     inspector.append(open, ai);
   }
   const advisory = document.createElement('p');
