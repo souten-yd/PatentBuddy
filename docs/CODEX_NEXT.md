@@ -244,3 +244,11 @@ K7a次Codex: WIPO IPC 2026.01の本物の公式有効記号XML（XSD v2）をダ
 2. 削除済み一時CI後の正規checkoutで `bash scripts/verify.sh`、`bash scripts/verify-k6.sh`（LINUX成果物）、任意 `WITH_QPKG=1`、ローカル任意PyMuPDF worker、Host read-only/CSRF/main manifest/runtime docs照合を完了。直前全repo325 testsの唯一failureはテスト用追加workflowの存在であり現在削除済みだが、**未再実行なのでPASSとは扱わない**。
 3. EPO/JPO/USPTOの実公開データ取得はユーザーが各アカウント登録後にResearchDataHub管理画面「設定→外部キー」に入力してから、手動1件テストを行う。キーをCI/GitHubに貼らない。実接続できないソースは試験的表示のまま。OpenAlex無料キー登録も導入時に行い、429・リトライ・source license・取得制限を確認する。
 4. ソフトquotaを全経路hard quotaと表示しない。未公開発明/原文・Local AI質問・非公開請求項を外部検索に送らない。外部CQLはユーザー承認済み固定/公式IPC・国・期間だけ。Host executor追加、raw source/fallback/redirect、server起動時npm build、Vue default化、runtime semantics変更、autonomous actionsは禁止。依存PR #29～#40のmainファイル/manifest/docs/testsを照合し、すべて確認してからのみmerge/release。
+
+### K7a 次のOSS bulk実装（2026-11-18）
+
+1. [patent-bulk-open-source-k7a.md](patent-bulk-open-source-k7a.md)の実調査を参照。USPTO ODP公式Product Files read-onlyカタログと13テスト0failを実装済み。ユーザー環境へuspto_api_keyを登録したら、実ODP公開製品/ファイル一覧に1回だけ接続して、API responseのschemaと期間・size・limitsを確認する。偽のデータを正常扱いしない。
+2. 今回の1つ後の段階として、**ユーザーが選んだ1〜5ファイルのみ**Linux PCにbounded staging、HTTP Range/If-Range/206/ETag、hash、.part、容量・空き容量の強制上限、受取ファイルを直接外部へ公開しない、導入時のみmanual確認を実装。bulk-file-loaderのスケジューラ/常駐worker/webhookは持ち込まない。QNAP TS-253beのディスク書込最小化。
+3. 特許ZIPをストリーム処理して、IPC/CPC・国・年で必要文献だけ分割し、重複ID/family/citation dedup。ZipSlip, Symlink, BOM/XML entity, ZIP爆弾, memory explosion防止。本文/図面の圧縮保存は一件ずつ人間の承認による二段階取得。
+4. Google BigQueryはquery dry-runでbytes/costを出してから。CPC/ドイツDPMA/JPO bulkを安全な固定official registryへ順次追加。対象の無料枠・アカウント登録を実際のAPI結果で確認し、認証キーはGitHub/CIへ入力しない。
+5. main実ファイル/docs/manifest/tests/runtime、PR #39までの依存stack、ui.html default/Vue read-only/not default/backend authoritative/level_0_manual_only/no execution/no raw serving/no fallback/redirect/no startup npm buildを検査。今回追加した一時テストWorkflowは削除済みのため再追加を恒久化しない。全Python/ControlDeck/QNAP/iPhone/actual-keyを検証してから初めてmerge/releaseを判断する。
