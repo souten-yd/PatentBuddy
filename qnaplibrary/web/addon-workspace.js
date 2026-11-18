@@ -1205,8 +1205,6 @@ el('map-zoom-in').onclick = () => localForceView?.zoom(1.2);
 el('map-zoom-out').onclick = () => localForceView?.zoom(1/1.2);
 el('map-fit').onclick = () => localForceView?.fit();
 el('map-reflow').onclick = () => localForceView?.reflow();
-
-let atlasForceView = null;
 let atlasSelectedId = 'atlas:root';
 let atlasLoading = false;
 let atlasLoaded = false;
