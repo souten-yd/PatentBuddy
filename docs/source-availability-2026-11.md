@@ -55,6 +55,11 @@ Existing connector does **not** demonstrate successful runtime API access. No pr
 
 ## K7a bulk OSS integration (2026-11-18)
 
-[OSS採用基準・安全な段階的バルク取得計画](patent-bulk-open-source-k7a.md)を追加。現在のUSPTO公式ODPバルク3製品（PTGRXML/PTFWPRD/PTFWPRE）の**ファイル名・サイズ・対象期間のみ**を管理者が単発で読み取るpreview APIを追加。導入時に既存uspto_api_keyを入力して初めて照会可能。バルクZIP本体のダウンロード・抽出・差分適用・自動収集は今回**未実装**。コード参照元はMITライセンスのpatent-dev/bulk-file-loaderとpyUSPTO（実ファイルをコピーせず仕様のみ参考）。個別OSSのメンテ状況・他ソースの導入優先度はリンク先に記録。
+[OSS採用基準・安全な段階的バルク取得計画](patent-bulk-open-source-k7a.md)を追加。現在のUSPTO公式ODPバルク3製品（PTGRXML/PTFWPRD/PTFWPRE）の**ファイル名・サイズ・対象期間のみ**を管理者が単発で読み取るpreview APIを追加。導入時に既存uspto_api_keyを入力して初めて照会可能。2026-11-18後続で512MiB以内の**選択したZIP本体1ファイルの手動取得・中断・再開は実装済み**。ZIPの展開・IPC選別・差分適用・自動収集は未実装。コード参照元はMITライセンスのpatent-dev/bulk-file-loaderとpyUSPTO（実ファイルをコピーせず仕様のみ参考）。個別OSSのメンテ状況・他ソースの導入優先度はリンク先に記録。
 
 CIで新規USPTOバルク台帳+既存接続13テスト、0fail、Python+JS構文PASS。https://github.com/souten-yd/PatentBuddy/actions/runs/44236606303 。一時CI workflowは検証後削除。認証済みUSPTO ODP実APIはまだ未検証であるため「利用可能」と宣言しない。
+
+
+### 最新：USPTO ZIPを管理者が手動取得できる段階に到達
+
+[USPTO 手動取得設計](patent-bulk-manual-staging-k7a.md)。現行PR #40には開始/進捗/停止、ETag/HTTP206厳格再開、SHA256、512MiB/ファイル、専用領域2GiB上限が追加された。新しいソース実取得ではなく、キーを使わない模擬HTTPでの結合テスト。実ODPアカウント/キー入力後に公式公開ZIPの1件テストが必須。ZIP解析/文献DB投入は次工程。
