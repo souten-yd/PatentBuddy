@@ -30,9 +30,8 @@ def read(store, *, cursor=0, limit=MAX_COLLECTIONS):
     _limit(limit, 1, MAX_COLLECTIONS, 'limit')
     with store.lock:
         collections = store.db.execute(
-            'SELECT c.id,c.name,c.kind, '
-            '(SELECT count(*) FROM documents d WHERE d.collection_id=c.id) AS total '
-            'FROM collections c WHERE c.id>? ORDER BY c.id LIMIT ?',
+            'SELECT id,name,kind FROM collections WHERE id>? '
+            'ORDER BY id LIMIT ?',
             (cursor, limit + 1),
         ).fetchall()
         has_more = len(collections) > limit
@@ -43,11 +42,20 @@ def read(store, *, cursor=0, limit=MAX_COLLECTIONS):
         edges = []
         for item in collections[:limit]:
             collection_id = item['id']
+            # Avoid an exact COUNT(*) that would traverse millions of
+            # collection entries on a low-power QNAP just to draw a graph.
+            bounded_count = store.db.execute(
+                'SELECT COUNT(*) FROM (SELECT id FROM documents '
+                'WHERE collection_id=? ORDER BY id DESC LIMIT 1001)',
+                (collection_id,),
+            ).fetchone()[0]
             cid = 'c:%d' % collection_id
             nodes.append({
                 'id': cid, 'kind': 'collection', 'label': item['name'],
                 'collection_id': collection_id, 'collection_kind': item['kind'],
-                'document_count': item['total'], 'status': 'catalog_index',
+                'document_count': min(bounded_count, 1000),
+                'count_is_lower_bound': bounded_count > 1000,
+                'status': 'catalog_index',
                 'basis': 'catalog_index',
             })
             edges.append({
