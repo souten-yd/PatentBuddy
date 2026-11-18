@@ -75,21 +75,24 @@ def by_source_sample(store, limit=2000):
     """Read metadata lengths only, over at most limit+1 documents (newest first)."""
     if type(limit) is not int or not 1 <= limit <= MAX_SAMPLE:
         raise ValueError("標本上限は1〜5000件にしてください")
+    # Reading or measuring entire patent bodies may touch many GiB on NAS.
+    # Only bounded short metadata columns are sampled; full text and blob
+    # storage are deliberately excluded and reported as unavailable.
     rows = store.q(
         "SELECT source, length(CAST(title AS BLOB)) AS title_bytes,"
-        "length(CAST(meta AS BLOB)) AS meta_bytes,"
-        "length(CAST(body AS BLOB)) AS body_bytes "
+        "length(CAST(meta AS BLOB)) AS meta_bytes "
         "FROM documents ORDER BY id DESC LIMIT ?", (limit + 1,))
     partial = len(rows) > limit
     groups = {}
     for row in rows[:limit]:
         source = str(row["source"] or "(unspecified)")[:100]
         item = groups.setdefault(source, {"source": source, "documents_in_sample": 0,
-                                          "logical_payload_bytes_in_sample": 0})
+                                          "metadata_bytes_in_sample": 0})
         item["documents_in_sample"] += 1
-        item["logical_payload_bytes_in_sample"] += sum(int(row[k] or 0)
-                                                       for k in ("title_bytes", "meta_bytes", "body_bytes"))
+        item["metadata_bytes_in_sample"] += sum(int(row[k] or 0)
+                                                   for k in ("title_bytes", "meta_bytes"))
     # Never hide the limit: rows outside the sample may change rankings.
-    return {"scope": "newest_documents_bounded_sample", "documents_examined": min(limit, len(rows)),
+    return {"scope": "newest_documents_metadata_sample", "documents_examined": min(limit, len(rows)),
             "has_older_documents": partial, "not_physical_storage": True,
+            "excludes": ["body", "pdf", "images", "chunks", "vectors", "indexes"],
             "items": sorted(groups.values(), key=lambda x: (-x["documents_in_sample"], x["source"]))[:30]}
