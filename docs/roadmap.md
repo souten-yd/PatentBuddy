@@ -129,3 +129,6 @@ Draft（K6c #39をbase）で [K7a設計・実装記録](source-collector-k7a.md)
 K7a続行 (2026-11-18): ResearchDataHub管理Webに分類候補・確認付き手動EPO収集・容量/元別標本・履歴・設定を追加。ControlDeckはread-only状態確認。任意のPDF図面抽出はCPU/RAM/ファイル制限付き別プロセスへ隔離。詳細は source-collector-k7a.md。GitHub JS静的検査と独立SQLite/図面smokeのみ確認済み、正規Python/HTTP/実EPOは未検証、Draft維持。
 
 K7a継続: EPO OPS公式 CQL (IPC + 公開国 + 公開年最大10年)・結果2000件までの1回最大25件手動ページ指定を追加。ResearchDataHub admin画面で外部送信前に検索式をプレビューし条件変更時に再承認。ControlDeck read-onlyプレビュー、履歴の国/年/ページ、OPS Range header/JSON修正、出典別の軽量タイトル・メタ標本に変更。詳しくは source-collector-k7a.md。Draft #40、未検証・未リリース。
+
+
+K7a分類UIの変更: 固定分野ボタンを廃止し、ローカルAIへの自然文質問とWIPO IPC公式分類の階層閲覧を追加。AIは未確認提案のみ、登録済み公式辞書にない候補は外部検索で選択不可。正式IPCタイトル/CPC分類は次工程。docs/source-collector-k7a.md参照。#40 Draft、未検証。
