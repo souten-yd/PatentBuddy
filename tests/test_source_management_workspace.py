@@ -26,7 +26,7 @@ class SourceManagementWorkspaceTests(unittest.TestCase):
                      '"/api/v1/source-acquisitions?limit=20"',
                      "if (!approved.checked || !selectCode.value || !epoReady) return;",
                      '"public_only_confirmed: true"'.replace('"', ''),
-                     'if (!confirm("公開済みの分類コード "',
+                     'if (!confirm("確認済みの公開IPC・公開国・公開年だけをEPO OPSへ送信し、"',
                      '"allow_scheduled_collection: false"'.replace('"', '')):
             self.assertIn(item, js)
         self.assertIn('"source-acquisition"', (ROOT / "qnaplibrary" / "api.py").read_text("utf-8"))
