@@ -152,8 +152,17 @@ def epo_search(cql, key, secret, limit=25, *, start=1):
     """
     if not key or not secret:
         raise ConnectorError("EPO OPS の Consumer Key / Secret が未設定です")
+    # Existing generic connector forms submit the limit as an input string.
+    # Keep the old clamp-to-1..100 behavior; scoped acquisition separately
+    # enforces max 25 and rejects noninteger JSON before reaching here.
+    try:
+        if type(limit) not in (int, str) or (type(limit) is str and
+                (not limit.isascii() or not limit.isdecimal())):
+            raise ValueError()
+        limit = max(1, min(int(limit), 100))
+    except (ValueError, TypeError):
+        raise ConnectorError("EPO OPSの取得件数が不正です") from None
     if (not isinstance(cql, str) or not cql.strip() or type(start) is not int
-            or type(limit) is not int or not 1 <= limit <= 100
             or not 1 <= start <= 2000 or start + limit - 1 > 2000):
         raise ConnectorError("EPO OPSの検索範囲が不正です")
     token = _epo_auth(key, secret)
