@@ -143,6 +143,51 @@ async function load() {
   }
 }
 el('reconnect').onclick = () => load();
+
+function sourceMiB(bytes) {
+  return (Math.max(0, Number(bytes) || 0) / (1024 * 1024)).toLocaleString('ja-JP', {maximumFractionDigits: 1}) + ' MiB';
+}
+el('source-plan-form').onsubmit = async event => {
+  event.preventDefault();
+  const button = el('source-plan-go');
+  button.disabled = true;
+  el('source-plan-status').textContent = '分類候補を調べています…';
+  el('source-plan-results').replaceChildren();
+  try {
+    const result = await api('source-plan', {topic: el('source-topic').value.trim()});
+    const holder = el('source-plan-results');
+    for (const candidate of result.candidates.slice(0, 10)) {
+      const card = document.createElement('p');
+      card.className = 'hint';
+      card.textContent = candidate.code + ' · ' + candidate.label + '（未確認の候補） / EPO式: ' + candidate.cql_preview;
+      holder.append(card);
+    }
+    el('source-plan-status').textContent = result.candidates.length
+      ? result.candidates.length + '分類を提案しました。辞書と原典で照合し、公開情報だけを外部検索してください。'
+      : '対応する初期候補がありません。ResearchDataHubの分類辞書で検索し、IPC/CPCを確認してください。';
+  } catch (error) {
+    el('source-plan-status').textContent = '分類候補を取得できません: ' + error.message;
+  } finally { button.disabled = false; }
+};
+el('source-storage-refresh').onclick = async () => {
+  const button = el('source-storage-refresh');
+  button.disabled = true;
+  el('source-storage-status').textContent = '容量を計測しています…';
+  try {
+    const result = await api('source-storage');
+    const u = result.usage, f = u.files, c = u.counts || {};
+    el('source-storage-status').textContent =
+      'DB ' + sourceMiB(f.sqlite_bytes) + ' / WAL ' + sourceMiB(f.wal_bytes) +
+      ' / SHM ' + sourceMiB(f.shm_bytes) + ' · 空き ' + sourceMiB(u.disk_free_bytes) +
+      ' · ソフト上限 ' + sourceMiB(u.soft_limit_bytes) +
+      ' · 文献 ' + (c.documents ?? '未計測') + '件 / 原本PDF ' + (c.pdf_originals ?? '未計測') +
+      '件 / PDF画像 ' + (c.pdf_images ?? '未計測') + '件' +
+      (u.soft_limit_reached ? ' · 新規分類収集の上限超過' : '');
+  } catch (error) {
+    el('source-storage-status').textContent = '容量を確認できません: ' + error.message;
+  } finally { button.disabled = false; }
+};
+
 window.addEventListener('message', event => {
   let expected = location.origin;
   try { if (document.referrer) expected = new URL(document.referrer).origin; } catch (_) { return; }
