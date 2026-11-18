@@ -192,6 +192,18 @@ CREATE TABLE IF NOT EXISTS official_ipc_symbols(
  edition TEXT NOT NULL, section TEXT NOT NULL, symbol TEXT NOT NULL,
  PRIMARY KEY(edition,section,symbol));
 CREATE INDEX IF NOT EXISTS official_ipc_symbol_lookup ON official_ipc_symbols(edition,section,symbol);
+-- WIPO 2026.01 official English section/class/subclass titles.
+-- Store names separately from patent documents to avoid FTS/LLM or duplicate BLOBs.
+CREATE TABLE IF NOT EXISTS official_ipc_title_catalogs(
+ edition TEXT NOT NULL, section TEXT NOT NULL, language TEXT NOT NULL,
+ source_sha256 TEXT NOT NULL, entry_count INTEGER NOT NULL,
+ imported_at REAL NOT NULL, PRIMARY KEY(edition,section,language));
+CREATE TABLE IF NOT EXISTS official_ipc_titles(
+ edition TEXT NOT NULL, section TEXT NOT NULL, language TEXT NOT NULL,
+ code TEXT NOT NULL, title TEXT NOT NULL,
+ PRIMARY KEY(edition,section,language,code));
+CREATE INDEX IF NOT EXISTS idx_official_ipc_titles_codes
+ ON official_ipc_titles(edition,section,language,code);
 -- History for explicit public IPC data acquisitions only; no source queries or credentials.
 CREATE TABLE IF NOT EXISTS source_acquisition_runs(
  id INTEGER PRIMARY KEY,
