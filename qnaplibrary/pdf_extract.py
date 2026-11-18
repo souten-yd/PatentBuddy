@@ -72,6 +72,73 @@ def _run(tool, args, directory, cancel, timeout=120, version=False):
     return output.read_bytes()
 
 
+def _geometry_candidates(pdf, image_directory, start_index, limit, cancel):
+    """Use an isolated, resource-limited local PDF worker; fail without images.
+
+    The parent never parses untrusted PDFs with PyMuPDF. Worker output is
+    revalidated against files in the private scratch. No user supplied commands.
+    """
+    import json
+    from .pdf_images import MAX_IMAGE_BYTES, png_size
+    if not 0 <= start_index < 200 or not 1 <= limit <= 12:
+        raise PDFError('図面候補の数が不正です')
+    argv = [sys.executable, str(Path(__file__).with_name('pdf_figure_regions.py').resolve()),
+            '--isolated-worker', str(pdf), str(image_directory), str(start_index), str(limit)]
+    process = subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                               stderr=subprocess.DEVNULL, cwd=image_directory,
+                               start_new_session=True)
+    deadline = time.monotonic() + 60
+    try:
+        while process.poll() is None:
+            _check_cancel(cancel)
+            if time.monotonic() > deadline:
+                raise PDFError('図面領域の解析時間が上限を超えました')
+            cancel.wait(.1)
+        raw = process.communicate()[0]
+        if process.returncode or len(raw) > 64 * 1024:
+            raise PDFError('図面解析の補助処理が正常終了しませんでした')
+        response = json.loads(raw)
+        if (not isinstance(response, dict) or response.get('status')
+                not in ('unreviewed', 'optional_pdf_geometry_unavailable')
+                or not isinstance(response.get('images'), list)
+                or len(response['images']) > limit):
+            raise PDFError('図面解析の結果が不正です')
+        if response['status'] != 'unreviewed':
+            return {'status': response['status'], 'candidates': []}, []
+        result = []
+        for n, candidate in enumerate(response['images']):
+            image_id = start_index + n
+            path = image_directory / ('%d.png' % image_id)
+            if type(candidate.get('id')) is not int or candidate['id'] != image_id:
+                raise PDFError('図面候補のIDが不正です')
+            if path.is_symlink() or not path.is_file() or path.stat().st_size > MAX_IMAGE_BYTES:
+                raise PDFError('図面画像が不正です')
+            payload = path.read_bytes()
+            width, height = png_size(payload)
+            if (candidate.get('sha256') != hashlib.sha256(payload).hexdigest()
+                    or candidate.get('size_bytes') != len(payload)
+                    or candidate.get('width') != width or candidate.get('height') != height
+                    or candidate.get('review_status') != 'unreviewed'
+                    or candidate.get('method') != 'local_pdf_page_crop'):
+                raise PDFError('図面画像と抽出根拠が一致しません')
+            result.append(candidate)
+        return {'status': 'unreviewed',
+                'pages_scanned': response.get('pages_scanned', 0),
+                'candidates': response.get('candidates', [])[:60],
+                'truncated': response.get('truncated', False)}, result
+    except (ValueError, OSError, PDFError, json.JSONDecodeError):
+        # Scratch may contain partial worker outputs; discard only its new files.
+        for index in range(start_index, min(200, start_index + limit)):
+            (image_directory / ('%d.png' % index)).unlink(missing_ok=True)
+        if cancel.is_set():
+            raise PDFError('PDF処理をキャンセルしました') from None
+        return {'status': 'geometry_worker_failed', 'candidates': []}, []
+    finally:
+        if process.poll() is None:
+            os.killpg(process.pid, signal.SIGKILL)
+        process.wait()
+
+
 def _ocr_words(tsv):
     reader = csv.DictReader(io.StringIO(tsv), delimiter='\t', quoting=csv.QUOTE_NONE)
     expected = {'level', 'text', 'conf', 'block_num', 'par_num', 'line_num'}
@@ -167,41 +234,26 @@ def extract_pdf(source, cancel=None, force_pages=(), progress=None, scratch_pare
         if image_directory is not None:
             from .pdf_images import extract_images, MAX_IMAGES, MAX_TOTAL_BYTES
             images = extract_images(pdf, image_directory, image_listing, cancel, _run)
-            # Optional PC-only geometry hints, never an AI/legal determination.
-            # A PDF image object is not necessarily a standalone patent figure.
-            try:
-                if max_figure_crops == 0:
-                    raise RuntimeError('figure crop disabled by policy')
-                from .pdf_figure_regions import scan as scan_figure_regions, crop as crop_figure_region
-                figure_preview = scan_figure_regions(pdf, limit_pages=min(count, 12))
-                figure_preview["status"] = "unreviewed"
-                added_bytes = sum(item["size_bytes"] for item in images)
-                max_id = max((item["id"] for item in images), default=-1)
-                for candidate in figure_preview["candidates"][:max_figure_crops]:
-                    _check_cancel(cancel)
-                    if len(images) >= MAX_IMAGES or max_id + 1 >= MAX_IMAGES:
-                        figure_preview["truncated"] = True
-                        break
-                    try:
-                        result = crop_figure_region(pdf, page_number=candidate["page"],
-                                                    bbox_points=candidate["bbox_points"], dpi=120)
-                    except ValueError:
-                        continue
-                    if added_bytes + result["size_bytes"] > MAX_TOTAL_BYTES:
-                        figure_preview["truncated"] = True
-                        break
-                    max_id += 1
-                    (Path(image_directory) / ("%d.png" % max_id)).write_bytes(result["png"])
-                    images.append({"id": max_id, "page": candidate["page"],
-                                   "kind": "figure_candidate", "width": result["width"],
-                                   "height": result["height"], "sha256": result["sha256"],
-                                   "size_bytes": result["size_bytes"],
-                                   "method": "local_pdf_page_crop", "review_status": "unreviewed",
-                                   "bbox_points": result["bbox_points"]})
-                    added_bytes += result["size_bytes"]
-            except RuntimeError as error:
-                figure_preview = {"status": ("disabled_by_policy" if max_figure_crops == 0
-                                             else "optional_local_geometry_unavailable"), "candidates": []}
+            # Optional isolated worker. Never load an untrusted PDF into this
+            # long-lived PDF job process via a native optional library.
+            if max_figure_crops == 0:
+                figure_preview = {"status": "disabled_by_policy", "candidates": []}
+            else:
+                next_id = max((item["id"] for item in images), default=-1) + 1
+                room = min(max_figure_crops, MAX_IMAGES - next_id)
+                if room > 0:
+                    figure_preview, crops = _geometry_candidates(
+                        pdf, Path(image_directory), next_id, room, cancel)
+                    remaining = MAX_TOTAL_BYTES - sum(x["size_bytes"] for x in images)
+                    for candidate in crops:
+                        _check_cancel(cancel)
+                        if candidate["size_bytes"] > remaining:
+                            figure_preview["truncated"] = True
+                            break
+                        images.append(candidate)
+                        remaining -= candidate["size_bytes"]
+                else:
+                    figure_preview = {"status": "image_limit_reached", "candidates": []}
         started = time.monotonic()
         pages, total = [], 0
         for page in range(1, count + 1):
