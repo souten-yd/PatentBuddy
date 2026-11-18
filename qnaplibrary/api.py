@@ -706,7 +706,14 @@ def source_acquisition(req):
             source_history.finish(req.app.store, receipt_id, "failed", failure="provider_error")
             receipt_id = None
             raise _err(502, "EPO OPSから取得できません。APIの認証・上限・接続を確認してください") from None
-        bytes_downloaded = len(json.dumps(docs, ensure_ascii=False).encode("utf-8"))
+        try:
+            if not isinstance(docs, list) or any(not isinstance(doc, dict) for doc in docs):
+                raise ValueError("invalid response")
+            bytes_downloaded = len(json.dumps(docs, ensure_ascii=False).encode("utf-8"))
+        except (ValueError, TypeError):
+            source_history.finish(req.app.store, receipt_id, "failed", failure="limit_error")
+            receipt_id = None
+            raise _err(502, "取得データの形式が正しくありません") from None
         if len(docs) > limit or bytes_downloaded > 1024 * 1024:
             source_history.finish(req.app.store, receipt_id, "failed", failure="limit_error")
             receipt_id = None
