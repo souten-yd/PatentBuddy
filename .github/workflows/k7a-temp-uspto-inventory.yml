@@ -1,0 +1,26 @@
+name: K7a temporary USPTO bulk source test
+
+on:
+  push:
+    branches: [feat/scoped-sources-storage-figures-k7a]
+
+permissions:
+  contents: read
+
+jobs:
+  targeted:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Bounded metadata + existing source auth tests
+        run: |
+          python -m unittest tests.test_patent_bulk_catalog tests.test_source_connectivity -v
+      - name: Static backend and admin UI syntax
+        run: |
+          python -m compileall -q qnaplibrary
+          node --check qnaplibrary/web/app.js
+          node --check qnaplibrary/web/addon-workspace.js
