@@ -160,17 +160,40 @@ def browse(store, parent="", *, limit=60, after=""):
             after and (not CODE_RE.fullmatch(after) or not parent
                        or not after.startswith(parent))):
         raise ValueError("分類の続き位置が不正です")
+    from .official_ipc_titles import get_title
     if not parent:
         installed = store.q(
             "SELECT section,symbol_count FROM official_ipc_catalogs "
             "WHERE edition=? ORDER BY section", (EDITION,))
         available = {row["section"]: row["symbol_count"] for row in installed}
+        title_sections = store.q(
+            "SELECT section,entry_count FROM official_ipc_title_catalogs "
+            "WHERE edition=? AND language='en' ORDER BY section", (EDITION,))
+        with_titles = {row["section"]: row["entry_count"] for row in title_sections}
         return {"parent": "", "level": "section", "items": [
-            {"code": code, "imported": code in available,
-             "symbol_count": available.get(code), "selection_type": "section"}
+            {"code": code, "imported": code in available or code in with_titles,
+             "symbol_count": available.get(code), "title": get_title(store,code),
+             "official_title_imported": code in with_titles,
+             "selection_type": "section"}
             for code in sorted(SECTIONS)],
-            "version": EDITION, "requires_import": not bool(installed),
-            "titles": "not_in_valid_symbols_feed", "manual_only": True}
+            "version": EDITION, "requires_import": not bool(installed or with_titles),
+            "titles": "en_if_imported", "manual_only": True}
+    if len(parent) in (1, 3):
+        level = "class" if len(parent) == 1 else "subclass"
+        width = 3 if len(parent) == 1 else 4
+        title_rows = store.q(
+            "SELECT code,title FROM official_ipc_titles "
+            "WHERE edition=? AND section=? AND language='en' "
+            "AND length(code)=? AND code>=? AND code<? ORDER BY code LIMIT ?",
+            (EDITION, parent[0], width, parent, parent + "\uffff", limit + 1))
+        if title_rows:
+            items = [dict(row) for row in title_rows[:limit]]
+            return {"parent": parent, "level": level,
+                    "items": [{"code": item["code"], "title": item["title"],
+                               "selection_type": level, "official_title_imported": True,
+                               "verified_in_imported_catalog": True} for item in items],
+                    "has_more": len(title_rows) > limit, "next_after": None,
+                    "version": EDITION, "titles": "en", "manual_only": True}
     if len(parent) == 1:
         rows = store.q(
             "SELECT DISTINCT substr(symbol,1,3) AS code FROM official_ipc_symbols "
@@ -212,6 +235,12 @@ def verified_subclass(store, code):
     """Check installed official IPC symbol list, not LLM output or user claims."""
     if not isinstance(code, str) or not re.fullmatch(r"[A-H][0-9]{2}[A-Z]", code):
         return False
+    row = store.one(
+        "SELECT 1 FROM official_ipc_titles WHERE edition=? AND section=? "
+        "AND language='en' AND code=? LIMIT 1",
+        (EDITION, code[0], code))
+    if row:
+        return True
     row = store.one(
         "SELECT 1 FROM official_ipc_symbols WHERE edition=? AND section=? "
         "AND symbol>=? AND symbol<? LIMIT 1",
