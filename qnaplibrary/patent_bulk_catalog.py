@@ -137,6 +137,9 @@ def preview(api_key, *, product_id, limit=3, date_from=None, date_to=None):
         timeout=30, pace=2.0)
     if len(raw) > MAX_RESPONSE_BYTES:
         raise ValueError("USPTO製品の応答が2MiBを超えました")
-    result = normalize_payload(raw, product_id, limit)
+    try:
+        result = normalize_payload(raw, product_id, limit)
+    except ValueError:
+        raise connectors.ConnectorError("USPTO公式バルク製品の応答形式が不正です") from None
     result["date_filter"] = {"from": start, "to": end}
     return result
