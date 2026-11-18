@@ -514,3 +514,19 @@ button:focus-visible,[role="tab"]:focus-visible,summary:focus-visible,textarea:f
    transition:none
  }
 }
+
+/* Interactive label search only changes presentation of the bounded slice. */
+.atlas-find {display:flex;align-items:center;gap:9px;margin:13px 0 10px;flex-wrap:wrap}
+.atlas-find label {font-size:12px;color:var(--pb-muted);font-weight:600}
+.atlas-find input,#map-node-find {min-width:180px;max-width:100%;
+  padding:8px 10px;min-height:44px;font-size:16px;border:1px solid var(--pb-border);
+  border-radius:10px;background:var(--pb-bg);color:var(--pb-text)}
+.atlas-find input {flex:1 1 280px}
+#map-node-find {flex:1 1 210px}
+.graph-nodes .map-point.is-filter-match circle {stroke:var(--pb-accent);stroke-width:3.6}
+.graph-nodes .map-point.is-filter-match .map-node-label {opacity:1;font-weight:700}
+.graph-nodes .map-point.is-filtered {opacity:.16}
+@media(max-width:767px) {
+ .atlas-find {align-items:stretch;flex-direction:column}
+ .atlas-find input,#map-node-find {width:100%;flex-basis:auto}
+}
