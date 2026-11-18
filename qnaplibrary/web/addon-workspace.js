@@ -174,7 +174,9 @@ el('source-storage-refresh').onclick = async () => {
   button.disabled = true;
   el('source-storage-status').textContent = '容量を計測しています…';
   try {
-    const result = await api('source-storage');
+    const [result, receipts] = await Promise.all([
+      api('source-storage'), api('source-acquisitions')
+    ]);
     const u = result.usage, f = u.files, c = u.counts || {};
     el('source-storage-status').textContent =
       'DB ' + sourceMiB(f.sqlite_bytes) + ' / WAL ' + sourceMiB(f.wal_bytes) +
@@ -183,6 +185,34 @@ el('source-storage-refresh').onclick = async () => {
       ' · 文献 ' + (c.documents ?? '未計測') + '件 / 原本PDF ' + (c.pdf_originals ?? '未計測') +
       '件 / PDF画像 ' + (c.pdf_images ?? '未計測') + '件' +
       (u.soft_limit_reached ? ' · 新規分類収集の上限超過' : '');
+    const overview = el('source-breakdown');
+    overview.replaceChildren();
+    const sample = result.by_source_sample;
+    if (sample?.items?.length) {
+      const description = document.createElement('p');
+      description.textContent = '新しい文献' + sample.documents_examined + '件から集計した取得元別の論理サイズ参考値' +
+        (sample.has_older_documents ? '（過去の文献は標本外）' : '') + '。物理ディスク使用量ではありません。';
+      overview.append(description);
+      for (const source of sample.items.slice(0, 8)) {
+        const row = document.createElement('p');
+        row.textContent = source.source + ': ' + source.documents_in_sample + '件 / ' +
+          sourceMiB(source.logical_payload_bytes_in_sample);
+        overview.append(row);
+      }
+    }
+    const recent = el('source-acquisition-receipts');
+    recent.replaceChildren();
+    const rows = receipts.items || [];
+    const hint = document.createElement('p');
+    hint.textContent = '分類別の手動取得履歴（最大' + rows.length + '件）。管理者はResearchDataHubの「収集」で操作できます。';
+    recent.append(hint);
+    for (const item of rows.slice(0, 6)) {
+      const row = document.createElement('p');
+      row.textContent = item.source + ' ' + item.classification + ' · ' +
+        (item.status === 'succeeded' ? '成功' : item.status === 'failed' ? '失敗' : '進行中') +
+        ' · 取得' + item.received + '件 / 新規' + item.added + '件';
+      recent.append(row);
+    }
   } catch (error) {
     el('source-storage-status').textContent = '容量を確認できません: ' + error.message;
   } finally { button.disabled = false; }
