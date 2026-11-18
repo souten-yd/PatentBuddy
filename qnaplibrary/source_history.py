@@ -49,7 +49,14 @@ def list_recent(store, limit=30):
         "SELECT id,source,classification,requested,received,added,response_bytes,"
         "status,started,finished,failure_code "
         "FROM source_acquisition_runs ORDER BY id DESC LIMIT ?", (limit,))
-    return [dict(r) for r in rows]
+    now = time.time()
+    result = [dict(r) for r in rows]
+    for row in result:
+        # Display-only interruption hint after a crash; never rewrite audit
+        # history or silently claim the run succeeded.
+        row["possibly_interrupted"] = (row["status"] == "running" and
+                                       now - float(row["started"]) > 600)
+    return result
 
 
 def by_source_sample(store, limit=2000):
