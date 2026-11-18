@@ -375,3 +375,6 @@ K7a継続3: PR #40に固定IPC分類 + 公開国 + 公開年 + 取得開始位�
 
 
 K7a UX: 自然文→手動ローカルAI提案 または WIPO IPC公式階層→選択へ変更。固定技術分野チップは撤去。新WIPO有効記号のセクション別取得と版/ハッシュ記録、backendによるAIコード検証、ControlDeck read-only browse/ask追加。source-collector-k7a.md参照。GitHub JS静的PASS、正規Python/実WIPO未テスト、PR #40 Draft継続。
+
+
+K7a 外部取得実証（2026-11-18）: Draft #40にOpenAlex小規模metadata connector/任意無料キー secret、WIPO実形式XMLパーサ修正、英語タイトル取込、管理画面のソース別接続テストUIを追加。GitHub Actions一時検証でWIPO H分類タイトル66/記号10,607を実取得・実SQLite import・H02M browse PASS、OpenAlex匿名1件成功と後続429を観測。対象29 tests/2skip/0fail。全325 tests/1fail（規約で禁止される一時CIファイル）、一時CIは検証後削除。残ゲート: 削除後のfull verify-k6再実行、実EPO/JPO/USPTOキー、Host/Ubuntu/QNAP/iOS実機、PyMuPDF。根拠は [source-smoke-evidence-2026-11-18.md](source-smoke-evidence-2026-11-18.md)。設定キーをGitHub/CIで保持せず、設置時に利用者自身が「外部キー」に登録する。
