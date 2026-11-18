@@ -58,7 +58,7 @@ WORKSPACE_STEPS.forEach((step, index) => {
 function updateActivitySummary() {
   const count = activeAnalysisJobs + activePDFJobs;
   const label = el('workspace-job-count');
-  label.textContent = count > 0 ? count + '件を処理中' : '処理履歴を確認';
+  label.textContent = count > 0 ? count + '件を処理中' : '実行履歴を確認';
   label.dataset.active = count > 0 ? 'true' : 'false';
 }
 el('workspace-source-return').onclick = () => {
@@ -1359,7 +1359,7 @@ function renderMapInspector(data, nodeId) {
       const row = document.createElement('p');
       row.className = 'hint';
       row.textContent = edge.basis === 'provenance_only'
-        ? '文献 → AI知識候補（出典リンクのみ・技術的関係の認定ではありません）'
+        ? '文献 → AI知識候補（出典リンクのみ・技術的関係の認定ではありません）。技術的な因果関係ではありません'
         : edge.basis === 'inferred'
           ? ('人が確認した技術仮説（事実ではありません）: ' + edge.relation +
              '（' + edge.source + ' → ' + edge.target + '）')
