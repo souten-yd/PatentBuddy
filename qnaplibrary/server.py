@@ -574,6 +574,14 @@ class Handler(BaseHTTPRequestHandler):
                             if not isinstance(body, dict):
                                 raise AddonError(400, "知識比較条件が不正です")
                             result = client.data("POST", "/api/v1/knowledge/compare", body)
+                        elif method == "POST" and path == "/addon/v1/source-plan":
+                            body = Request(self, method, path, {}, {}).json(limit=2048)
+                            if not isinstance(body, dict) or set(body) != {"topic"}:
+                                raise AddonError(400, "調査テーマのみを指定してください")
+                            # Read-only private preview: no source requests or save.
+                            result = client.data("POST", "/api/v1/source-plan", body)
+                        elif method == "GET" and path == "/addon/v1/source-storage":
+                            result = client.data("GET", "/api/v1/source-storage?counts=1")
                         elif method == "GET" and path == "/addon/v1/collections":
                             result = client.data("GET", "/api/v1/collections")
                         elif method == "POST" and path == "/addon/v1/library":
