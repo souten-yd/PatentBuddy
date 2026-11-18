@@ -135,4 +135,7 @@ K7a分類UIの変更: 固定分野ボタンを廃止し、ローカルAIへの�
 
 
 K7a 公式ソース実取得ゲート（2026-11-18）: WIPO 2026.01 H分類の英語タイトル66件/有効記号10,607件を公式HTTPから取得し、一時SQLiteへの保存とH02M名称付き階層閲覧PASS。OpenAlexコネクタを追加、公開論文1件取得成功、匿名429の再現あり（無料キーは導入時入力）。管理者の単発「接続テスト」UIを追加。対象Python29件/2skip/0fail、全体325件/3skip/1fail（一時CI存在による既存のworkflow規約違反、CIは撤去済み）。[実ログと残ゲート](source-smoke-evidence-2026-11-18.md)。EPO/JPO/USPTOキー認証、実機、全回帰再実行が完了するまでDraft・未リリース。
-K7a OSS活用（2026-11-18）: GitHub現行bulk-file-loader(MIT)、pyUSPTO(MIT)、python-epo-ops-client(Apache-2.0)、Google patents-public-data等を実ソースで評価。USPTO ODPの公式製品/ファイルの**一覧とファイル容量**をadmin manual-onlyで取得する接続を追加（ZIP実ダウンロードは未実装）。モックCI13件0fail、一時Workflowは削除済み。次はLinux PCで bounded/resumable/hashed manual staging→必要IPC/期間の書誌データだけstream import。 [詳細](patent-bulk-open-source-k7a.md)。
+K7a OSS活用（2026-11-18）: GitHub現行bulk-file-loader(MIT)、pyUSPTO(MIT)、python-epo-ops-client(Apache-2.0)、Google patents-public-data等を実ソースで評価。USPTO ODPの公式製品/ファイルの**一覧とファイル容量**をadmin manual-onlyで取得する接続を追加（後続K7aでZIP手動取得まで実装）。初期モックCI13件0fail、一時Workflowは削除済み。Linux PCでの bounded/resumable/hashed manual stagingを追加、次は必要IPC/期間の書誌データだけstream import。 [詳細](patent-bulk-open-source-k7a.md)。
+
+
+K7a 手動ZIPダウンロード（2026-11-18）：公式USPTOファイル一覧から選択→管理者確認→1件を専用領域へ保存、512MiB/ファイル・専用領域2GiB、手動停止と強いETag/HTTP206による途中再開・SHA256を実装。全339件回帰skip3/0fail、Linuxビルド・隔離PDF test PASS (Actions 44240112831)。総容量/複数プロセス・起動時無書込みの追加testあり。次はZIP内部のIPC/CPC選別と文献DB投入。実USPTOキー・Linux/ControlDeck/QNAP/iOS実機のZIP試験は未実施。[設計・テスト・残課題](patent-bulk-manual-staging-k7a.md)。
