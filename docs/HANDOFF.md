@@ -354,3 +354,12 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 - 資料はPCで検索/最近の資料を2カラム、iPhoneで単列。PDF取込は任意の折りたたみと直接ショートカット。接続状態/再接続、共通Jobsの実行件数、原文レビュー/Map/リンクは維持。Knowledgeは承認済みK2の条件を**検索語としてフォームへ引継ぐだけ**、人が検索を押すまでAPI/Idea mutationなし。文献から直接比較へ進め、K4/K5の引用確認後は元の比較・未保存のIdeaフォームに戻れる。
 - K5 Ideaの入力途中に別の新規案/保存案を開こうとする場合だけ破棄確認。タブ移動や原文参照はフォームを保持。ControlDeck Host theme zinc/accent、各44px/16px、768pxのPC gridと767/390px mobile、reduced-motion/focus/aria tabsなどを実装。
 - `tests/test_workspace_ux.py`で3 tabpanel/ARIA、旧機能ID、文献→知識→Idea/戻る、明示人間操作、接続/Jobs、No innerHTML/No CDN/Host UI重複なし、iPhoneテーマを静的検査。V8 JS構文PASS・HTML ID重複0/参照漏れ0・タグ階層整合を確認。**Python test本体/実ブラウザー/全verify/Ubuntu-QNAP/iPhoneは未実施**。正規repo checkout不可のためDraft・未マージ・未Releaseのまま。
+
+## 2026-11-18 K6c Knowledge Atlas/ローカルAI/大規模文献（Draft PR #39）
+
+- [Draft PR #39](https://github.com/souten-yd/PatentBuddy/pull/39)はK6b UI PR #38上の追加。Obsidian公式GraphとSigma.js/Graphologyを調査し、**固定36点の放射状SVG**を近傍フォース・タッチドラッグ・パン/ホイール拡大縮小・再配置・隣接強調・名前検索・キーボードEnter/Spaceへ変更。iPhoneでも操作可能なSVGを表示し、ControlDeck Hostテーマに統一。[K6c全設計とK7 Codex指示](knowledge-atlas-k6c.md)。
+- 既存SQLiteだけを参照する`qnaplibrary/knowledge_atlas.py`を追加。全体は10 collection×5 document/sample(最大61 nodes/60 edges)を先に表示し、選択collectionは50文献ずつkeysetで探索。**全文やPDFはAtlasへ送らない**。既存`documents_coll_id` index使用、件数Countは最大1001 index rowで下限判定。別Graph DB・永続インデックス・GET時の書込を追加せず低I/O。
+- 集合・所属線は`catalog_index`（因果・類似ではない）と明示。K3出典・factual relation、K3b人間承認仮説、K2 AIモデル推論を視覚/Inspectorで区別。Nodeから文献を開きK3近傍へ、またはユーザーの明示確認でK1b/K1d **ControlDeck Host local-only AI knowledge extraction**の既存Jobを実行できる。未公開発明のクラウドフォールバックなし、結果は人間レビュー必須・Idea自動保存なし。
+- 実施検証：GitHub実ソースとObsidian/Sigma/SQLiteの仕様照合、V8 JS syntax PASS、HTML ID欠落/重複0、CSS括弧整合。100,500文献の**独立SQLite smoke**でkeyset50件ずつ重複なし/index使用/Count上限/原文非SELECTをPASS。新規LiveServerの`tests/test_knowledge_atlas.py`と`tests/test_knowledge_atlas_workspace.py`は**追加しただけで未実行**。実CtrlDeck/QNAP/Linux/iPhone/物理I/O/本物のAI動作は未検証。
+- 今回WebGLは**未導入**。多数の文献を同時描画する必要が実測で出た時だけSigma.js+Graphology/ForceAtlas2 Workerをオフラインbuild時に同梱するK7検討。ユーザーのAI必須方針を引き継ぎ、次K7にlocal-only embeddings/候補関連検索→原文の人間審査を含める。AI生成候補を未承認のまま事実関係に昇格させない。
+- 全K1a〜K6c PR #29→#39は依存stack、現main正式版0.5.12。実CI/verify/QPKG/Host実機を通過してからmainへ依存順merge/Release。
