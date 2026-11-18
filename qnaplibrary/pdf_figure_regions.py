@@ -132,3 +132,67 @@ def crop(path, *, page_number, bbox_points, dpi=120):
                 "method": "local_pdf_page_crop", "status": "unreviewed"}
     finally:
         doc.close()
+
+
+
+def _isolated_worker():
+    """Private PC PDF geometry worker; only invoked with exact arguments by parent.
+
+    Standard input is closed, no shell or arbitrary command selection, and no
+    network or external AI call is used. Results are unreviewed candidates.
+    """
+    import json
+    import resource
+    import sys
+
+    if len(sys.argv) != 6 or sys.argv[1] != "--isolated-worker":
+        raise SystemExit(2)
+    pdf, directory = Path(sys.argv[2]), Path(sys.argv[3])
+    try:
+        first, count = int(sys.argv[4]), int(sys.argv[5])
+    except ValueError:
+        raise SystemExit(2)
+    if not 0 <= first <= 200 or not 1 <= count <= 12 or first + count > 200:
+        raise SystemExit(2)
+    # Limits are installed BEFORE loading the optional third-party PDF parser.
+    # Fsize applies to any one output file; parent also checks combined bytes.
+    resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+    resource.setrlimit(resource.RLIMIT_CPU, (40, 40))
+    resource.setrlimit(resource.RLIMIT_AS, (1024**3, 1024**3))
+    resource.setrlimit(resource.RLIMIT_FSIZE, (2 * 1024 * 1024, 2 * 1024 * 1024))
+    if pdf.is_symlink() or not pdf.is_file() or directory.is_symlink() or not directory.is_dir():
+        raise SystemExit(2)
+    try:
+        candidates = scan(pdf, limit_pages=12)
+    except RuntimeError:
+        print(json.dumps({"status": "optional_pdf_geometry_unavailable", "images": [],
+                          "candidates": [], "truncated": False}), flush=True)
+        return
+    images = []
+    for candidate in candidates["candidates"][:count]:
+        try:
+            result = crop(pdf, page_number=candidate["page"],
+                          bbox_points=candidate["bbox_points"], dpi=120)
+        except ValueError:
+            continue
+        image_id = first + len(images)
+        dest = directory / ("%d.png" % image_id)
+        # 'xb' refuses existing extracted source images. Never overwrite.
+        with dest.open("xb") as stream:
+            stream.write(result["png"])
+        images.append({"id": image_id, "page": candidate["page"],
+                       "kind": "figure_candidate", "width": result["width"],
+                       "height": result["height"], "sha256": result["sha256"],
+                       "size_bytes": result["size_bytes"],
+                       "method": "local_pdf_page_crop", "review_status": "unreviewed",
+                       "bbox_points": result["bbox_points"]})
+    print(json.dumps({
+        "status": "unreviewed", "pages_scanned": candidates["pages_scanned"],
+        "candidates": candidates["candidates"][:60],
+        "truncated": candidates["truncated"] or len(candidates["candidates"]) > count,
+        "images": images,
+    }, ensure_ascii=False, separators=(",", ":")), flush=True)
+
+
+if __name__ == "__main__":
+    _isolated_worker()
