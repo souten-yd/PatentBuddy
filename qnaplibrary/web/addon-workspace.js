@@ -229,13 +229,13 @@ el('source-storage-refresh').onclick = async () => {
     const sample = result.by_source_sample;
     if (sample?.items?.length) {
       const description = document.createElement('p');
-      description.textContent = '新しい文献' + sample.documents_examined + '件から集計した取得元別の論理サイズ参考値' +
+      description.textContent = '新しい文献' + sample.documents_examined + '件のタイトル・メタデータ容量の参考値（本文・PDF・画像・索引は除外）' +
         (sample.has_older_documents ? '（過去の文献は標本外）' : '') + '。物理ディスク使用量ではありません。';
       overview.append(description);
       for (const source of sample.items.slice(0, 8)) {
         const row = document.createElement('p');
         row.textContent = source.source + ': ' + source.documents_in_sample + '件 / ' +
-          sourceMiB(source.logical_payload_bytes_in_sample);
+          sourceMiB(source.metadata_bytes_in_sample);
         overview.append(row);
       }
     }
