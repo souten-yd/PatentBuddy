@@ -120,3 +120,8 @@ K1a Draft PR #29に原文範囲・source revision・Host local_only証跡形式�
 - [Draft PR #39](https://github.com/souten-yd/PatentBuddy/pull/39)でObsidian公式Graph Viewを参考に、フォース配置・ノードドラッグ/パン/ズーム/近傍ハイライト/名前フィルタ・iPhoneタッチ表示・型別線種/Inspectorを導入。大規模資料は全体の保存先最大10×新しい文献最大5件→選択保存先の最大50件ページ→K3原文/審査済み知識へ段階展開（既存SQLite read-only）。文献メタデータのみ取得、COUNTは1001 index item上限でNAS低I/O重視。[実装/ベンチ/K7詳細](knowledge-atlas-k6c.md)。
 - Local AIはGlobal/Localの文献Nodeから**ユーザー確認付きの既存ControlDeck Host knowledgeジョブ**を実行。結果は未確認推論のままK2人間承認が必要。Semantic Graph relationの自動断定なし。**次K7**でlocal-only embedding＋AI候補の関連文献探索を必須タスクとし、実bench後にWebGL Sigma.js/Graphology（build時同梱・CDNなし）も検討。
 - 静的JS/DOM/CSS・独立SQLite 100,500文献のkeyset index smokeはPASSだが、実Python全テスト/本物のAI/ControlDeck/QNAP/iPhone/正式配布は未実施。PRはDraft・未マージ・未リリース。
+
+
+## K7a — IPC分類からの限定収集・容量の可視化・PDF図面crop（2026-11-18）
+
+Draft（K6c #39をbase）で [K7a設計・実装記録](source-collector-k7a.md) の初期機能を追加。ControlDeckの技術テーマ→分類候補、SQLite/WAL/SHM容量・文献/PDF/画像件数のオンデマンド読取、管理者専用の固定IPC/EPO OPS最大25件取得、PDF原本座標付きの未確認図面候補の最大12点PNG crop（任意PCライブラリ利用時）。追加Python unittest・実EPO・全PR回帰・実ControlDeck/QNAP/iPhone未実施。正式API/配布の実装完了と誤認しない。次段階は分類辞書、ソース別容量/取得履歴、Local-only Vision AIによる図面審査・図表数値候補、厳密ハードquotaと全体リリースゲート。
