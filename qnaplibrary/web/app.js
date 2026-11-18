@@ -600,6 +600,22 @@ async function scopedSourceCard(main, connectors) {
   const topic = h("input", { class: "wide", maxlength: 120, placeholder: "例：インバータ、電気、機械" });
   const selectCode = sel([["", "先に分類候補を調べてください"]], "");
   const max = h("input", { type: "number", min: 1, max: 25, step: 1, value: 10 });
+  const publicationCountry = sel([["ALL", "全公開国"], ["JP", "日本(JP)"], ["US", "米国(US)"],
+    ["EP", "欧州(EP)"], ["WO", "PCT(WO)"], ["CN", "中国(CN)"], ["KR", "韓国(KR)"],
+    ["DE", "ドイツ(DE)"], ["FR", "フランス(FR)"], ["GB", "英国(GB)"]], "ALL");
+  const yearStart = h("input", { type: "number", min: 1900, max: 2100, step: 1, value: 2020 });
+  const yearEnd = h("input", { type: "number", min: 1900, max: 2100, step: 1, value: new Date().getFullYear() });
+  const firstIndex = h("input", { type: "number", min: 1, max: 2000, step: 1, value: 1 });
+  const scopePreview = h("pre", { class: "pre" }, "分類・公開国・公開年・開始位置を確認するとEPO検索式を表示します。");
+  let previewSignature = "";
+  const requestedScope = () => ({
+    ipc: selectCode.value, limit: Number(max.value),
+    publication_country: publicationCountry.value,
+    year_from: yearStart.value === "" ? null : Number(yearStart.value),
+    year_to: yearEnd.value === "" ? null : Number(yearEnd.value),
+    first: Number(firstIndex.value)
+  });
+  const signature = () => JSON.stringify(requestedScope());
   const approved = h("input", { type: "checkbox" });
   const feedback = h("p", { class: "small muted", role: "status" }, "入力テーマは外部送信せず、分類候補だけをローカルで提案します。");
   const candidateRows = h("div", {});
@@ -636,7 +652,12 @@ async function scopedSourceCard(main, connectors) {
     perFetch.value = String(p.max_results_per_fetch);
     crops.value = String(p.max_figures_per_pdf);
     max.max = String(p.max_results_per_fetch);
-    if (Number(max.value) > p.max_results_per_fetch) max.value = String(p.max_results_per_fetch);
+    if (Number(max.value) > p.max_results_per_fetch) {
+      max.value = String(p.max_results_per_fetch);
+      previewSignature = "";
+      approved.checked = false;
+      canAcquire();
+    }
     cap.textContent = "DB " + sizeMiB(u.files.sqlite_bytes) + " / WAL " + sizeMiB(u.files.wal_bytes) +
       " / SHM " + sizeMiB(u.files.shm_bytes) + " · 合計 " + sizeMiB(u.total_database_files_bytes) +
       " / ソフト上限 " + sizeMiB(u.soft_limit_bytes) + " · 空き " + sizeMiB(u.disk_free_bytes) +
@@ -685,39 +706,82 @@ async function scopedSourceCard(main, connectors) {
       candidateRows.append(details);
     }
     approved.checked = false;
+    previewSignature = "";
     acquisition.disabled = true;
+    scopePreview.textContent = "IPC候補を選択してから検索条件を確認してください。";
     feedback.textContent = plan.candidates.length
       ? "候補 " + plan.candidates.length + "件。技術範囲を確認し公開分類のみを収集してください。"
       : "対象の分類がありません。IPC/CPC分類辞書の導入が必要です。";
   });
-  const canAcquire = () => { acquisition.disabled = !epoReady || !selectCode.value || !approved.checked; };
-  selectCode.addEventListener("change", canAcquire);
+  const canAcquire = () => {
+    acquisition.disabled = !epoReady || !selectCode.value || !approved.checked ||
+      signature() !== previewSignature;
+  };
+  const invalidatePreview = () => {
+    previewSignature = "";
+    approved.checked = false;
+    scopePreview.textContent = "条件が変更されました。外部送信前にもう一度検索条件を確認してください。";
+    canAcquire();
+  };
+  for (const input of [selectCode, max, publicationCountry, yearStart, yearEnd, firstIndex]) {
+    input.addEventListener("change", invalidatePreview);
+    input.addEventListener("input", invalidatePreview);
+  }
   approved.addEventListener("change", canAcquire);
+  const preview = guard(async () => {
+    const value = requestedScope();
+    const result = await api("POST", "/api/v1/source-scope/preview", value);
+    previewSignature = signature();
+    approved.checked = false;
+    scopePreview.textContent = "EPO OPS公開書誌の検索式: " + result.cql +
+      "\n対象：公開国 " + result.publication_country +
+      " ／ 公開年 " + (result.publication_year_from ?? "指定なし") +
+      "〜" + (result.publication_year_to ?? "指定なし") +
+      " ／ 取得位置 " + result.first_result + "〜" + result.last_result +
+      "\n公開日による検索です。出願日・優先日とは異なります。";
+    feedback.textContent = "検索条件を確認してください。外部APIはまだ呼び出していません。";
+    canAcquire();
+  });
   acquisition.addEventListener("click", guard(async () => {
     if (!approved.checked || !selectCode.value || !epoReady) return;
-    const selected = selectCode.value;
-    const count = Number(max.value);
+    const req = requestedScope();
+    const selected = req.ipc;
+    const count = req.limit;
+    if (!previewSignature || signature() !== previewSignature) throw Error("検索条件を再確認してください");
     if (!Number.isInteger(count) || count < 1 || count > Number(max.max)) throw Error("取得件数の上限を確認してください");
-    if (!confirm("公開済みの分類コード " + selected + " だけをEPO OPSへ送信し、最大" +
-      count + "件をResearchDataHubに保存します。実行しますか？")) return;
+    if (!confirm("確認済みの公開IPC・公開国・公開年だけをEPO OPSへ送信し、" +
+      "結果 " + req.first + " 件目から最大" + count +
+      "件をResearchDataHubに保存します。実行しますか？")) return;
     acquisition.disabled = true;
     feedback.textContent = "公式APIから取得しています…別操作は開始しないでください。";
     try {
       const result = await api("POST", "/api/v1/source-acquisitions",
-        {ipc: selected, limit: count, public_only_confirmed: true});
+        {...req, public_only_confirmed: true});
       feedback.textContent = "取得完了: 受信 " + result.received + "件 / 新規 " + result.added +
-        "件。履歴ID " + result.receipt_id + "。";
+        "件。履歴ID " + result.receipt_id +
+        (result.next_first_result_hint ? "。次の取得候補は " + result.next_first_result_hint + " 件目（再承認が必要）" : "") +
+        "。";
+      if (result.next_first_result_hint) firstIndex.value = String(result.next_first_result_hint);
+      invalidatePreview();
       await refresh();
     } finally { canAcquire(); }
   }));
   const panel = h("details", { class: "card" },
     h("summary", {}, "技術分野からの限定収集・容量／ソース管理"),
-    h("p", { class: "small muted" }, "収集は無料枠と規約の範囲で手動実行します。未公開の発明・請求項は外部APIへ送信しません。先にIPCを選び、必要なら期間・国の絞り込みは今後の分類辞書統合で追加します。"),
+    h("p", { class: "small muted" }, "無料枠と公式規約の範囲で手動取得します。最初にIPC候補を選び、公開国と公開年で絞ってください。公開日による範囲指定であり、出願日・優先日ではありません。最大2000結果まで、25件ずつ手動取得します。"),
     field("調査分野（この入力は外部に送信しません）", topic),
     h("div", { class: "row" }, h("button", { class: "btn", onclick: suggest }, "IPC候補を確認"), selectCode),
     candidateRows,
-    h("div", { class: "row" }, field("今回の取得件数", max),
-      h("label", {}, approved, " 公開IPCコードのみを外部送信することを確認")),
+    h("div", { class: "row" },
+      field("公開国", publicationCountry),
+      field("公開年の開始（西暦）", yearStart),
+      field("公開年の終了（西暦）", yearEnd)),
+    h("div", { class: "row" },
+      field("今回の取得件数", max),
+      field("取得開始位置（1〜2000）", firstIndex),
+      h("button", { class: "btn", onclick: preview }, "検索条件を確認")),
+    scopePreview,
+    h("label", {}, approved, " 表示された公開IPC・公開国・公開年をEPOへ送ることを確認"),
     !epoReady ? h("p", { class: "small muted" }, "EPO OPSのAPIキーが未設定です。設定 > 外部キーで登録してください。") : null,
     acquisition, feedback,
     h("div", { class: "row" }, h("h2", {}, "保存容量と取得元別の参考量"),
