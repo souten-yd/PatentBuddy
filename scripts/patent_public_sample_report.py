@@ -8,6 +8,7 @@ No credentials, non-public search terms, bulk file fetch or background jobs.
 import argparse
 from collections import Counter
 from datetime import date
+from html import escape
 from html.parser import HTMLParser
 import hashlib
 import json
@@ -192,12 +193,56 @@ def collect():
             "automatic_refresh": False}
 
 
+def chart_report(records):
+    """Render the ten pilot metrics from either live or archived metadata."""
+    if not records:
+        raise ValueError("no publications to chart")
+    sections = []
+    def section(title, rows):
+        rows = list(rows)
+        maximum = max([1] + [value for label, value in rows])
+        bars = ''.join(
+            f'<li>{escape(str(label))} <meter min="0" max="{maximum}" '
+            f'value="{value}"></meter> {value}</li>' for label, value in rows)
+        sections.append(f'<section><h2>{escape(title)}</h2><ul>{bars}</ul></section>')
+
+    for title, field in [('公開年', 'publication_date'), ('公開国・機関', 'country'),
+                         ('公報種別', 'kind'), ('サブクラス別公報数', 'subclass_codes')]:
+        counts = Counter()
+        for row in records:
+            value = row[field]
+            if field == 'publication_date':
+                value = value[:4] or '不明'
+            counts.update(set(value) if isinstance(value, list) else [value])
+        section(title, sorted(counts.items()) if field == 'publication_date' else counts.most_common())
+
+    for title, field, alias in [
+            ('ページ表示分類コード数', 'classification_count', 'classification_count_capped'),
+            ('関連文献メタデータ数', 'dc_relation_count', 'references_metadata_count'),
+            ('後続参照の表示行数', 'forward_reference_rows', None),
+            ('図面サムネイル表示数', 'figure_thumbnail_rows', None),
+            ('ファミリー関連国の表示行数', 'family_country_rows', None)]:
+        values = [(row['publication'], row[field] if field in row else row[alias]) for row in records]
+        section(title, sorted(values, key=lambda item: (-item[1], item[0])))
+    topics = Counter(topic for row in records for topic in dict.fromkeys(row['topic_indicators']))
+    section('タイトル・要約のキーワード一致公報数', topics.most_common())
+    return ('<!doctype html><html lang="ja"><meta charset="utf-8"><title>公開公報の集計</title>'
+            '<h1>公開公報の集計</h1>'
+            f'<p>対象 {len(records)} 公報。選定標本のページ表示値とキーワード一致数。'
+            '方式の普及率、正式な引用数、有効国数、減衰性能は評価対象外。</p>'
+            + ''.join(sections) + '</html>')
+
+
 def main():
     cli = argparse.ArgumentParser()
     cli.add_argument("--fetch", action="store_true", help="explicit single-run public download")
     cli.add_argument("--input", type=Path, help="offline metadata JSON for reproducible charts")
     cli.add_argument("--output", type=Path, required=True)
+    cli.add_argument("--chart-report", type=Path, help="also write ten offline HTML charts")
     opts = cli.parse_args()
+    paths = [p.resolve() for p in (opts.input, opts.output, opts.chart_report) if p]
+    if opts.chart_report and opts.chart_report.resolve() in paths[:-1]:
+        raise SystemExit("use a separate chart report path")
     if opts.fetch == bool(opts.input):
         raise SystemExit("choose exactly one of --fetch or --input")
     result = collect() if opts.fetch else json.loads(opts.input.read_text("utf-8"))
@@ -205,6 +250,9 @@ def main():
         raise SystemExit("invalid source sample")
     opts.output.parent.mkdir(parents=True, exist_ok=True)
     opts.output.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+    if opts.chart_report:
+        opts.chart_report.parent.mkdir(parents=True, exist_ok=True)
+        opts.chart_report.write_text(chart_report(result["records"]), encoding="utf-8")
     print("SAMPLE_TOTAL=" + str(len(result["records"])), flush=True)
 
 
