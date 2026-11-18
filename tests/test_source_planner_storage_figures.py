@@ -108,3 +108,103 @@ class PDFRegionTests(unittest.TestCase):
                     pdf_figure_regions.crop(path, page_number=1, bbox_points=box)
             with self.assertRaises(ValueError):
                 pdf_figure_regions.scan(path, limit_pages=0)
+
+
+
+class SourceHistoryTests(unittest.TestCase):
+    def test_source_receipts_and_metadata_only_samples(self):
+        from qnaplibrary import source_history
+        with tempfile.TemporaryDirectory() as temp:
+            store = Store(Path(temp) / "main.sqlite3")
+            try:
+                coll = store.ensure_collection("patent-usage", "patent")
+                store.add_documents(coll["id"], [
+                    {"id": "EP1", "title": "実験A", "body": "実験結果", "source": "EPO OPS"},
+                    {"id": "EP2", "title": "実験B", "body": "制御回路", "source": "EPO OPS"},
+                    {"id": "JP1", "title": "機械", "body": "歯車", "source": "JPO bulk"},
+                ])
+                old = store.db.total_changes
+                sample = source_history.by_source_sample(store, limit=2)
+                self.assertEqual(store.db.total_changes, old)
+                self.assertTrue(sample["has_older_documents"])
+                self.assertTrue(sample["not_physical_storage"])
+                self.assertEqual(sample["documents_examined"], 2)
+                self.assertGreater(sum(x["logical_payload_bytes_in_sample"] for x in sample["items"]), 0)
+                for size in (0, 5001, True):
+                    with self.assertRaises(ValueError):
+                        source_history.by_source_sample(store, size)
+                started = source_history.start(store, "epo_ops", "H02M", 2)
+                self.assertEqual(source_history.list_recent(store)[0]["status"], "running")
+                source_history.finish(store, started, "succeeded",
+                                      received=2, added=1, response_bytes=125)
+                row = source_history.list_recent(store)[0]
+                self.assertEqual((row["status"], row["received"], row["added"], row["response_bytes"]),
+                                 ("succeeded", 2, 1, 125))
+                with self.assertRaises(ValueError):
+                    source_history.finish(store, started, "succeeded")
+                with self.assertRaises(ValueError):
+                    source_history.list_recent(store, 51)
+                self.assertEqual(store.one("SELECT count(*) FROM source_acquisition_runs")[0], 1)
+            finally:
+                store.close()
+
+    def test_manual_http_receipts_error_safety_and_double_start(self):
+        from qnaplibrary.connectors import ConnectorError
+        server = LiveServer()
+        try:
+            admin = Client(server.base); admin.login_setup()
+            ro = Client(server.base); ro.token = server.app.auth.local_token()
+            anon = Client(server.base)
+            self.assertEqual(anon.call("GET", "/api/v1/source-acquisitions")[0], 401)
+            self.assertEqual(ro.call("GET", "/api/v1/source-acquisitions")[0], 200)
+            self.assertEqual(ro.call("GET", "/api/v1/source-storage?breakdown=1")[0], 200)
+            self.assertEqual(ro.call("GET", "/api/v1/source-storage?breakdown=bad")[0], 400)
+            payload = {"ipc": "H02M", "limit": 1, "public_only_confirmed": True}
+            self.assertTrue(server.app.source_fetch_lock.acquire(blocking=False))
+            try:
+                self.assertEqual(admin.call("POST", "/api/v1/source-acquisitions", payload)[0], 429)
+            finally:
+                server.app.source_fetch_lock.release()
+            with patch("qnaplibrary.connectors.epo_search",
+                       side_effect=ConnectorError("secret=must_not_echo")):
+                code, result = admin.call("POST", "/api/v1/source-acquisitions", payload)
+                self.assertEqual(code, 502, result)
+                self.assertNotIn("must_not_echo", str(result))
+            code, result = ro.call("GET", "/api/v1/source-acquisitions")
+            self.assertEqual(code, 200, result)
+            self.assertEqual(result["items"][0]["status"], "failed")
+            self.assertEqual(result["items"][0]["failure_code"], "provider_error")
+            with patch("qnaplibrary.connectors.epo_search", return_value=[
+                {"id": "EP1", "title": "Sample 1", "source": "EPO OPS"},
+                {"id": "EP2", "title": "Sample 2", "source": "EPO OPS"},
+            ]):
+                self.assertEqual(admin.call("POST", "/api/v1/source-acquisitions", payload)[0], 413)
+            self.assertEqual(ro.call("GET", "/api/v1/source-acquisitions")[1]["items"][0]["failure_code"],
+                             "limit_error")
+            with patch("qnaplibrary.connectors.epo_search", return_value=[
+                {"id": "EP3", "title": "Sample 3", "source": "EPO OPS"},
+            ]):
+                code, result = admin.call("POST", "/api/v1/source-acquisitions", payload)
+                self.assertEqual(code, 200, result)
+                self.assertEqual(result["received"], 1)
+                self.assertIsInstance(result["receipt_id"], int)
+            last = ro.call("GET", "/api/v1/source-acquisitions")[1]["items"][0]
+            self.assertEqual(last["status"], "succeeded")
+            self.assertEqual((last["received"], last["added"]), (1, 1))
+        finally:
+            server.close()
+
+    def test_pdf_region_provenance_validation_does_not_approve(self):
+        from qnaplibrary import pdf_store
+        from tests.test_pdf_images import value, png
+        payload = value()
+        item = payload["images"][0]
+        item.update(kind="figure_candidate", method="local_pdf_page_crop",
+                    bbox_points=[10.0, 15.0, 150.0, 215.0])
+        self.assertEqual(len(pdf_store.validate_images(payload, {0: png()})), 1)
+        self.assertEqual(item["review_status"], "unreviewed")
+        for coords in ([0, 0, 1, 1], [-1, 0, 30, 30],
+                       [float("nan"), 10, 50, 50], ["foo", 0, 60, 60]):
+            item["bbox_points"] = coords
+            with self.assertRaises(ValueError):
+                pdf_store.validate_images(payload, {0: png()})
