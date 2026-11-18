@@ -127,3 +127,5 @@ K1a Draft PR #29に原文範囲・source revision・Host local_only証跡形式�
 Draft（K6c #39をbase）で [K7a設計・実装記録](source-collector-k7a.md) の初期機能を追加。ControlDeckの技術テーマ→分類候補、SQLite/WAL/SHM容量・文献/PDF/画像件数のオンデマンド読取、管理者専用の固定IPC/EPO OPS最大25件取得、PDF原本座標付きの未確認図面候補の最大12点PNG crop（任意PCライブラリ利用時）。追加Python unittest・実EPO・全PR回帰・実ControlDeck/QNAP/iPhone未実施。正式API/配布の実装完了と誤認しない。次段階は分類辞書、ソース別容量/取得履歴、Local-only Vision AIによる図面審査・図表数値候補、厳密ハードquotaと全体リリースゲート。
 
 K7a続行 (2026-11-18): ResearchDataHub管理Webに分類候補・確認付き手動EPO収集・容量/元別標本・履歴・設定を追加。ControlDeckはread-only状態確認。任意のPDF図面抽出はCPU/RAM/ファイル制限付き別プロセスへ隔離。詳細は source-collector-k7a.md。GitHub JS静的検査と独立SQLite/図面smokeのみ確認済み、正規Python/HTTP/実EPOは未検証、Draft維持。
+
+K7a継続: EPO OPS公式 CQL (IPC + 公開国 + 公開年最大10年)・結果2000件までの1回最大25件手動ページ指定を追加。ResearchDataHub admin画面で外部送信前に検索式をプレビューし条件変更時に再承認。ControlDeck read-onlyプレビュー、履歴の国/年/ページ、OPS Range header/JSON修正、出典別の軽量タイトル・メタ標本に変更。詳しくは source-collector-k7a.md。Draft #40、未検証・未リリース。
