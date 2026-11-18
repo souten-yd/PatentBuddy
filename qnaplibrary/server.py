@@ -54,6 +54,7 @@ class App:
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.config = Config(self.data_dir)
         self.store = Store(self.data_dir / "library.sqlite3")
+        self.source_fetch_lock = threading.Lock()  # only one manual scoped source acquisition at a time
         self.public_catalog = PublicCatalog(self.store)
         self.backups = Backups(self.store)
         self.auth = Auth(self.config, self.store)
@@ -582,6 +583,8 @@ class Handler(BaseHTTPRequestHandler):
                             result = client.data("POST", "/api/v1/source-plan", body)
                         elif method == "GET" and path == "/addon/v1/source-storage":
                             result = client.data("GET", "/api/v1/source-storage?counts=1")
+                        elif method == "GET" and path == "/addon/v1/source-acquisitions":
+                            result = client.data("GET", "/api/v1/source-acquisitions?limit=20")
                         elif method == "GET" and path == "/addon/v1/collections":
                             result = client.data("GET", "/api/v1/collections")
                         elif method == "POST" and path == "/addon/v1/library":
