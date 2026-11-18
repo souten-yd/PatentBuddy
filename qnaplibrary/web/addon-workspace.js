@@ -823,6 +823,7 @@ function makeForceGraph(svg, data, onSelect, initialFocus) {
   svg.append(scene);
   const lines = [], visualNodes = new Map();
   let focusId = lookup.has(initialFocus) ? initialFocus : data.root;
+  let filterTerm = '';
   let hoverId = null, request = 0, destroyed = false, pointer = null;
   const media = window.matchMedia?.('(prefers-reduced-motion: reduce)');
   const reduced = media?.matches || document.documentElement.classList.contains('reduce-motion');
@@ -853,10 +854,13 @@ function makeForceGraph(svg, data, onSelect, initialFocus) {
     const center = hoverId || focusId;
     const adjacent = neighbors.get(center) || new Set();
     for (const [nodeId, group] of visualNodes) {
+      const matched = !filterTerm || lookup.get(nodeId).label.toLocaleLowerCase().includes(filterTerm);
       group.classList.toggle('is-selected', nodeId === focusId);
       group.classList.toggle('is-neighbor', adjacent.has(nodeId));
-      group.classList.toggle('is-dimmed', nodeId !== center &&
-        nodeId !== focusId && !adjacent.has(nodeId));
+      group.classList.toggle('is-filter-match', Boolean(filterTerm) && matched);
+      group.classList.toggle('is-filtered', Boolean(filterTerm) && !matched);
+      group.classList.toggle('is-dimmed', (Boolean(filterTerm) && !matched) ||
+        (nodeId !== center && nodeId !== focusId && !adjacent.has(nodeId)));
     }
     for (const entry of lines) {
       entry.el.classList.toggle('is-active',
@@ -1037,11 +1041,16 @@ function makeForceGraph(svg, data, onSelect, initialFocus) {
     svg.onwheel=svg.onpointerdown=svg.onpointermove=svg.onpointerup=svg.onpointercancel=null;
   }
   svg._forceDestroy=destroy;
+  function filter(query) {
+    filterTerm = String(query || '').trim().toLocaleLowerCase();
+    focus(focusId);
+  }
   fit();focus(focusId);draw();reflow();
-  return {focus,zoom,fit,reflow,destroy};
+  return {focus,zoom,fit,reflow,destroy,filter};
 }
 function drawKnowledgeMap(data, select) {
   localForceView = makeForceGraph(el('map-svg'), data, select, selectedMapId);
+  localForceView.filter(el('map-node-find').value);
 }
 
 function renderMapInspector(data, nodeId) {
@@ -1213,6 +1222,7 @@ el('map-zoom-in').onclick = () => localForceView?.zoom(1.2);
 el('map-zoom-out').onclick = () => localForceView?.zoom(1/1.2);
 el('map-fit').onclick = () => localForceView?.fit();
 el('map-reflow').onclick = () => localForceView?.reflow();
+el('map-node-find').oninput = () => localForceView?.filter(el('map-node-find').value);
 let atlasSelectedId = 'atlas:root';
 let atlasLoading = false;
 let atlasLoaded = false;
@@ -1334,6 +1344,7 @@ async function loadAtlas(cursor = 0, collectionId = 0) {
     atlasForceView = makeForceGraph(el('atlas-svg'), data, id => {
       atlasSelectedId=id;atlasForceView?.focus(id);renderAtlasInspector(data,id);
     }, data.root);
+    atlasForceView.filter(el('atlas-node-find').value);
     renderAtlasInspector(data, data.root);
     next.hidden = !Number.isInteger(data.next_cursor);
     next.dataset.cursor = String(data.next_cursor || '');
@@ -1371,6 +1382,7 @@ el('atlas-zoom-in').onclick = () => atlasForceView?.zoom(1.2);
 el('atlas-zoom-out').onclick = () => atlasForceView?.zoom(1/1.2);
 el('atlas-fit').onclick = () => atlasForceView?.fit();
 el('atlas-reflow').onclick = () => atlasForceView?.reflow();
+el('atlas-node-find').oninput = () => atlasForceView?.filter(el('atlas-node-find').value);
 
 
 const LINK_RELATION_LABELS = {
