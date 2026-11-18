@@ -5,6 +5,7 @@ may enter this component. Fixed origin and path, no redirects, archive extractio
 public file serving, automatic retries, scheduler, or ControlDeck execution.
 Staging is intended for the Linux processing PC, not QNAP's busy RAID volume.
 """
+import fcntl
 import hashlib
 import json
 import os
@@ -20,6 +21,7 @@ import urllib.request
 from .patent_bulk_catalog import PRODUCTS, SAFE_FILE
 
 MAX_FILE_BYTES = 512 * 1024 * 1024
+MAX_STAGING_BYTES = 2 * 1024 * 1024 * 1024
 MIN_FREE_BYTES = 256 * 1024 * 1024
 BUFFER_BYTES = 128 * 1024
 MAX_TRANSFER_SECONDS = 900
@@ -253,6 +255,40 @@ class ManualBulkTransfer:
             source_lock.release()
 
     def _download(self, product, name, expected, key, restart):
+        root = _ensure_dir(self.root)
+        lock_path = root / ".manual-transfer.lock"
+        _safe_file(lock_path)
+        # flock blocks a second process from writing the same .part, but never
+        # schedules a transfer or takes action without an admin start request.
+        with lock_path.open("a+b") as process_lock:
+            try:
+                fcntl.flock(process_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                raise BulkTransferError("別プロセスがファイルを取得中です") from None
+            try:
+                return self._download_locked(product, name, expected, key, restart)
+            finally:
+                fcntl.flock(process_lock, fcntl.LOCK_UN)
+
+    def _staging_used(self):
+        total, scanned = 0, 0
+        for folder in self.root.iterdir():
+            if folder.name.startswith("."):
+                continue
+            if folder.is_symlink():
+                raise BulkTransferError("保存先の構造に問題があります")
+            if not folder.is_dir():
+                continue
+            for file in folder.iterdir():
+                scanned += 1
+                if scanned > 2000:
+                    raise BulkTransferError("保存済みファイルが多いため容量を確認できません")
+                _safe_file(file)
+                if file.is_file() and (file.suffix == ".zip" or file.name.endswith(".zip.part")):
+                    total += file.stat().st_size
+        return total
+
+    def _download_locked(self, product, name, expected, key, restart):
         paths = self._paths(product, name, create=True)
         part, meta_path, final, receipt_path = paths
         for p in paths:
@@ -282,6 +318,9 @@ class ManualBulkTransfer:
                     meta.get("expected_bytes") != expected or
                     not 0 < offset < expected or not ALLOWED_ETAG.fullmatch(meta.get("etag", ""))):
                 raise BulkTransferError("安全に再開できません。再取得を明示してください")
+        used = self._staging_used()
+        if used + expected - offset > MAX_STAGING_BYTES:
+            raise BulkTransferError("専用領域の2GiB保存上限を超えています")
         self._update(bytes_done=offset)
         headers = {"X-API-KEY": key, "Accept": "application/octet-stream",
                    "Accept-Encoding": "identity", "User-Agent": "PatentBuddy-manual-bulk/0.1"}
