@@ -78,3 +78,6 @@ WIPO公式 IPC 2026.01: https://www.wipo.int/en/web/classification-ipc
 公式のWIPO IPC 2026.01 Hセクションについて、英語分類名66件/841,166 bytes、公式有効記号10,607件/1,227,656 bytesの**実HTTP取得→実XML/TXTパーサー→一時SQLite保存→H02M名称付き閲覧**を完了。OpenAlexは公開論文1件の実取得に成功後、匿名HTTP 429も実測。分類GUIには公式名取得ボタン、OpenAlexには最大25件の軽量metadata connectorを実装。管理画面ではEPO/JPO/USPTO等のキーを導入時に入力し、ユーザーが手動で少量の接続テストを実行できる（テストで資料は保存しない）。
 
 一時CIで対象29テストは27件成功＋2件スキップ。全体325テストは1件失敗＋3件スキップ（禁止されている一時CI workflowが唯一の失敗原因）であり、一時workflowは検証後撤去済み。撤去後の全体再テスト未実施。実機、EPO/JPO/USPTO実認証、PyMuPDF任意依存の実確認は残る。[根拠・ログ](source-smoke-evidence-2026-11-18.md)。本PRはDraftのまま。
+## K7a OSSバルク研究・実装（2026-11-18）
+
+現行USPTO ODPのProduct/Files APIを、MITのpyUSPTO・patent-dev/bulk-file-loaderを参照し、標準ライブラリで容量限定の読み取り専用カタログとして実装。管理者専用POST /api/v1/uspto-bulk/preview、既存read認証のローカルGET /api/v1/uspto-bulk/options、管理UI、導入後のAPIキー入力、モック13テストPASS。カタログだけでありZIPのダウンロードはまだしない。取得時の容量上限・Range再開・一時ファイル・hash・zip爆弾検査・差分/IPCを絞った保存は次工程。詳細は [patent-bulk-open-source-k7a.md](patent-bulk-open-source-k7a.md)。
