@@ -80,4 +80,7 @@ WIPO公式 IPC 2026.01: https://www.wipo.int/en/web/classification-ipc
 一時CIで対象29テストは27件成功＋2件スキップ。全体325テストは1件失敗＋3件スキップ（禁止されている一時CI workflowが唯一の失敗原因）であり、一時workflowは検証後撤去済み。撤去後の全体再テスト未実施。実機、EPO/JPO/USPTO実認証、PyMuPDF任意依存の実確認は残る。[根拠・ログ](source-smoke-evidence-2026-11-18.md)。本PRはDraftのまま。
 ## K7a OSSバルク研究・実装（2026-11-18）
 
-現行USPTO ODPのProduct/Files APIを、MITのpyUSPTO・patent-dev/bulk-file-loaderを参照し、標準ライブラリで容量限定の読み取り専用カタログとして実装。管理者専用POST /api/v1/uspto-bulk/preview、既存read認証のローカルGET /api/v1/uspto-bulk/options、管理UI、導入後のAPIキー入力、モック13テストPASS。カタログだけでありZIPのダウンロードはまだしない。取得時の容量上限・Range再開・一時ファイル・hash・zip爆弾検査・差分/IPCを絞った保存は次工程。詳細は [patent-bulk-open-source-k7a.md](patent-bulk-open-source-k7a.md)。
+現行USPTO ODPのProduct/Files APIを、MITのpyUSPTO・patent-dev/bulk-file-loaderを参照し、標準ライブラリで容量限定の読み取り専用カタログとして実装。管理者専用POST /api/v1/uspto-bulk/preview、既存read認証のローカルGET /api/v1/uspto-bulk/options、管理UI、導入後のAPIキー入力、モック13テストPASS。2026-11-18後続では管理者が明示したZIP1ファイルのダウンロード、容量上限512MiB/合計2GiB、Range/ETag/206再開、.part、SHA256、手動停止まで実装した。ZIP爆弾検査・ZIP内文献のストリーミング解析・IPC選別/差分DB保存は次工程。詳細は [patent-bulk-open-source-k7a.md](patent-bulk-open-source-k7a.md)。
+
+
+最新の[USPTOファイルの限定取得設計](patent-bulk-manual-staging-k7a.md)を参照。初期カタログ-only記述は時系列の前段階で、現在はユーザーが承認して初めてZIPを保存する処理も実装済み。自動検索/自動取得・ControlDeck実行能力の追加はない。
