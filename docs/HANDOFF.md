@@ -372,3 +372,6 @@ K6c Draft PR #39をbaseに scoped-sources-storage-figures-k7a を作成。実装
 K7a継続 (2026-11-18): PR #40にソース取得履歴・ResearchDataHub管理WebのIPC確認→EPO手動取得・容量設定、ControlDeckの元別参考容量/履歴read-only表示を追加。PDF geometryをリソース制限付き別プロセスへ隔離。新規追加テストコードをコミットしたが正規Python unittestは未実行。V8 JS構文/独立SQLiteと合成PDF worker smoke PASS。未実施・次Codex・安全性ゲートは source-collector-k7a.md 参照。依存PR #39以下とともにDraft、未配布。
 
 K7a継続3: PR #40に固定IPC分類 + 公開国 + 公開年 + 取得開始位置の公式EPO検索式とAPI、admin確認付きUI、ControlDeck read-only preview、取得履歴のscopeを追加。既存generic EPOの数値文字列limit互換を維持。OPS公式Range headerへ修正。出典別容量サンプルはNAS負担を減らすため本文を読まずtitle/metaのみ。tests/test_source_scope.py追加。正規Python/HTTP/EPO/ControlDeck/実機テストは未実施。releaseしない。source-collector-k7a.mdを先に読む。
+
+
+K7a UX: 自然文→手動ローカルAI提案 または WIPO IPC公式階層→選択へ変更。固定技術分野チップは撤去。新WIPO有効記号のセクション別取得と版/ハッシュ記録、backendによるAIコード検証、ControlDeck read-only browse/ask追加。source-collector-k7a.md参照。GitHub JS静的PASS、正規Python/実WIPO未テスト、PR #40 Draft継続。
