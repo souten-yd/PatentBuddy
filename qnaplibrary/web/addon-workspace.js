@@ -739,6 +739,7 @@ function focusKnowledgeEvidence(evidence) {
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const MAP_KIND_LABELS = {
+  overview: '全体俯瞰', collection: '文献集合',
   document: '文献', concept: '技術概念', classification: '分類',
   party: '出願人', claim: '請求項', family: 'ファミリー',
   priority: '優先権', problem: '課題', cause: '原因',
@@ -761,6 +762,7 @@ function mapItemStatus(node) {
     return names[node.review_status] || names.unreviewed;
   }
   if (node.status === 'reviewed_graph_node') return '根拠で確認されたグラフの構成要素';
+  if (node.basis === 'catalog_index') return '文献・保存先のインデックス（技術的関連性ではありません）';
   return '参照文献';
 }
 // Obsidian-style interactive force-directed view for a BOUNDED client slice.
@@ -1169,8 +1171,8 @@ function renderKnowledgeMap(data) {
     data.edges.length + '件、' + data.hops + '段階（' +
     (data.include_unreviewed ? '未確認も参考表示' : '確認済みだけ') +
     (data.include_links ? '・確認済み仮説も参考表示' : '') + '）。' +
-    (data.truncated ? '上限に達したため一部を省略しています。' :
-     'グラフの線は出典の接続で、必ずしも技術的な因果関係ではありません。');
+    (data.truncated ? '表示上限に達したため、この文献の近傍の一部だけを表示しています。' :
+     'ドラッグ・ズーム・ノード選択に対応しています。AI推論と出典関係は別です。');
 }
 async function loadKnowledgeMap(id) {
   if (currentDoc !== id) return;
