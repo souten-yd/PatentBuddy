@@ -144,3 +144,6 @@ K7a 手動ZIPダウンロード（2026-11-18）：公式USPTOファイル一覧�
 ### K7a最終受入証跡（2026-11-18）
 
 直近のGitHub Actions Run https://github.com/souten-yd/PatentBuddy/actions/runs/44240713777 で、対象テスト**25件0fail**、全体**342件0fail/3skip**、K6安全/バージョン/UI構文・Linux build・隔離PyMuPDF PASS。QPKG実パッケージ生成（WITH_QPKG=1）、実USPTO認証/公式ZIP、Linux/ControlDeck/QNAP/iPhone導入は未実施。追加した一時workflowは削除済み、既存release.ymlだけを維持。PR #40はDraft・未マージ・未リリース。
+
+
+K7a実公報パイロット（2026-11-18）: インバータ/コモンモード関係の公開特許11件を個別Google Patents公開ページから、robots・2.5秒間隔・固定公報ID/3MiB上限で実ダウンロード。分類コード231、DC.relationの延べ164、技術キーワード/年/国/IPC/関連/図面など**10種類の可視化**を実測メタデータで作成。公式バルク取込やAI請求項分析は未実施。取得コードscripts/patent_public_sample_report.py、追跡可能なSHAとデータtests/fixtures/k7a_public_patents_20261118.json、出典・解釈・限界と次のCodex指示は[public-patent-pilot-2026-11-18.md](public-patent-pilot-2026-11-18.md)。PR #40 Draft維持。
