@@ -28,6 +28,7 @@ let activePDFJobs = 0;
 function switchWorkspace(next, {focusTab = false, scroll = true} = {}) {
   if (!WORKSPACE_STEPS.includes(next)) return;
   activeWorkspace = next;
+  if (next === 'knowledge' && !atlasLoaded && !atlasLoading) void loadAtlas(0);
   for (const step of WORKSPACE_STEPS) {
     const tab = el('workspace-tab-' + step);
     const pane = el('workspace-panel-' + step);
@@ -1189,6 +1190,7 @@ async function loadKnowledgeMap(id) {
     el('map-status').textContent = '知識マップを読み込めません。サーバー更新・権限・接続を確認してください。';
     el('map-list').replaceChildren();
     el('map-inspector').replaceChildren();
+    if (localForceView) {localForceView.destroy();localForceView=null;}
     el('map-svg').replaceChildren();
     currentKnowledgeMap = null;
   }
@@ -1197,6 +1199,143 @@ el('map-refresh').onclick = () => { if (currentDoc) void loadKnowledgeMap(curren
 el('map-hops').onchange = () => { if (currentDoc) void loadKnowledgeMap(currentDoc); };
 el('map-unreviewed').onchange = () => { if (currentDoc) void loadKnowledgeMap(currentDoc); };
 el('map-links').onchange = () => { if (currentDoc) void loadKnowledgeMap(currentDoc); };
+el('map-zoom-in').onclick = () => localForceView?.zoom(1.2);
+el('map-zoom-out').onclick = () => localForceView?.zoom(1/1.2);
+el('map-fit').onclick = () => localForceView?.fit();
+el('map-reflow').onclick = () => localForceView?.reflow();
+
+let atlasForceView = null;
+let atlasSelectedId = 'atlas:root';
+let atlasLoading = false;
+let atlasLoaded = false;
+let atlasRequest = 0;
+function renderAtlasInspector(data, id) {
+  const inspector = el('atlas-inspector');
+  inspector.replaceChildren();
+  const item = data.nodes.find(node => node.id === id) || data.nodes[0];
+  if (!item) return;
+  atlasSelectedId = item.id;
+  const heading = document.createElement('h4');
+  heading.textContent = item.label;
+  const kind = document.createElement('p');
+  kind.className = 'hint';
+  kind.textContent = item.kind === 'overview' ? '資料の全体俯瞰（保存先と文献サンプル）' :
+    item.kind === 'collection' ? '文献集合・保存先' : '文献（最新サンプル）';
+  inspector.append(heading, kind);
+  if (item.kind === 'collection') {
+    const count = document.createElement('p');
+    count.textContent = (item.count_is_lower_bound ? '少なくとも ' : '') +
+      item.document_count.toLocaleString('ja-JP') + '件の文献が含まれます。';
+    inspector.append(count);
+    const note = document.createElement('p');
+    note.className = 'hint';
+    note.textContent = '地図には新しい最大5件だけを表示しています。すべての資料を示しているわけではありません。';
+    inspector.append(note);
+    const open = document.createElement('button');
+    open.type = 'button';
+    open.className = 'secondary';
+    open.textContent = 'この保存先の文献を表示';
+    open.onclick = async () => {
+      try {
+        const picker = el('library-collection');
+        if (![...picker.options].some(opt => opt.value === String(item.collection_id)))
+          await loadLibrary();
+        picker.value = String(item.collection_id);
+        switchWorkspace('research', {focusTab: true});
+        await showLibrary();
+        el('library-items').scrollIntoView({block: 'nearest', behavior: 'auto'});
+      } catch (_) {
+        el('atlas-status').textContent = '保存先を開けません。接続と読取権限を確認してください。';
+      }
+    };
+    inspector.append(open);
+  }
+  if (Number.isInteger(item.document_id)) {
+    const open = document.createElement('button');
+    open.type = 'button';
+    open.className = 'secondary';
+    open.textContent = '原文と知識マップを開く';
+    open.onclick = async () => {
+      try {
+        await openDocument(item.document_id);
+        el('detail').scrollIntoView({block: 'start', behavior: 'auto'});
+      } catch (_) {
+        el('atlas-status').textContent = '文献を開けません。接続と読取権限を確認してください。';
+      }
+    };
+    const ai = document.createElement('button');
+    ai.type = 'button';
+    ai.className = 'secondary atlas-ai-action';
+    ai.textContent = 'ローカルAIで知識エッセンスを抽出';
+    ai.onclick = async () => {
+      if (!window.confirm('この文献の知識候補をローカルAIで抽出しますか？ 出力は未確認の推論として保存され、承認操作が必要です。')) return;
+      ai.disabled = true;
+      el('atlas-status').textContent = 'ローカルAIへの明示的な分析要求を登録しています…';
+      try {
+        await api('jobs', {doc_id: item.document_id, kind: 'knowledge'});
+        el('atlas-status').textContent = 'ローカルAIの知識抽出ジョブを登録しました。処理状況から進捗を確認できます。';
+        el('workspace-activity').open = true;
+        await loadJobs();
+      } catch (_) {
+        el('atlas-status').textContent = 'AI抽出を開始できません。ControlDeckのローカルモデル・権限・接続を確認してください。';
+      } finally {ai.disabled = false;}
+    };
+    inspector.append(open, ai);
+  }
+  const advisory = document.createElement('p');
+  advisory.className = 'hint';
+  advisory.textContent = 'この線は資料の所属だけを示します。AIの類似性判定や特許性は意味しません。';
+  inspector.append(advisory);
+}
+async function loadAtlas(cursor = 0) {
+  if (atlasLoading) return;
+  atlasLoading = true;
+  const request = ++atlasRequest;
+  const refresh = el('atlas-reload'), next = el('atlas-next');
+  refresh.disabled = true;next.disabled = true;
+  el('atlas-status').textContent = 'コレクションと文献のインデックスを取得しています…';
+  try {
+    const data = await api('knowledge/atlas?cursor=' + cursor + '&limit=10');
+    if (request !== atlasRequest) return;
+    if (!Array.isArray(data.nodes) || !Array.isArray(data.edges) ||
+        data.nodes.length > 61 || data.edges.length > 60 ||
+        data.read_only !== true || data.scope !== 'catalog_sample') {
+      throw new Error('Atlas data contract mismatch');
+    }
+    atlasLoaded = true;
+    atlasSelectedId = data.root;
+    atlasForceView = makeForceGraph(el('atlas-svg'), data, id => {
+      atlasSelectedId=id;atlasForceView?.focus(id);renderAtlasInspector(data,id);
+    }, data.root);
+    renderAtlasInspector(data, data.root);
+    next.hidden = !Number.isInteger(data.next_cursor);
+    next.dataset.cursor = String(data.next_cursor || '');
+    el('atlas-status').textContent =
+      '表示中：保存先 ' + data.nodes.filter(n => n.kind === 'collection').length +
+      '件、文献サンプル ' + data.nodes.filter(n => n.kind === 'document').length +
+      '件。大量の文献は個別に開いて探索します。' +
+      (data.truncated ? ' 全体の一部のみを表示中。' : '');
+  } catch (_) {
+    if (request !== atlasRequest) return;
+    atlasLoaded = false;
+    el('atlas-status').textContent = 'アトラスを読み込めません。ResearchDataHub更新・読取権限・接続を確認して再読み込みしてください。';
+    el('atlas-svg').replaceChildren();
+    el('atlas-inspector').textContent = '現在表示できる文献集合はありません。';
+    next.hidden = true;
+  } finally {
+    atlasLoading=false;refresh.disabled=false;next.disabled=false;
+  }
+}
+el('atlas-reload').onclick = () => void loadAtlas(0);
+el('atlas-next').onclick = () => {
+  const cursor = Number(el('atlas-next').dataset.cursor);
+  if (Number.isInteger(cursor) && cursor > 0) void loadAtlas(cursor);
+};
+el('atlas-zoom-in').onclick = () => atlasForceView?.zoom(1.2);
+el('atlas-zoom-out').onclick = () => atlasForceView?.zoom(1/1.2);
+el('atlas-fit').onclick = () => atlasForceView?.fit();
+el('atlas-reflow').onclick = () => atlasForceView?.reflow();
+
 
 const LINK_RELATION_LABELS = {
   problem: '課題との関係', solution: '解決手段との関係',
