@@ -62,3 +62,12 @@ WIPO公式 IPC 2026.01: https://www.wipo.int/en/web/classification-ipc
 - 未実施: 正規checkoutでのPython unittest、実EPO無料キー接続、全verify-k6、ControlDeck/QNAP/iPhone実機。GitHub実JS構文PASS、実HTML DOM重複0は確認。型・API/テストの統合は**未認証**としてDraft維持。
 
 次工程: 公式IPC/CPC/FI辞書をライセンスに従ってローカル登録し、入力語の曖昧性・境界・confidenceを手動検証させる。2000結果を超える場合は期間・分類を再分割させる（無制限に取得しない）。原本PDF + local-only Vision AI図番号照合、図表数値検証/スキップ、硬い全入口quota、収集ジョブの手動中断・履歴監査を実装。現時点は未実装。
+
+
+## 2026-11-18: 分類の低操作UI — ローカルAI提案／公式IPC階層
+
+- ユーザー要望で、独自に用意した固定のインバータ・機械などの選択ボタンを主画面から削除。第一経路は日本語の自然文から検証済みローカルAIへ手動問い合わせ、第二経路はWIPO IPC 2026.01の公式階層 A-H → H02 → H02M と選択。ControlDeckで外部取得や辞書の更新は行わない。
+- AIによる分類候補は最大5件、JSON形式のみ、未確認。バックエンドは登録済みWIPO公式記号とサブクラスを照合し、辞書未登録コードを画面で選択不可とする。ユーザーが検索条件を再承認するまでEPOへ送信しない。ローカルAIは既存の confidential_allowed + Providers.chat confidential の二重確認を再利用し、クラウド代替接続・オートラン・ツール実行をしない。質問最大360文字、単発・並列1件・60秒上限。
+- WIPO公式データは固定2026.01 URLからの有効記号XMLを、管理者の承認した単一セクションごとに最大3MiB/3万件で手動取得し、SQLiteへ版・セクション・SHA256・件数を登録。同一内容は再書込みを回避。IPC階層はローカルの保存済み公式記号から閲覧し、AI候補でも公式で検証できれば固定の10候補以外も対象にできる。backend authoritative。
+- 制約: 有効記号リストは分類タイトル/日本語定義を含まず、今後WIPO Scheme/JPO日本語IPC/CPC正式XMLをライセンスを守って追加する必要がある。WIPO実XMLの本番解析、外部接続、正規checkoutのPythonテストは未実施。今回追加した synthetic XMLとHTTP mockの tests/test_ipc_ai_selection.py もまだ実行していない。全CI、ユーザー実機、PyMuPDF性能/ライセンス、既存PR依存確認が終わるまでDraft維持。
+- 静的確認: GitHubの実 app.js / addon-workspace.js はV8構文PASS。HTML重複ID0、JSから参照されるID欠落0、Hostに辞書更新・EPO取得POSTなし。固定テーマの選択肢も撤去。mainのUIデフォルトやVue/runtime/manifestの変更無し。
