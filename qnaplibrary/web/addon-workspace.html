@@ -28,9 +28,15 @@
 <div class="pane-heading pane-heading-with-action"><div><p class="pane-eyebrow">STEP 01 / RESEARCH</p><h2>資料を調べる</h2><p>文献を開いて根拠を確認し、必要な知識を抽出・レビューします。</p></div><button id="research-pdf-quick" class="secondary" type="button">PDFを追加する</button></div>
 <section id="source-planning" class="workbench-card" aria-label="調査分野と保存容量">
  <h2>収集する技術分野を決める</h2>
- <p class="hint">例：インバータ、電気、機械。IPC候補を表示するだけで、外部へ検索語を送信しません。収集は別途管理者の明示承認が必要です。</p>
+ <p class="hint">自然文をローカルAIに相談するか、WIPO公式IPC分類の階層から選んでください。外部へ調査語は送信しません。収集は別途管理者の確認が必要です。</p>
  <form id="source-plan-form"><label for="source-topic">調査する技術</label><div class="row"><input id="source-topic" maxlength="120" required placeholder="例：インバータ"><button id="source-plan-go" type="submit">IPC候補を調べる</button></div></form>
- <div id="source-quick-presets" class="row" aria-label="調査分野の選択肢"></div>
+ <details id="source-catalog-browser" class="workspace-disclosure">
+ <summary>公式IPCの分類から選ぶ（AIを使わない）</summary>
+ <p class="hint">WIPO IPC 2026.01の登録済み分類を、大分類からサブクラスまで辿れます。正式な分類名や定義は原典で照合してください。</p>
+ <button id="source-catalog-open" type="button" class="secondary">公式分類の階層を開く</button>
+ <p id="source-catalog-browser-status" class="hint" role="status">未登録の分野はResearchDataHub管理画面からWIPO辞書を取り込んでください。</p>
+ <div id="source-catalog-tree" class="row"></div>
+ </details>
  <p id="source-plan-status" class="hint" role="status">調査分野を指定してください。</p><div id="source-plan-results"></div>
  <details id="source-ai-details" class="workspace-disclosure">
    <summary>ローカルAIに分類を簡単に聞く（任意）</summary>
