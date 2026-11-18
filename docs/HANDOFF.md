@@ -368,3 +368,5 @@ QNAP TS-253Be/iPhone実署名・TLS実環境、公的API実キー、Host署名/p
 ### K7a 新ブランチ: 分野限定収集・容量表示・PDF図面候補（2026-11-18）
 
 K6c Draft PR #39をbaseに scoped-sources-storage-figures-k7a を作成。実装: qnaplibrary/source_planner.py、source_storage.py、pdf_figure_regions.py、API/Host Bridge/ControlDeck資料タブ、PDF取込および保存バリデータ、tests/test_source_planner_storage_figures.py。オンライン外部資料の総取り込みではなく、ユーザーが入力した「インバータ」「電気」「機械」から少数のIPC分類候補を提示し、外部には承認した固定分類文字列だけを送る。EPO取得は管理者専用で1回最大25件。ディスク表示はSQLite/WAL/SHMの物理サイズと文献/PDF/画像カウント、上限はソフト上限。PDF図候補は原本ページ+bboxを持つ未確認圧縮PNG。実装詳細と次Codex・未実施テストは [source-collector-k7a.md](source-collector-k7a.md)。GitHub実JSの構文PASS・HTML ID重複0、独立合成PDFでrectangle→crop smoke PASS、正式全repo unittest/ControlDeck実機/EPO live/本番配布は未実行。旧Draft stackは未マージ・未リリース。
+
+K7a継続 (2026-11-18): PR #40にソース取得履歴・ResearchDataHub管理WebのIPC確認→EPO手動取得・容量設定、ControlDeckの元別参考容量/履歴read-only表示を追加。PDF geometryをリソース制限付き別プロセスへ隔離。新規追加テストコードをコミットしたが正規Python unittestは未実行。V8 JS構文/独立SQLiteと合成PDF worker smoke PASS。未実施・次Codex・安全性ゲートは source-collector-k7a.md 参照。依存PR #39以下とともにDraft、未配布。
