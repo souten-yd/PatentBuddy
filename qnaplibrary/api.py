@@ -685,6 +685,35 @@ def source_assistant_ask(req):
         req.app.source_advice_lock.release()
 
 
+@route("GET", "/api/v1/ipc-title-catalog", "read")
+def ipc_title_catalog_status(req):
+    from .official_ipc_titles import section_status
+    return section_status(req.app.store)
+
+
+@route("POST", "/api/v1/ipc-title-catalog/import", "admin")
+def ipc_title_catalog_import(req):
+    """Bounded official WIPO 2026.01 EN title download; no user URLs."""
+    from .official_ipc_titles import section_title_url, import_titles, MAX_RAW_BYTES
+    from .source_storage import usage
+    b = req.json(limit=1024)
+    if not isinstance(b, dict) or set(b) != {"section", "confirm_public_source"}:
+        raise _err(400, "分類名セクションと公式取得の承認のみ指定してください")
+    if b["confirm_public_source"] is not True:
+        raise _err(400, "WIPO公式分類タイトルの取得を確認してください")
+    url = section_title_url(b["section"])
+    use = usage(req.app.store)
+    if use["soft_limit_reached"] or use["disk_free_bytes"] < 128 * 1024 * 1024:
+        raise _err(409, "分類名保存のソフト上限か空き容量を確認してください")
+    try:
+        raw = connectors.http_get(url, timeout=45, pace=2.0)
+    except connectors.ConnectorError:
+        raise _err(502, "WIPO公式IPC分類名が取得できませんでした") from None
+    if len(raw) > MAX_RAW_BYTES:
+        raise _err(413, "WIPO公式IPC分類名が2MiBを超えています")
+    return import_titles(req.app.store, b["section"], raw)
+
+
 @route("GET", "/api/v1/ipc-catalog", "read")
 def ipc_catalog_status(req):
     from .official_ipc import status
