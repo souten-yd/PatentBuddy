@@ -599,6 +599,11 @@ class Handler(BaseHTTPRequestHandler):
                             result = client.data("POST", "/api/v1/source-assistant/ask", body)
                         elif method == "GET" and path == "/addon/v1/ipc-catalog":
                             result = client.data("GET", "/api/v1/ipc-catalog")
+                        elif method == "POST" and path == "/addon/v1/ipc-catalog/browse":
+                            body = Request(self, method, path, {}, {}).json(limit=256)
+                            if not isinstance(body, dict) or set(body) != {"parent"}:
+                                raise AddonError(400, "IPC分類の親階層だけ指定してください")
+                            result = client.data("POST", "/api/v1/ipc-catalog/browse", body)
                         elif method == "POST" and path == "/addon/v1/ipc-catalog/lookup":
                             body = Request(self, method, path, {}, {}).json(limit=512)
                             if not isinstance(body, dict) or set(body) != {"prefix"}:
