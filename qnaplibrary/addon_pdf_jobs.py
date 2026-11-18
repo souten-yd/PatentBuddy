@@ -152,8 +152,17 @@ class PDFJobs(AnalysisJobs):
                     self._update(identifier, phase='extracting', completed=page, total=total,
                                  message='PDF読み取り・OCR %d / %dページ' % (page, total))
                     last[0] = time.monotonic()
+            try:
+                storage = self.client.data('GET', '/api/v1/source-storage')
+                crop_limit = storage['policy']['max_figures_per_pdf']
+            except AddonError as error:
+                if error.status != 404:
+                    raise
+                # Compatibility with an older ResearchDataHub before K7a.
+                crop_limit = 12
             result = extract_pdf(source, cancel=session.aborted, force_pages=forced, progress=progress,
-                                 scratch_parent=scratch, image_directory=scratch / "images")
+                                 scratch_parent=scratch, image_directory=scratch / "images",
+                                 max_figure_crops=crop_limit)
             raw = source.read_bytes()
             source_hash, extraction_hash, _ = validate(raw, result, metadata['name'][:300])
             state = session.heartbeat()
