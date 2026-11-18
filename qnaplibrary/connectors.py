@@ -144,15 +144,24 @@ def _epo_auth(key, secret):
     return _epo_token["value"]
 
 
-def epo_search(cql, key, secret, limit=25):
-    """Search published-data with CQL (e.g. 'ta=battery and pd>=2020') and fetch biblio+abstract."""
+def epo_search(cql, key, secret, limit=25, *, start=1):
+    """OPS published-data bibliographic search, one bounded page per request.
+
+    Official OPS published-data uses X-OPS-Range, not Register's Range header.
+    Preserve the public existing start=1 behavior for other call sites.
+    """
     if not key or not secret:
         raise ConnectorError("EPO OPS の Consumer Key / Secret が未設定です")
+    if (not isinstance(cql, str) or not cql.strip() or type(start) is not int
+            or type(limit) is not int or not 1 <= limit <= 100
+            or not 1 <= start <= 2000 or start + limit - 1 > 2000):
+        raise ConnectorError("EPO OPSの検索範囲が不正です")
     token = _epo_auth(key, secret)
-    limit = max(1, min(int(limit), 100))
     url = "https://ops.epo.org/3.2/rest-services/published-data/search/biblio?" + urllib.parse.urlencode(
-        {"q": cql, "Range": "1-%d" % limit})
-    raw = http_get(url, headers={"Authorization": "Bearer " + token, "Accept": "application/json"}, pace=1.0)
+        {"q": cql})
+    raw = http_get(url, headers={"Authorization": "Bearer " + token,
+                                 "Accept": "application/json",
+                                 "X-OPS-Range": "%d-%d" % (start, start + limit - 1)}, pace=1.0)
     data = json.loads(raw.decode())
     return _epo_docs(data)
 
