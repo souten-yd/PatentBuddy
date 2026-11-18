@@ -57,12 +57,12 @@ def parse_valid_symbols(raw, section):
     for node in root.iter():
         kind = local_tag(node.tag)
         candidates = []
-        if kind in ("ipc-entry", "classification-item", "ipcr-symbol",
+        if kind in ("ipc-entry", "classification-item", "ipcr-symbol", "symbol",
                     "ipc-symbol", "classification-symbol", "valid-symbol"):
             for attribute in ("symbol", "id", "code"):
                 if attribute in node.attrib:
                     candidates.append(node.attrib[attribute])
-            if kind in ("ipc-symbol", "classification-symbol", "valid-symbol"):
+            if kind in ("ipcr-symbol", "ipc-symbol", "classification-symbol", "valid-symbol", "symbol"):
                 if node.text and len(node.text) < 32:
                     candidates.append(node.text)
             # WIPO validity symbols may use decomposed ST.8 elements.
