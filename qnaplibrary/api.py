@@ -654,10 +654,15 @@ def source_acquisition(req):
     if before["soft_limit_reached"] or (
             before["total_database_files_bytes"] + 1024 * 1024 > before["soft_limit_bytes"]):
         raise _err(409, "保存容量のソフト上限に達しました。容量管理を確認してください")
+    if before["disk_free_bytes"] < 128 * 1024 * 1024:
+        raise _err(409, "保存先の空き容量が128MiB未満です")
     # The query is generated from a static allowlist, never the user's
     # unpublished theme or arbitrary AI-suggested query.
-    docs = connectors.epo_search(query, req.app.config.secret("epo_ops_key"),
-                                 req.app.config.secret("epo_ops_secret"), limit)
+    try:
+        docs = connectors.epo_search(query, req.app.config.secret("epo_ops_key"),
+                                     req.app.config.secret("epo_ops_secret"), limit)
+    except connectors.ConnectorError as error:
+        raise _err(502, "EPO OPSから取得できません: " + str(error)[:160]) from None
     if len(docs) > limit or len(json.dumps(docs, ensure_ascii=False).encode()) > 1024 * 1024:
         raise _err(413, "取得結果の件数または容量が上限を超えました")
     collection = req.app.store.ensure_collection("patent-ipc-" + body["ipc"], "patent")
