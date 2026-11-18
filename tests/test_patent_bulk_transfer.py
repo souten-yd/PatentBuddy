@@ -9,6 +9,7 @@ import unittest
 import urllib.error
 import zipfile
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from qnaplibrary import patent_bulk_transfer as bulk
@@ -177,7 +178,7 @@ class ManualBulkFileUnitTests(unittest.TestCase):
             manager.start(product=self.product, name=self.name,
                           expected_bytes=bulk.MAX_FILE_BYTES + 1,
                           key="unit-key", source_lock=threading.Lock())
-        with patch.object(bulk.shutil, "disk_usage", return_value=(100, 0, 0)):
+        with patch.object(bulk.shutil, "disk_usage", return_value=SimpleNamespace(free=0)):
             with self.assertRaises(bulk.BulkTransferError):
                 self.fake_download(FakeOpener([]))
         root = Path(self.scratch.name) / "some-directory"
