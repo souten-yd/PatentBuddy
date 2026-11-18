@@ -156,7 +156,17 @@ el('source-plan-form').onsubmit = async event => {
   try {
     const result = await api('source-plan', {topic: el('source-topic').value.trim()});
     const holder = el('source-plan-results');
+    const selector = el('source-ipc-select');
+    selector.replaceChildren();
+    const empty = document.createElement('option');
+    empty.value = '';
+    empty.textContent = '分類を選択してください';
+    selector.append(empty);
     for (const candidate of result.candidates.slice(0, 10)) {
+      const option = document.createElement('option');
+      option.value = candidate.code;
+      option.textContent = candidate.code + ' · ' + candidate.label;
+      selector.append(option);
       const card = document.createElement('p');
       card.className = 'hint';
       card.textContent = candidate.code + ' · ' + candidate.label + '（未確認の候補） / EPO式: ' + candidate.cql_preview;
@@ -173,6 +183,29 @@ el('source-plan-form').onsubmit = async event => {
       : '初期候補はありません。分類辞書からの追加候補も確認してください。';
   } catch (error) {
     el('source-plan-status').textContent = '分類候補を取得できません: ' + error.message;
+  } finally { button.disabled = false; }
+};
+el('source-year-to').value = String(new Date().getFullYear());
+el('source-scope-preview').onclick = async () => {
+  const button = el('source-scope-preview');
+  button.disabled = true;
+  const status = el('source-scope-status');
+  status.textContent = 'ローカルの検索式を確認しています…';
+  try {
+    const from = el('source-year-from').value;
+    const to = el('source-year-to').value;
+    const result = await api('source-scope/preview', {
+      ipc: el('source-ipc-select').value, limit: Number(el('source-page-limit').value),
+      publication_country: el('source-office').value,
+      year_from: from === '' ? null : Number(from),
+      year_to: to === '' ? null : Number(to),
+      first: Number(el('source-page-first').value)
+    });
+    status.textContent = 'EPO公開書誌検索式: ' + result.cql +
+      ' · ' + result.first_result + '〜' + result.last_result + '件目。' +
+      ' この確認だけでは外部照会・保存を行いません。実行はResearchDataHub管理画面から行います。';
+  } catch (error) {
+    status.textContent = '確認できません: ' + error.message;
   } finally { button.disabled = false; }
 };
 el('source-storage-refresh').onclick = async () => {
@@ -214,7 +247,11 @@ el('source-storage-refresh').onclick = async () => {
     recent.append(hint);
     for (const item of rows.slice(0, 6)) {
       const row = document.createElement('p');
-      row.textContent = item.source + ' ' + item.classification + ' · ' +
+      row.textContent = item.source + ' ' + item.classification +
+        ' / ' + (item.publication_country || 'ALL') +
+        ' / ' + (item.publication_year_from ?? '全年') + '〜' +
+        (item.publication_year_to ?? '全年') + '年 / ' +
+        (item.first_result || 1) + '件目から · ' +
         (item.status === 'succeeded' ? '成功' : item.status === 'failed' ? '失敗' : item.possibly_interrupted ? '中断の可能性' : '進行中') +
         ' · 取得' + item.received + '件 / 新規' + item.added + '件';
       recent.append(row);
