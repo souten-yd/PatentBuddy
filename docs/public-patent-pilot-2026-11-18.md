@@ -49,3 +49,15 @@ GitHub Actions実取得証跡: https://github.com/souten-yd/PatentBuddy/actions/
 3. 文献保存だけでグラフを生成できるモード（AIなし）を優先し、必要な文献だけローカルAIに手動依頼する。すべての生成チャートは対象条件、母集団数、NULL/欠測、source run IDとデータの版を表示。
 4. 統合テスト：同じZIP2回投入、commit途中クラッシュ、ネット切断、空き容量不足、壊れたZIP/巨大展開、XML entity、部分AI推論失敗、異なる原文の版での再開拒否、参照元のリンク変更。実ControlDeck/QNAP/Linux/iPhone受入を別途実施。
 5. 本番キーは環境導入時に設定。No executable Host extension, no autonomous fetching, no raw source serving, no unrestricted fallback/redirect, no startup npm build, ui.html default, Vue non-default/read-only, backend authoritative, runtime level_0_manual_onlyを保つ。依存PR #39以下がすべて受入前のためPR #40はDraft・未マージ・未リリース。
+
+## 追加検証：集計を技術調査に使う
+
+11件の保存済みメタデータから、手動で10図を単一HTMLに再生成できる。
+
+```sh
+python3 scripts/patent_public_sample_report.py --input tests/fixtures/k7a_public_patents_20261118.json --output /tmp/patent-sample.json --chart-report /tmp/patent-charts.html
+```
+
+「アクティブ抑制」の語句一致は1公報だが、[US11996769B2の要約](https://patents.google.com/patent/US11996769B2/en#abstract)には電圧検出と逆極性電圧の注入も明記される。[US20240413777A1の要約](https://patents.google.com/patent/US20240413777A1/en#abstract)の180度ずらした二組の出力と逆並列巻線とは、必要な回路と介入箇所が異なる。キーワードの件数から方式の件数を確定しない。交流出力タグも three-phase に反応するため、設置側は回路図で確認する。
+
+既存の文献単位の手動「要約」で、原文が説明する作用・効果、設計上の解釈、測定条件、未確認事項と根拠箇所を日本語で出すようモデルへの依頼を更新。根拠の自動照合、複数文献の一括解釈、グラフ画面でのモデル実行は未実装。次の受入では、公報番号・本文版・段落または図番号を解釈ごとに追跡し、本文がない文献を保留する。電圧・電流・周波数・測定点の一致が確認できない性能値は横並びにしない。
