@@ -778,6 +778,18 @@ async function scopedSourceCard(main, connectors) {
         (result.unchanged ? "（変更なし）" : "（取り込みました）");
     } finally {importCatalog.disabled = false;}
   }) }, "WIPO公式IPC辞書を取り込む");
+  const importCatalogTitles = h("button", { class: "btn", onclick: guard(async () => {
+    if (!confirm("WIPO IPC 2026.01 " + catalogSection.value +
+      " セクションの英語分類名だけを公式配布元から取得しますか？")) return;
+    importCatalogTitles.disabled = true;
+    try {
+      const data = await api("POST", "/api/v1/ipc-title-catalog/import",
+        {section: catalogSection.value, confirm_public_source: true});
+      catalogInfo.textContent = "WIPO " + data.edition + " / " + data.section +
+        " / 英語タイトル " + data.entries + "件（" +
+        (data.unchanged ? "変更なし" : "保存済み") + "）";
+    } finally {importCatalogTitles.disabled = false;}
+  }) }, "公式英語分類名を取得");
   const catalogHierarchy = h("div", {});
   const catalogBrowseStatus = h("p", { class: "small muted" },
     "公式IPC記号の大分類→クラス→サブクラスを辿れます。分類名と詳細定義はこの記号一覧に含まれません。");
@@ -792,7 +804,7 @@ async function scopedSourceCard(main, connectors) {
         parent.length === 3 ? parent.slice(0,1) : "")}, "上の階層へ"));
     for (const item of result.items) {
       const terminal = result.level === "subclass";
-      const title = item.code + (result.level === "section" ? " · " + (sectionLabels[item.code] || "") : "") +
+      const title = item.code + " · " + (item.title || (result.level === "section" ? (sectionLabels[item.code] || "") : "名称未取得")) +
         (result.level === "section" && !item.imported ? "（未取込）" : "");
       catalogHierarchy.append(h("button", {class:"btn", onclick: () => {
         if (result.level === "section" && !item.imported) {
@@ -882,6 +894,52 @@ async function scopedSourceCard(main, connectors) {
       await refresh();
     } finally { canAcquire(); }
   }));
+  // One-click live sample tests. Never save the sample or start a watcher.
+  // Credential values are configured separately under admin Settings.
+  const testRows = h("div", {});
+  const jpoPublicSample = h("input", { class: "wide", maxlength: 12,
+    placeholder: "JPOだけ: 公開済み出願番号（例: 2023-123456）" });
+  const testHint = h("p", { class: "small muted", role: "status" },
+    "接続テストは管理者の操作時だけ1ソースあたり少量取得し、文献を保存しません。キーは導入後に設定 > 外部キーへ入力します。");
+  const testLabels = {wipo_ipc_titles:"WIPO IPC英語分類名（キー不要）",
+    wipo_ipc_symbols:"WIPO IPC有効記号（キー不要）",
+    epo_ops:"EPO OPS書誌（キー必要）", jpo:"JPO審査経過（キー必要）",
+    uspto:"USPTO ODP（キー必要）", openalex:"OpenAlex研究論文（無料キー任意）"};
+  const refreshTests = guard(async () => {
+    const status = await api("GET", "/api/v1/source-tests");
+    clear(testRows);
+    for (const source of status.items) {
+      const msg = h("span", { class: "small muted" },
+        source.configured ? "テスト未実施" : "キー未設定（導入時に登録）");
+      const testBtn = h("button", { class: "btn", disabled: !source.configured,
+        onclick: guard(async () => {
+          if (!confirm((testLabels[source.id] || source.id) +
+            "へ公式APIで接続し、少量の公開サンプルを確認しますか？ 文献は保存しません。")) return;
+          testBtn.disabled = true;
+          msg.textContent = "公式ソースを確認しています…";
+          try {
+            const result = await api("POST", "/api/v1/source-tests/run",
+              {source: source.id, confirmed: true,
+               public_sample: source.id === "jpo" ? jpoPublicSample.value.trim() : "",
+               section: "H"});
+            msg.textContent = result.status + " / 受信・検出 " + result.received +
+              "件（保存なし）" + (result.reason_code ? " / " + result.reason_code : "");
+          } catch (error) {
+            msg.textContent = "テスト失敗: " + error.message;
+          } finally {testBtn.disabled = false;}
+        })
+      }, "単発取得テスト");
+      testRows.append(h("div", { class: "row" },
+        h("span", {}, testLabels[source.id] || source.id), msg, testBtn));
+    }
+  });
+  const testsPanel = h("details", {},
+    h("summary", {}, "データソースの接続・取得テスト（初期設定時）"),
+    testHint,
+    h("p", {class:"small muted"}, "キーが必要なEPO/JPO/USPTOは導入時に入力します。OpenAlexは無料キーなしの小規模テストにも対応しています。"),
+    jpoPublicSample,
+    h("button", {class:"btn", onclick:refreshTests}, "登録状態を確認"),
+    testRows);
   const panel = h("details", { class: "card" },
     h("summary", {}, "技術分野からの限定収集・容量／ソース管理"),
     h("p", { class: "small muted" }, "無料枠と公式規約の範囲で手動取得します。最初にIPC候補を選び、公開国と公開年で絞ってください。公開日による範囲指定であり、出願日・優先日ではありません。最大2000結果まで、25件ずつ手動取得します。"),
@@ -894,7 +952,7 @@ async function scopedSourceCard(main, connectors) {
       h("p", { class: "small muted" }, "回答は未確認候補。公式辞書に存在するコードだけ選択でき、検索は手動確認が必要です。")),
     h("details", {}, h("summary", {}, "方法2: WIPO公式IPC分類を辿って選ぶ（AI不要）"),
       h("p", { class: "small muted" }, "大分類→クラス→サブクラスを選びます。公式IPC有効記号は分類名・説明を含まないため原典で照合してください。"),
-      h("div", { class: "row" }, browseStart, catalogSection, importCatalog, browseCodes),
+      h("div", { class: "row" }, browseStart, catalogSection, importCatalogTitles, importCatalog, browseCodes),
       catalogBrowseStatus, catalogHierarchy, catalogInfo, catalogResults),
     h("details", {}, h("summary", {}, "補助: 自然文から規則ベースの暫定候補を表示"),
       h("button", { class: "btn", onclick: suggest }, "暫定候補を確認"),
@@ -914,7 +972,7 @@ async function scopedSourceCard(main, connectors) {
     acquisition, feedback,
     h("div", { class: "row" }, h("h2", {}, "保存容量と取得元別の参考量"),
       h("button", { class: "btn", onclick: refresh }, "容量・履歴を更新")),
-    cap, sample, list, policyFields, h("h3", {}, "分類別取得の履歴"), history);
+    cap, sample, list, policyFields, testsPanel, h("h3", {}, "分類別取得の履歴"), history);
   main.append(panel);
 }
 
