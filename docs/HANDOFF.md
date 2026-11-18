@@ -381,4 +381,9 @@ K7a 外部取得実証（2026-11-18）: Draft #40にOpenAlex小規模metadata co
 K7a OSS一括取得評価（2026-11-18）: [patent-bulk-open-source-k7a.md](patent-bulk-open-source-k7a.md)。bulk-file-loader/pyUSPTO等の実READMEとコードを参照、USPTO ODP product APIを限定的に実装。新 qnaplibrary/patent_bulk_catalog.py、auth/admin preview /api/v1/uspto-bulk/preview、管理Webの製品/サイズ表示、source_probes単発チェック、mock unit13件PASS（Actions Run 44236606303）。秘密キーは導入時入力。ZIP本体・diff import/auto scheduler追加なし。既存 release-only workflow規約維持のため一時CI削除。Draft #40依存stack、未マージ未リリース。
 
 
-K7a manual USPTO ZIP stage（2026-11-18）：[patent-bulk-manual-staging-k7a.md](patent-bulk-manual-staging-k7a.md) を引継ぎ正本とする。ODPファイル一覧選択、admin明示確認・再照会、専用data_dir/bulk_stagingへの1ファイル上限512MiB/総2GiB、ETag+HTTP206厳格再開・停止・SHA256・flock、外部ファイル配信なし。ControlDeck Host/manifestに能力追加なし。全339件（skip3）・K6 Linux packaging・optional PyMuPDF worker PASS（Actions 44240112831）。追加3テストもCIで実行。PR #40 Draft未マージ/未リリース。実ODPキーとZIP本番接続・QNAP/PC/iOS・ZIP選別解析とDB投入は未検証。
+K7a manual USPTO ZIP stage（2026-11-18）：[patent-bulk-manual-staging-k7a.md](patent-bulk-manual-staging-k7a.md) を引継ぎ正本とする。ODPファイル一覧選択、admin明示確認・再照会、専用data_dir/bulk_stagingへの1ファイル上限512MiB/総2GiB、ETag+HTTP206厳格再開・停止・SHA256・flock、外部ファイル配信なし。ControlDeck Host/manifestに能力追加なし。全342件（skip3）・K6 Linux packaging・optional PyMuPDF worker PASS（Actions 44240112831）。追加3テストもCIで実行。PR #40 Draft未マージ/未リリース。実ODPキーとZIP本番接続・QNAP/PC/iOS・ZIP選別解析とDB投入は未検証。
+
+
+### K7a最終受入証跡（2026-11-18）
+
+直近のGitHub Actions Run https://github.com/souten-yd/PatentBuddy/actions/runs/44240713777 で、対象テスト**25件0fail**、全体**342件0fail/3skip**、K6安全/バージョン/UI構文・Linux build・隔離PyMuPDF PASS。QPKG実パッケージ生成（WITH_QPKG=1）、実USPTO認証/公式ZIP、Linux/ControlDeck/QNAP/iPhone導入は未実施。追加した一時workflowは削除済み、既存release.ymlだけを維持。PR #40はDraft・未マージ・未リリース。
