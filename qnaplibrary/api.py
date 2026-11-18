@@ -678,7 +678,7 @@ def source_assistant_ask(req):
         raise _err(429, "ローカルAIによる分類問い合わせが実行中です")
     try:
         try:
-            return advise(b["question"], b["provider"], req.app.providers, req.app.config)
+            return advise(b["question"], b["provider"], req.app.providers, req.app.config, req.app.store)
         except LLMError:
             raise _err(502, "ローカルAIで分類候補を作れませんでした。モデル・接続を確認してください") from None
     finally:
