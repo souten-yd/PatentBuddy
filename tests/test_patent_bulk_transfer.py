@@ -1,4 +1,5 @@
 """Explicit USPTO ODP bulk ZIP staging; isolated fake HTTP, no upstream key."""
+import fcntl
 import hashlib
 import io
 import json
@@ -188,6 +189,35 @@ class ManualBulkFileUnitTests(unittest.TestCase):
         target.symlink_to(root, target_is_directory=True)
         with self.assertRaises(bulk.BulkTransferError):
             self.fake_download(FakeOpener([]))
+
+    def test_hard_total_staging_cap_without_network(self):
+        opener = FakeOpener([])
+        with patch.object(self.manager, "_staging_used",
+                          return_value=bulk.MAX_STAGING_BYTES):
+            with self.assertRaisesRegex(bulk.BulkTransferError, "2GiB"):
+                self.fake_download(opener)
+        self.assertEqual(opener.requests, [])
+        self.assertFalse((Path(self.scratch.name) / "bulk_staging" /
+                          self.product / self.name).exists())
+
+    def test_process_lock_prevents_a_second_writer(self):
+        root = Path(self.scratch.name) / "bulk_staging"
+        root.mkdir(mode=0o700)
+        locked_file = root / ".manual-transfer.lock"
+        opener = FakeOpener([])
+        with locked_file.open("a+b") as stream:
+            fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            try:
+                with self.assertRaisesRegex(bulk.BulkTransferError, "別プロセス"):
+                    self.fake_download(opener)
+            finally:
+                fcntl.flock(stream, fcntl.LOCK_UN)
+        self.assertFalse(opener.requests)
+
+    def test_idle_constructor_does_not_create_staging_directory(self):
+        self.assertFalse((Path(self.scratch.name) / "bulk_staging").exists())
+        self.assertEqual(self.manager.status()["state"], "idle")
+        self.assertFalse((Path(self.scratch.name) / "bulk_staging").exists())
 
     def test_async_manual_one_file_and_existing_hash_idempotency(self):
         opener = FakeOpener([FakeResponse(self.zip)])
