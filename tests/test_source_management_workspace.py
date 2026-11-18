@@ -51,6 +51,27 @@ class SourceManagementWorkspaceTests(unittest.TestCase):
         self.assertNotIn('path == "/addon/v1/source-acquisitions" and method == "POST"', server)
         self.assertNotIn(".innerHTML =", js)
 
+    def test_office_year_scope_preview_is_read_only_and_requires_explicit_reapproval(self):
+        admin = (WEB / "app.js").read_text("utf-8")
+        host = (WEB / "addon-workspace.js").read_text("utf-8")
+        html = (WEB / "addon-workspace.html").read_text("utf-8")
+        bridge = (ROOT / "qnaplibrary" / "server.py").read_text("utf-8")
+        for field in ('source-ipc-select', 'source-office', 'source-year-from',
+                      'source-year-to', 'source-page-first', 'source-page-limit',
+                      'source-scope-preview', 'source-scope-status'):
+            self.assertIn('id="' + field + '"', html)
+        self.assertIn('"/api/v1/source-scope/preview"', admin)
+        self.assertIn("api('source-scope/preview'", host)
+        self.assertIn('method == "POST" and path == "/addon/v1/source-scope/preview"', bridge)
+        self.assertNotIn('method == "POST" and path == "/addon/v1/source-acquisitions"', bridge)
+        self.assertIn('previewSignature', admin)
+        self.assertIn('signature() !== previewSignature', admin)
+        self.assertIn('approved.checked = false', admin)
+        self.assertIn('publication_country: publicationCountry.value', admin)
+        self.assertIn('first: Number(firstIndex.value)', admin)
+        self.assertIn('"X-OPS-Range"', (ROOT / "qnaplibrary" / "connectors.py").read_text("utf-8"))
+
+
     def test_source_storage_limits_and_figure_worker_isolation(self):
         policy = (ROOT / "qnaplibrary" / "source_storage.py").read_text("utf-8")
         pdf = (ROOT / "qnaplibrary" / "pdf_extract.py").read_text("utf-8")
