@@ -33,7 +33,9 @@ class BoundedUSPTOBulkInventoryTests(unittest.TestCase):
         options = patent_bulk_catalog.product_options()
         self.assertEqual({x["id"] for x in options["products"]},
                          {"PTGRXML", "PTFWPRD", "PTFWPRE"})
-        self.assertFalse(options["download_implemented"])
+        self.assertTrue(options["download_implemented"])
+        self.assertTrue(options["bounded_staging_only"])
+        self.assertFalse(options["archive_parse_implemented"])
         self.assertTrue(options["manual_only"])
 
     def test_official_fixed_url_and_api_key_in_header_only(self):
