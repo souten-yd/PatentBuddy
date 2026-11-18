@@ -127,7 +127,8 @@ class BoundedUSPTOBulkInventoryTests(unittest.TestCase):
             self.assertTrue(http.called)
             status, offline = reader.call("GET", "/api/v1/uspto-bulk/options")
             self.assertEqual(status, 200, offline)
-            self.assertFalse(offline["download_implemented"])
+            self.assertTrue(offline["download_implemented"])
+            self.assertFalse(offline["archive_parse_implemented"])
         finally:
             server.close()
 
