@@ -4,6 +4,7 @@ The user confirms official IPC candidates, publication office, publication-year
 window, and one 25-record page. The title/invention text remains local.
 """
 from datetime import date
+import re
 
 from .source_planner import accepted_ipc
 
@@ -12,13 +13,21 @@ MAX_EPO_RESULT_INDEX = 2000
 MAX_YEAR_SPAN = 10
 
 
-def build_scope(*, ipc, publication_country="ALL", year_from=None, year_to=None, first=1, limit=25):
+def build_scope(*, ipc, publication_country="ALL", year_from=None, year_to=None,
+                first=1, limit=25, official_verified=False):
     """Create deterministic CQL for EPO published-data search, never Register.
 
     EPO OPS Reference Guide v1.3.20 (2024), Appendix 4.2:
     'ic' is IPC, 'pn=EP' publication country, 'pd within "yyyyMMdd yyyyMMdd"'.
     """
-    expression = accepted_ipc(ipc)
+    if type(official_verified) is not bool:
+        raise ValueError("分類辞書の検証状態が不正です")
+    if official_verified:
+        if not isinstance(ipc, str) or not re.fullmatch(r"[A-H][0-9]{2}[A-Z]", ipc):
+            raise ValueError("有効なIPCサブクラスを選択してください")
+        expression = "ic=" + ipc
+    else:
+        expression = accepted_ipc(ipc)
     if type(publication_country) is not str or publication_country not in OFFICES:
         raise ValueError("公開国は選択肢から指定してください")
     if (year_from is None) != (year_to is None):
@@ -44,4 +53,5 @@ def build_scope(*, ipc, publication_country="ALL", year_from=None, year_to=None,
         "cql": expression, "date_basis": "publication_date",
         "search_kind": "EPO_OPS_published_data_bibliographic",
         "query_sends_topic_text": False, "manual_only": True,
+        "official_catalog_verified": official_verified,
     }
