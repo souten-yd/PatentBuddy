@@ -84,9 +84,12 @@ def _geometry_candidates(pdf, image_directory, start_index, limit, cancel):
         raise PDFError('図面候補の数が不正です')
     argv = [sys.executable, str(Path(__file__).with_name('pdf_figure_regions.py').resolve()),
             '--isolated-worker', str(pdf), str(image_directory), str(start_index), str(limit)]
-    process = subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                               stderr=subprocess.DEVNULL, cwd=image_directory,
-                               start_new_session=True)
+    report = image_directory / 'figure-worker-report.json'
+    process = None
+    with report.open('wb') as stream:
+        process = subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=stream,
+                                   stderr=subprocess.DEVNULL, cwd=image_directory,
+                                   start_new_session=True)
     deadline = time.monotonic() + 60
     try:
         while process.poll() is None:
@@ -94,7 +97,9 @@ def _geometry_candidates(pdf, image_directory, start_index, limit, cancel):
             if time.monotonic() > deadline:
                 raise PDFError('図面領域の解析時間が上限を超えました')
             cancel.wait(.1)
-        raw = process.communicate()[0]
+        if report.stat().st_size > 64 * 1024:
+            raise PDFError('図面解析の結果が上限を超えました')
+        raw = report.read_bytes()
         if process.returncode or len(raw) > 64 * 1024:
             raise PDFError('図面解析の補助処理が正常終了しませんでした')
         response = json.loads(raw)
@@ -134,9 +139,11 @@ def _geometry_candidates(pdf, image_directory, start_index, limit, cancel):
             raise PDFError('PDF処理をキャンセルしました') from None
         return {'status': 'geometry_worker_failed', 'candidates': []}, []
     finally:
-        if process.poll() is None:
-            os.killpg(process.pid, signal.SIGKILL)
-        process.wait()
+        if process is not None:
+            if process.poll() is None:
+                os.killpg(process.pid, signal.SIGKILL)
+            process.wait()
+        report.unlink(missing_ok=True)
 
 
 def _ocr_words(tsv):
