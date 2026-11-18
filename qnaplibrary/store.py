@@ -187,6 +187,10 @@ CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY, ts REAL NOT NULL, actor
 CREATE TABLE IF NOT EXISTS source_acquisition_runs(
  id INTEGER PRIMARY KEY,
  source TEXT NOT NULL, classification TEXT NOT NULL,
+ publication_country TEXT NOT NULL DEFAULT 'ALL',
+ publication_year_from INTEGER,
+ publication_year_to INTEGER,
+ first_result INTEGER NOT NULL DEFAULT 1,
  requested INTEGER NOT NULL, received INTEGER NOT NULL DEFAULT 0,
  added INTEGER NOT NULL DEFAULT 0, response_bytes INTEGER NOT NULL DEFAULT 0,
  status TEXT NOT NULL, failure_code TEXT NOT NULL DEFAULT '',
@@ -225,6 +229,16 @@ class Store:
                        "wal_autocheckpoint=2000", "busy_timeout=30000"):
             self.db.execute("PRAGMA " + pragma)
         self.db.executescript(SCHEMA)
+        # K7a draft migration preserves old limited-scope acquisition receipts.
+        existing_fields = {row[1] for row in self.db.execute(
+            'PRAGMA table_info(source_acquisition_runs)')}
+        for field, definition in (
+                ('publication_country', "TEXT NOT NULL DEFAULT 'ALL'"),
+                ('publication_year_from', 'INTEGER'),
+                ('publication_year_to', 'INTEGER'),
+                ('first_result', 'INTEGER NOT NULL DEFAULT 1')):
+            if field not in existing_fields:
+                self.db.execute('ALTER TABLE source_acquisition_runs ADD COLUMN ' + field + ' ' + definition)
         # One-time fail-closed migration if the early K2 draft schema was used:
         # old review events have no epoch proof and remain stale (epoch=-1).
         if 'source_epoch' not in {row[1] for row in self.db.execute(
