@@ -131,6 +131,7 @@ def _geometry_candidates(pdf, image_directory, start_index, limit, cancel):
         return {'status': 'unreviewed',
                 'embedded_labels': response.get('embedded_labels', []),
                 'pages_scanned': response.get('pages_scanned', 0),
+                'scan_complete': response.get('scan_complete') is True,
                 'candidates': response.get('candidates', [])[:60],
                 'truncated': response.get('truncated', False)}, result
     except (ValueError, OSError, PDFError, json.JSONDecodeError):

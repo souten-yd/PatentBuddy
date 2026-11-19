@@ -15,7 +15,7 @@ from pathlib import Path
 
 MAX_PDF = 50 * 1024 * 1024
 MAX_PAGES = 200
-MAX_SCAN_PAGES = 12
+MAX_SCAN_PAGES = MAX_PAGES
 MAX_CANDIDATES = 60
 MAX_IMAGE_BYTES = 2 * 1024 * 1024
 MAX_PIXELS = 16_000_000
@@ -62,17 +62,23 @@ def scan(path, *, limit_pages=MAX_SCAN_PAGES):
     The result is metadata only; no source PDF or bitmap is returned.
     """
     if type(limit_pages) is not int or not 1 <= limit_pages <= MAX_SCAN_PAGES:
-        raise ValueError("スキャン対象ページ数は1〜12です")
+        raise ValueError("スキャン対象ページ数は1〜200です")
     doc = _open(path)
     try:
         found = []
+        scanned = 0
+        limited = False
         for page_num in range(min(len(doc), limit_pages)):
             page = doc[page_num]
+            scanned += 1
             width, height = float(page.rect.width), float(page.rect.height)
             if width <= 0 or height <= 0:
+                limited = True
                 continue
             boxes = []
-            for img in page.get_image_info(xrefs=False)[:80]:
+            page_images = page.get_image_info(xrefs=False)
+            limited = limited or len(page_images) > 80
+            for img in page_images[:80]:
                 try:
                     bbox = _rect(tuple(img["bbox"]), width, height)
                 except (ValueError, KeyError):
@@ -83,7 +89,9 @@ def scan(path, *, limit_pages=MAX_SCAN_PAGES):
             # Large drawing paths provide hints for vector-line patent figures.
             # Do not merge arbitrary paths across diagrams: that would invent a
             # region and could hide captions, dimensions, or unrelated figures.
-            for drawing in page.get_drawings()[:400]:
+            drawings = page.get_drawings()
+            limited = limited or len(drawings) > 400
+            for drawing in drawings[:400]:
                 try:
                     bbox = _rect(tuple(drawing["rect"]), width, height)
                 except (ValueError, KeyError):
@@ -105,8 +113,9 @@ def scan(path, *, limit_pages=MAX_SCAN_PAGES):
                     break
             if len(found) >= MAX_CANDIDATES:
                 break
-        return {"page_count": len(doc), "pages_scanned": min(len(doc), limit_pages),
-                "candidates": found, "truncated": len(found) >= MAX_CANDIDATES,
+        return {"page_count": len(doc), "pages_scanned": scanned,
+                "scan_complete": scanned == len(doc) and not limited and len(found) < MAX_CANDIDATES,
+                "candidates": found, "truncated": limited or scanned < len(doc) or len(found) >= MAX_CANDIDATES,
                 "note": "図面領域の候補です。図番号・切り抜き位置は原本と照合してください。表やグラフの値は抽出しません。"}
     finally:
         doc.close()
@@ -209,7 +218,7 @@ def _isolated_worker():
     if pdf.is_symlink() or not pdf.is_file() or directory.is_symlink() or not directory.is_dir():
         raise SystemExit(2)
     try:
-        candidates = scan(pdf, limit_pages=12)
+        candidates = scan(pdf)
     except RuntimeError:
         print(json.dumps({"status": "optional_pdf_geometry_unavailable", "images": [],
                           "candidates": [], "truncated": False}), flush=True)
@@ -238,8 +247,11 @@ def _isolated_worker():
                        "bbox_points": result["bbox_points"]})
     print(json.dumps({
         "status": "unreviewed", "pages_scanned": candidates["pages_scanned"],
+        "scan_complete": candidates["scan_complete"],
+        "page_count": candidates["page_count"],
         "candidates": candidates["candidates"][:60],
-        "truncated": candidates["truncated"] or len(candidates["candidates"]) > count,
+        "truncated": (candidates["truncated"] or len(candidates["candidates"]) > count
+                      or len(images) < min(count, len(candidates["candidates"]))),
         "images": images, "embedded_labels": labels,
     }, ensure_ascii=False, separators=(",", ":")), flush=True)
 

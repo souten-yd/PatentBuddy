@@ -2238,6 +2238,23 @@ async function openDocument(id) {
   const source = document.createElement('p'); source.className = 'hint';
   source.textContent = `原本 SHA-256: ${evidence.sha256} · ${evidence.page_count}ページ · OCR結果は未確認です`;
   box.append(heading, download, source);
+  const coverage = document.createElement('p'); coverage.className = 'hint';
+  const preview = evidence.figure_preview || {};
+  const scanned = Number.isInteger(preview.pages_scanned) ? preview.pages_scanned : null;
+  const states = {
+    disabled_by_policy: '設定により図面領域の検査は無効です',
+    not_requested: '図面領域は未検査です',
+    optional_pdf_geometry_unavailable: '図面検査ツールが利用できません',
+    geometry_worker_failed: '図面検査が完了しませんでした',
+    image_limit_reached: '画像数の上限により図面領域を検査できませんでした'
+  };
+  const progress = scanned === null ? '検査済みページ数は記録されていません' :
+    `図面領域の検査 ${scanned} / ${evidence.page_count}ページ`;
+  coverage.textContent = `${states[preview.status] || progress}。` +
+    (preview.truncated ? '検査または切り抜き保存が上限に達し、一部が未処理です。' : '') +
+    (preview.scan_complete === true ? '領域検査は全ページを走査しました。' : '全ページの領域検査完了は確認できません。') +
+    '保存画像数は図面数ではありません。図番号・細線・数値は原本と照合してください。';
+  box.append(coverage);
   if (evidence.classification_candidates?.length) {
     const group = document.createElement('details');
     const title = document.createElement('summary');

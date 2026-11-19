@@ -8,7 +8,7 @@
 - 取得: 管理者のみ POST /api/v1/source-acquisitions。IPC固定候補、明示 public_only_confirmed=true、1回上限25件、公式EPO OPSの既存コネクタから限定書誌を取得し既存SQLiteに追加。任意の検索語/Cloud AI/定期自動取得/複数アカウントで上限回避はしない。Host Bridge のread権限から管理者の収集操作は不許可。
 - 容量: GET /api/v1/source-storage (read) と GET /addon/v1/source-storage (Host read)でSQLite/WAL/SHM各ファイルバイト・ディスク空き・任意の文献/原本PDF/画像件数を表示。図書全件の本文を読む処理はしない。PUT /api/v1/source-storage/policy (admin)で soft_limit_mib（初期5120）、max_results_per_fetch（初期25）、max_figures_per_pdf（初期12）、定期収集不可を保存。保存容量はソフト上限であり、全既存インポートのハードquotaではない。計測対象はSQLite物理ファイルで、論理文献サイズ別内訳ではない。
 - ControlDeckの「資料」画面に技術テーマ入力、IPC候補、読み取り専用の容量手動更新を追加。取得の管理者操作は現状ResearchDataHub側APIのみ。UIでの管理者収集導線・進捗は次工程。
-- PDF図面: 既存の埋込ラスター抽出に加え、Linux PC上に任意のローカルPyMuPDFがある場合、先頭12ページで埋込画像/大きなベクターパスの領域候補を最大60件検出し、最大12候補を120dpi PNGでcrop。既存画像合計32MiB/200件、1画像2MiB上限とSHA-256重複抑止を維持。原文PDFを正本として、ページ、PDF point座標、未確認、抽出方式を保持。図番号/技術内容はまだ確認済みとして扱わない。任意依存がない時は既存PDF抽出経路を継続する。
+- PDF図面: 既存の埋込ラスター抽出に加え、Linux PC上に任意のローカルPyMuPDFがある場合、最大200ページを対象に埋込画像/大きなベクターパスの領域候補を最大60件検出し（候補数・CPU・時間上限で途中停止あり）、実走査ページ数と未完了状態を記録して、最大12候補を120dpi PNGでcrop。既存画像合計32MiB/200件、1画像2MiB上限とSHA-256重複抑止を維持。原文PDFを正本として、ページ、PDF point座標、未確認、抽出方式を保持。図番号/技術内容はまだ確認済みとして扱わない。任意依存がない時は既存PDF抽出経路を継続する。
 - グラフ/表の数値解析: 現段階は未実装。ローカルAIが軸/単位/目盛り/線の関係を検証できた場合だけ値を抽出し、曖昧ならスキップ。原図は維持、値を捏造しない。
 
 ## 実施済みと未実施
