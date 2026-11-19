@@ -1,6 +1,6 @@
-"""QnapPatentBuddy — private patent research and invention support on QNAP/Linux."""
+"""Legacy QNAP/Linux ResearchDataHub compatibility bridge; PatentBuddy is the ControlDeck add-on."""
 
 APP_NAME = "ResearchDataHub"
-VERSION = "0.5.12"
-REPO = "souten-yd/PatentBuddy"
+VERSION = "0.5.13"
+REPO = "souten-yd/ResearchDataHub"
 DEFAULT_PORT = 17871

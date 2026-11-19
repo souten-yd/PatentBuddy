@@ -1,4 +1,7 @@
-# AGENTS.md — AI エージェント／開発者向けガイド
+# AGENTS.md — PatentBuddy 開発ガイド
+
+> 2026-11-19: ResearchDataHubサーバー/QNAP/Linux配布の正本は新Repo souten-yd/ResearchDataHub。こちらのRepoはControlDeck特許Add-onの正本。旧QPKG更新の途絶を防ぐv0.5.13ブリッジだけ旧配布を維持し、旧サーバー/データを削除しない。docs/repository-migration.mdを先に読む。旧記載は分割前の履歴である。
+
 
 > **2026-11-10の開発方針（最優先）**: 汎用データ保存・収集・検索APIサーバーの新しい表示名は**ResearchDataHub**、ControlDeck特許専用アドオンは**PatentBuddy**。まずRyzen 7 9700XのLinux PCで両方を開発・結合し、完成後にResearchDataHubの唯一の正本DB/実行先をQNAPへ移行する。旧QPKG/SQLite/パスキーを維持し、未公開発明・請求項を外部LLMに渡さない（ローカルLLMへの入力、認証済みPC↔NASの転送は可）。正本は `docs/researchdatahub-plan.md`、**保存/低I/O受入契約は `docs/researchdatahub-performance.md`**、Codex指示は `docs/CODEX_NEXT.md`、進捗は `docs/HANDOFF.md`。**PR #16はdocs-onlyとしてマージ済み。Linux別名入口の実装/検証状況はHANDOFFのPR #17を参照。**
 

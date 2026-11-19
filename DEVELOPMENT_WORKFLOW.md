@@ -1,4 +1,6 @@
-# 開発ルール — QnapLibrary
+# 開発ルール — PatentBuddy（移行中の旧QnapLibrary更新ブリッジを含む）
+
+> 2026-11-19: ResearchDataHubの新機能とQNAP/Linux配布は新Repo。旧Repoのv0.5.13は更新先切替専用の最後の移管ブリッジを意図し、旧RepoのサーバーReleaseを今後増やさない。アドオン単独配布への切替は別PRで行う。
 
 このファイルは人間・AI を問わず全開発者が従う規則です。別の AI へ途中で引き継ぐ前提で書いています。
 まず `AGENTS.md` → 本書 → `docs/HANDOFF.md`（現在地）の順に読んでください。
