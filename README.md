@@ -1,119 +1,34 @@
-# ResearchDataHub
+# PatentBuddy
 
-QNAP NAS と Linux で動く**研究資料の保存・収集・検索APIサーバー**です。特許創出・先行技術調査・請求項・権利化の支援機能を備えています。公報・規格・公開審査基準を根拠に、日本語全文検索や任意のベクトル検索を利用できます。未公開発明は、管理者が確認したローカル専用LLMから出さない設計です。
-別の PC や AI アシスタントは API / MCP からデータの取り込み・検索ができます。
+PatentBuddy は [ControlDeck](https://github.com/souten-yd/ControlDeck) 向けの**特許調査・発明/請求項分析アドオン**です。文献正本と汎用APIを管理する独立サーバーは [ResearchDataHub](https://github.com/souten-yd/ResearchDataHub) に移管しました。
 
-## 主な機能
+## サービス分担
 
-- **特許支援**: 発明記録から登録までの 11 段階の案件管理、期限（目安）の自動計算、請求項の版管理と構成要件分解、クレームチャート、
-  AI 支援（ヒアリング、派生発明、検索式設計、新規性・進歩性評価、請求項ドラフト、拒絶理由対応、侵害・FTO）
-- **検索**: SQLite FTS5 による日本語検索（2-gram、AND/OR/除外/フレーズ）＋任意のベクトル検索をハイブリッド（RRF）
-- **データ管理**: コレクションの作成、NDJSON/JSON/CSV/テキスト取り込み、エクスポート、外部埋め込みの格納
-- **AI チャット**: 機密の案件・文書・検索結果は検証済みローカルLLMのみ。OpenRouter等の外部AIには、固定の公開制度ガイドや接続試験以外は送信しません。
-- **収集**: GDELT（公開世界ニュース）、RSS、EPO OPS、JPO 特許情報取得API、USPTO Open Data Portal。外部へ検索式を送る場合は公開情報のみと明示確認。
-- **接続**: LAN で事前パスコードによるペアリング → 以後トークンで無制限に利用。MCP（`/mcp`）対応
-- **ログイン**: パスワード、パスキー（Face ID / Windows Hello などの顔認証。HTTPS 接続時）
-- **公開資料API**: 管理者がタイトル・公開番号・抜粋を確認して承認した資料だけを専用トークンで検索・取得。原文更新で承認を停止します。自動クラウド送信はありません。詳しくは [公開資料API](docs/public-catalog.md)。
-- **AI 向けデバッグ出力**: 状態・直近エラー・検索トレースを JSON で取得（秘密は除去）
-- **自動更新**: [ResearchDataHub Releases](https://github.com/souten-yd/PatentBuddy/releases) から SHA-256 を検証して更新
-- **バックアップ**: 管理 Web からSQLiteの一貫したスナップショットを手動作成（設定・秘密情報は別途保全が必要）
-- **iPhoneホーム画面**: Safariの「ホーム画面に追加」で専用アイコンから起動。ホームは主要件数をコンパクト表示し、ベクトル化・調査・更新の処理状況を確認できます
-- **機密保護**: 既定でクラウドLLM送信不可。手動承認の公開検索語だけ公的APIへ送信。通知は本文や案件名なし。詳しくは [機密境界](docs/privacy-boundary.md) / [開発計画](docs/patent-feature-plan.md)
-- **低負荷**: 標準ライブラリのみ、ディスク書き込み最小、ログはメモリのみ
+- **PatentBuddy（このRepo）**: ControlDeck Add-on v2、Host AI/Jobs経由のローカルLLM解析、PDF/請求項確認、特許用UI、今後のGraphRAG。
+- **ResearchDataHub（新Repo）**: QNAP NAS（QTS）/Linux共通の文献DB・規格/論文/特許/ニュース保存・検索・REST/MCP・認証・バックアップ。最新版のQPKG/Linuxインストール説明とReleaseは [ResearchDataHub README](https://github.com/souten-yd/ResearchDataHub#readme) を参照。
 
-## 必要環境
+PatentBuddyはResearchDataHubの認証付きAPIを利用し、文献正本SQLiteを別途作成しません。未公開の発明/請求項を外部LLMに送信せず、ControlDeck管理の検証済みローカルLLMだけを利用します。
 
-- QNAP: x86_64、QTS 5.0 以降、App Center の **Python3**（3.9 以上）
-- Linux: Python 3.9 以上（sqlite3 / FTS5 付き）、systemd 推奨
+## PatentBuddyを開発・起動する
 
-## インストール
-
-### QNAP
-1. [Releases](https://github.com/souten-yd/PatentBuddy/releases) から `QnapLibrary_<版>_x86_64.qpkg` を取得。旧版で更新URLエラーが出る場合は[手動上書き更新の手順](docs/upgrade.md)に従ってください。
-2. App Center → 手動インストール で選択
-3. `http://<NAS>:17871/` を開き、管理者パスワードを設定（LAN から）
-
-データは従来通り QPKG の隣の `QnapLibrary-data` フォルダに保存され、更新しても残ります。**表示名は QnapPatentBuddy ですが、既存のQPKG識別子・配布ファイル名・ポートは互換性のためQnapLibraryのままです。**
-
-### Linux
-```bash
-tar xzf qnaplibrary-<版>-linux.tar.gz && cd qnaplibrary-<版>
-./install.sh                # 自分のユーザーで systemd --user サービスとして導入
-# sudo ./install.sh --system  # /opt に導入し専用ユーザーで実行
-```
-
-## 初期設定
-
-1. 管理者パスワードを設定
-2. 特許案件や未公開文書をAIに処理させる場合は、NAS内のローカル推論機を準備し、「AIプロバイダ」で「ローカル専用確認済み」をチェックしてください。QnapAssistantがクラウド中継していないことも確認が必要です。
-3. OpenRouterのキーは公開制度の一般ガイドなど公開用途にのみ使えます。登録しても発明本文の自動ベクトル化や機密チャットには使いません。
-
-パスキーはブラウザの仕様で HTTPS が必要です。NAS で次を実行し、`https://<NAS名>.<tailnet名>.ts.net:8443/` で開いてください
-（QnapDownloader が使う 443 とは別ポートなので共存できます）。詳しくは [docs/https.md](docs/https.md)。
+開発PCはLinux、Python 3.9以降、ControlDeck Add-on Host v2契約が必要です。
 
 ```sh
-tailscale serve --bg --https=8443 http://127.0.0.1:17871
+./pb.sh doctor
+./pb.sh serve
+bash scripts/verify.sh
 ```
 
-## 使い方
+起動時は127.0.0.1:9150でアドオンのhealth/UIを提供し、ResearchDataHubのAPI接続が必要です。アドオンの管理情報は [addon.json](addon.json)、Host連携仕様は [docs/controldeck-addon-plan.md](docs/controldeck-addon-plan.md)、機密境界は [docs/privacy-boundary.md](docs/privacy-boundary.md) を参照。
 
-- 検索: スペースで AND、`OR`、`-除外`、`"フレーズ"`。コレクションで絞り込み
-- 特許: 案件を作成 → 段階ボタンで進行 → 各段階の AI ボタンで支援を実行
-- 別PCから: [docs/api.md](docs/api.md)
+## 旧QNAP/Linuxアプリの更新ブリッジ
 
-## データと更新
+このRepoに残る qnaplibrary/・qpkg/・researchdatahub/ は**移管期の互換実装**です。旧ResearchDataHub（旧QnapLibrary）の起動・保存データ・QPKG ID・Port17871・認証・パスキーを維持するため、すぐには削除しません。
 
-- 設定 > 更新 で確認・適用（自動適用も選べます）。Linux 版は旧版を残すので `install.sh rollback` で戻せます
-- バックアップ対象: データフォルダ（`library.sqlite3*`、`settings.json`、`secrets.json`）。管理 Web「設定 > バックアップ」のスナップショットは SQLite のみ。詳しくは [docs/backup.md](docs/backup.md)
+v0.5.12以前のQPKG/Linux版はこのRepoのReleaseしか確認できません。**このRepoから旧形式のv0.5.13更新ブリッジを公開**し、インストール後は新RepoのReleaseを確認できるようにします。その後、ResearchDataHubのv0.5.14以降へ更新してください。ブリッジの公開・動作確認前には移行済みとは扱いません。
 
-## トラブルシューティング
+QNAP上の既存アプリをアンインストールせず、元の QnapLibrary-data を削除・初期化しないでください。ブリッジが利用できない場合は[新RepoのReleases](https://github.com/souten-yd/ResearchDataHub/releases) からQPKGを手動上書きします。移管契約は[docs/repository-migration.md](docs/repository-migration.md)を参照。
 
-- 「想定外のダウンロードURLです」: [旧版からの更新手順](docs/upgrade.md)を参照。
+## 開発ルール
 
-- 起動しない（QNAP）: App Center で Python3 が有効か確認。`QNAPLIBRARY_LOG_MODE=disk` で起動するとデータフォルダにログが出ます
-- 不具合の報告: 設定 > デバッグ からバンドルをダウンロードして AI や開発者に渡してください
-
-## 開発
-
-[AGENTS.md](AGENTS.md)、[DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md)、[docs/HANDOFF.md](docs/HANDOFF.md) を参照。
-
-## ドキュメント
-
-- [アーキテクチャ](docs/architecture.md) / [API と接続](docs/api.md) / [特許支援の設計](docs/patent-workflow.md)
-- [RAG 向け DB ランキング](docs/rag-db-ranking.md) / [実現性評価](docs/feasibility.md) / [提案](docs/proposals.md) / [ロードマップ](docs/roadmap.md)
-
-
-## Linux の ResearchDataHub 入口
-
-既存の `qnaplibrary` サーバーと同じ実装・データ形式を使います。
-新入口では保存先を明示してください（`QNAPLIBRARY_DATA` 環境変数も利用可能）。
-旧入口のデフォルト保存先、サービス名、Cookie、パスキーRP ID、QPKG IDは維持します。
-同じ保存先で新旧サーバーを同時起動しないでください。
-
-```sh
-python3 -m researchdatahub --data /path/to/pc-data --bind 127.0.0.1 --port 17871
-./rdh.sh doctor
-./rdh.sh serve --data /path/to/pc-data --bind 127.0.0.1
-./rdh.sh test
-```
-
-`doctor` はメモリ上でPython/SQLite/FTS5の可用性のみを確認し、秘密や設定を読みません。
-`test` は一時データとloopback上の実サーバーで起動・ログイン・保存先互換を確認する
-配布smokeです。全開発検査は `bash scripts/verify.sh` を使用します。
-Linux tar.gzに同梱し、インストール後は `<prefix>/current/rdh.sh` から使用できます。
-既存の `<prefix>/bin/qnaplibrary-run` とsystemdサービスは引き続き利用できます。
-
-## PatentBuddy（ControlDeckの特許アドオン）
-
-ResearchDataHubは資料の保存・収集・検索サーバーです。別のPatentBuddyアドオンはControlDeckのオプション機能として管理し、サーバーの認証APIへ接続して文献を検索・閲覧します。アドオン内に文献の正本DBは作りません。画面には各サービスの役割・接続先・バージョンを表示します。接続は [アドオン設定](docs/controldeck-addon-plan.md) を参照してください。
-
-同じLinuxユーザーで稼働するPatentBuddyとResearchDataHubは、トークン入力なしで読み取り専用接続を確立します。[ローカル自動認証の条件](docs/local-addon-auth.md)を参照してください。
-
-PatentBuddyでは文献詳細からローカルAIによる要約・請求項確認を実行できます。処理状況からキャンセル・再実行し、結果はResearchDataHubへ原文の版付きで保存します。本文10万文字以内に対応し、結果は原文と照合するまで未確認として扱います。Hostのlocal-only AI契約対応が必要です。
-
-
-PatentBuddyの「PDFを取り込む」でControlDeck上のPDFを選択できます。文字抽出を優先し、画像があるページや文字が少ないページは日本語・英語OCRを併用します。原本・ページ根拠・PDF内の画像はResearchDataHubへ保存し、そのまま要約・請求項確認へ進めます。OCRの誤読や図番号は原本と照合してください。画像抽出は埋め込みラスター画像が対象で、ベクトル図形の切り出しは行いません。
-
-PCにPoppler（pdfinfo/pdftotext/pdftoppm/pdfimages）とTesseractの日本語・英語データが必要です。入力は50MiB・200ページ、抽出本文100万文字、画像200点・各2MiB/1600万画素・合計32MiBまで。PDFは同時1件、暗号化PDFは非対応です。AI分析は別に本文10万文字以内の制限があります。[PDF処理と復旧の仕様](docs/pdf-ocr-plan.md)を参照してください。
-
-別PC/NASへの接続では、管理Webのデバイストークンから「PDF取り込み・分析結果保存」を選んで発行し、HTTPSの接続設定に使用できます。この権限は文献の読み取りと限定された取り込み・分析保存だけを許可します。
+[AGENTS.md](AGENTS.md)、[DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md)、[docs/HANDOFF.md](docs/HANDOFF.md)、[docs/knowledge-graph-design.md](docs/knowledge-graph-design.md)を参照。新しいQNAP/Linuxサーバーの改善はPatentBuddyではなくResearchDataHubへPRを出してください。

@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v0.5.13
+
+- ResearchDataHubを独立リポジトリへ移動するための旧QNAP/Linux更新ブリッジ。次回以降のサーバー更新確認先を souten-yd/ResearchDataHub に切り替えます。
+- QPKG ID QnapLibrary・データ/ポート/認証/API・アドオン機能は変更せず、既存のGitHub Releaseアセット名を維持します。新Repoのv0.5.14以降へ段階更新できます。
+
+
 ## v0.5.12
 
 - ControlDeck内の起動用JavaScript/CSSを初回画面へ同梱し、HTTP接続でCookieが利用できない環境でも起動できます。内容ハッシュによるCSP制限は維持します。

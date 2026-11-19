@@ -1,5 +1,13 @@
 # HANDOFF — ResearchDataHub / PatentBuddy
 
+## 2026-11-19 ResearchDataHub移管と更新ブリッジ（最新）
+
+- ResearchDataHubのサーバー/QPKG/Linux配布元は新Repo souten-yd/ResearchDataHub（移管PR #1、v0.5.14予定）。PatentBuddy Repoは特許用ControlDeck Add-onの開発正本。
+- 本Repo v0.5.13は既存v0.5.12以下が従来の更新先を参照する問題に対応した一度限りの移管ブリッジ。旧repoで従来名のQPKG/Linux資産を出し、インストール後は新Repoからv0.5.14以降を取得。
+- QPKG ID QnapLibrary、port17871、データ/パスキー/認証/REST/MCPは不変更。2Repoの新しい共通機能開発はせず、アドオン単独化と旧サーバーの除去はブリッジ公開・実機検証後。
+- この節より下の時点情報（v0.5.10など）は移管前の履歴。docs/repository-migration.mdを参照。
+
+
 更新: 2026-11-11。`AGENTS.md` → `DEVELOPMENT_WORKFLOW.md` → 本書 → `docs/CODEX_NEXT.md` の順に確認する。計画の正本は `researchdatahub-plan.md`、性能受入は `researchdatahub-performance.md`。
 
 ## 現在地
