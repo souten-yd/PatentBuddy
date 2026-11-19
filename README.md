@@ -21,7 +21,7 @@ bash scripts/verify.sh
 
 起動時は127.0.0.1:9150でアドオンのhealth/UIを提供し、ResearchDataHubのAPI接続が必要です。アドオンの管理情報は [addon.json](addon.json)、Host連携仕様は [docs/controldeck-addon-plan.md](docs/controldeck-addon-plan.md)、機密境界は [docs/privacy-boundary.md](docs/privacy-boundary.md) を参照。
 
-## 旧QNAP/Linuxアプリの更新ブリッジ（v0.5.13）
+## 旧QNAP/Linuxアプリの更新ブリッジ
 
 このRepoに残る qnaplibrary/・qpkg/・researchdatahub/ は**移管期の互換実装**です。旧ResearchDataHub（旧QnapLibrary）の起動・保存データ・QPKG ID・Port17871・認証・パスキーを維持するため、すぐには削除しません。
 
