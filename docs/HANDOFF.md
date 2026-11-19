@@ -408,3 +408,14 @@ PDF詳細の表紙分類候補は閲覧時にローカルで生成する。OCR�
 可逆・非可逆の実公報比較を [pdf-codec-comparison.md](pdf-codec-comparison.md) に記録。白黒24画像では、同解像度の非可逆WebP/JPEG/AVIFが可逆WebPより大きい。USのみ縦横1/4縮小で約49%減るが細部が変わる。製品の画像保存形式の変更は未実装。
 
 今回の検索関連7テスト成功。全353テストはUnix socket作成拒否7件とOCRテスト1件が未通過。OCRの1件は実行環境のpdftoppm overrideを避けて配布元Popplerを使用すると単独再実行で成功。全スイートをその条件で再実行はしていない。Python/JS/shell構文、stdlib、安全grep、diff whitespace検査成功。正式リリースの受入は未完了。
+
+## 2026-11-19 PR #40 — 可逆圧縮保存の実装とpush準備
+
+- 全図面保持の方針へstorage-search-recommendation.mdを更新。画像25%保持・約2GBの以前の試算は採用しない。
+- 新規PDFの抽出済み全画像を、画素一致・容量減少が成立する場合のみ可逆WebP化。任意PillowワーカーにCPU/メモリ/時間/出力上限。起動不能時はPNG維持。
+- 抽出根拠JSONをPBZ1+zlib圧縮。旧TEXTとの読取り互換、展開上限・破損検出を保持。抽出hashは圧縮前canonical JSONに基づく。原本と検索用本文/chunks/FTSは従来保存。
+- API MIMEとアドオン表示・取得・ダウンロードをPNG/WebP対応。既存認証境界を維持、Host権限・manifest・実行能力・外部送信は追加しない。
+- 取り込み時の一時WebP作成で一時書込みは増える。永続BLOBは縮小時のみ採用。GET時書換えや既存データの一括削除はない。
+- 前回の関連16テスト成功、全verifyの静的チェック成功。全357テストで既存AF_UNIX制限7 errors、既存OCR期待語の差1 failure。OCRはシステムPopplerで該当テスト再実行成功。全体合格・main統合・リリースとは扱わない。
+- push依頼時に前回の一時checkoutが消失していたため、同じremote head be6a4a0から会話記録の変更を復元。関連16テストを再実行し全件成功、JS構文とgit diff --check成功。前回の実公報測定値は履歴として記録し、再測定とは扱わない。
+- 未完了: 原本省略と公開版/hash照合つき認証済み手動再取得、全図面の抽出網羅性、画像AI説明の保留/手動再開、本文重複削減と容量内訳、Qdrant日付索引同期、2万件の実データ検索時間。現在の原本は保持する。約6GBは条件付き試算。

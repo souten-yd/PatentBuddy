@@ -1700,5 +1700,7 @@ def pdf_import_receipt(req):
 @route('GET', '/api/v1/documents/{did}/images/{iid}', 'read')
 def pdf_image(req):
     from . import pdf_store
-    return req.h.send_bytes(200, pdf_store.image_for(req.app.store, int(req.params['did']), int(req.params['iid'])),
-                            'image/png', {'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff'})
+    from .pdf_webp import image_info
+    raw = pdf_store.image_for(req.app.store, int(req.params['did']), int(req.params['iid']))
+    _, mime = image_info(raw)
+    return req.h.send_bytes(200, raw, mime, {'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff'})

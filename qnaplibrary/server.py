@@ -460,6 +460,10 @@ class Handler(BaseHTTPRequestHandler):
                             raw = client.image_png(int(path.split('/')[-3]), int(path.rsplit('/', 1)[1][:-4]))
                             status = self.send_bytes(200, raw, "image/png", {"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
                             return
+                        elif method == "GET" and re.fullmatch(r"/addon/v1/documents/[1-9][0-9]{0,17}/images/[0-9]{1,3}\.webp", path):
+                            raw = client.image_webp(int(path.split('/')[-3]), int(path.rsplit('/', 1)[1][:-5]))
+                            status = self.send_bytes(200, raw, "image/webp", {"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
+                            return
                         elif method == "GET" and re.fullmatch(r"/addon/v1/documents/[1-9][0-9]{0,17}/original.pdf", path):
                             raw = client.original_pdf(int(path.split('/')[-2]))
                             status = self.send_bytes(200, raw, "application/pdf", {"Content-Disposition": 'attachment; filename="original.pdf"', "Cache-Control": "no-store"})

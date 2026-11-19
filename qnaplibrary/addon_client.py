@@ -224,6 +224,15 @@ class AddonClient:
     def image_png(self, doc_id, image_id):
         return self._document_bytes(doc_id, 'images/%d' % image_id, 2 * 1024 * 1024, b'\x89PNG\r\n\x1a\n')
 
+    def image_webp(self, doc_id, image_id):
+        from .pdf_webp import webp_size
+        raw = self._document_bytes(doc_id, 'images/%d' % image_id, 2 * 1024 * 1024, b'RIFF')
+        try:
+            webp_size(raw)
+        except ValueError:
+            raise AddonError(502, '可逆WebPの応答が不正です') from None
+        return raw
+
     def _document_bytes(self, doc_id, suffix, limit, signature):
         config = self.settings()
         token = config.get('server_token')

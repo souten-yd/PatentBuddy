@@ -2271,12 +2271,13 @@ async function openDocument(id) {
       if (imageURL) { URL.revokeObjectURL(imageURL); imageURL = null; }
       if (!item) return;
       try {
-        const response = await fetch(root + '/addon/v1/documents/' + id + '/images/' + item.id + '.png', {credentials: 'omit', headers: {'X-Control-Deck-Bridge-Session': nonce}});
+        const extension = item.mime_type === 'image/webp' ? 'webp' : 'png';
+        const response = await fetch(root + '/addon/v1/documents/' + id + '/images/' + item.id + '.' + extension, {credentials: 'omit', headers: {'X-Control-Deck-Bridge-Session': nonce}});
         if (!response.ok) throw new Error('画像を取得できません');
         const blob = await response.blob();
         if (request !== imageRequest || currentDoc !== id) return;
         imageURL = URL.createObjectURL(blob); view.src = imageURL; view.alt = `ページ${item.page}の埋め込み画像${item.id + 1}`; view.hidden = false;
-        save.href = imageURL; save.download = `page-${item.page}-image-${item.id + 1}.png`; save.hidden = false;
+        save.href = imageURL; save.download = `page-${item.page}-image-${item.id + 1}.${extension}`; save.hidden = false;
       } catch (error) { el('message').textContent = error.message; }
     };
     label.append(select); gallery.append(label, caption, view, save); box.append(gallery);

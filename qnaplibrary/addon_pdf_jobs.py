@@ -176,7 +176,7 @@ class PDFJobs(AnalysisJobs):
                              extraction_sha256=extraction_hash, message='原本と抽出結果を保存しています')
                 saved = self.client.data('POST', '/api/v1/pdf-imports', {
                     'title': metadata['name'][:300], 'pdf_base64': base64.b64encode(raw).decode(), 'extraction': result,
-                    'images': [{'id': image['id'], 'data_base64': base64.b64encode((scratch / 'images' / ('%d.png' % image['id'])).read_bytes()).decode()} for image in result.get('images', [])]})
+                    'images': [{'id': image['id'], 'data_base64': base64.b64encode((scratch / 'images' / ('%d.%s' % (image['id'], 'webp' if image.get('mime_type') == 'image/webp' else 'png'))).read_bytes()).decode()} for image in result.get('images', [])]})
                 self._update(identifier, status='succeeded', phase='done', doc_id=saved['doc_id'],
                              message='PDFを取り込みました。OCR結果は原本と照合してください。')
         except Exception as error:

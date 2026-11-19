@@ -272,6 +272,10 @@ def extract_pdf(source, cancel=None, force_pages=(), progress=None, scratch_pare
                         remaining -= candidate["size_bytes"]
                 else:
                     figure_preview = {"status": "image_limit_reached", "candidates": []}
+        if image_directory is not None and images:
+            from .pdf_webp import compress_images
+            compress_images(images, image_directory, cancel)
+            _check_cancel(cancel)
         started = time.monotonic()
         pages, total = [], 0
         for page in range(1, count + 1):

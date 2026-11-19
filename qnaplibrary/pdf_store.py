@@ -2,6 +2,7 @@
 import hashlib
 import json
 import time
+import zlib
 
 from .store import StoreError
 
@@ -44,6 +45,27 @@ def validate(content, extraction, title):
     return digest, hashlib.sha256(canonical.encode()).hexdigest(), canonical
 
 
+def packed_extraction(canonical):
+    raw = canonical.encode('utf-8')
+    packed = b'PBZ1' + zlib.compress(raw, 9)
+    return packed if len(packed) < len(raw) else canonical
+
+
+def unpacked_extraction(value):
+    if isinstance(value, str):
+        return value
+    if not isinstance(value, bytes) or not value.startswith(b'PBZ1'):
+        raise StoreError('抽出根拠の保存形式が不正です')
+    try:
+        decoder = zlib.decompressobj()
+        raw = decoder.decompress(value[4:], MAX_EXTRACTION + 1)
+        if len(raw) > MAX_EXTRACTION or not decoder.eof or decoder.unused_data:
+            raise ValueError()
+        return raw.decode('utf-8')
+    except (ValueError, zlib.error):
+        raise StoreError('抽出根拠の圧縮データが不正です') from None
+
+
 def import_pdf(store, content, extraction, title, actor='system', images=None):
     source_hash, extraction_hash, canonical = validate(content, extraction, title)
     image_values = validate_images(extraction, images or {})
@@ -75,7 +97,7 @@ def import_pdf(store, content, extraction, title, actor='system', images=None):
         db.execute('INSERT OR IGNORE INTO source_pdfs(sha256,content,created) VALUES(?,?,?)',
                    (source_hash, content, stamp))
         db.execute('INSERT INTO document_pdfs(doc_id,source_sha256,extraction_sha256,extraction,created) VALUES(?,?,?,?,?)',
-                   (doc_id, source_hash, extraction_hash, canonical, stamp))
+                   (doc_id, source_hash, extraction_hash, packed_extraction(canonical), stamp))
         for image_id, image_hash, raw in image_values:
             db.execute('INSERT OR IGNORE INTO pdf_image_blobs(sha256,content) VALUES(?,?)', (image_hash, raw))
             db.execute('INSERT INTO document_pdf_images(doc_id,image_id,sha256) VALUES(?,?,?)', (doc_id, image_id, image_hash))
@@ -91,7 +113,7 @@ def extraction_for(store, doc_id):
     row = store.one('SELECT extraction FROM document_pdfs WHERE doc_id=?', (doc_id,))
     if not row:
         raise StoreError('PDFの抽出結果がありません')
-    return json.loads(row[0])
+    return json.loads(unpacked_extraction(row[0]))
 
 
 def original_for(store, doc_id):
@@ -103,7 +125,8 @@ def original_for(store, doc_id):
 
 
 def validate_images(extraction, images):
-    from .pdf_images import MAX_IMAGES, MAX_TOTAL_BYTES, png_size
+    from .pdf_images import MAX_IMAGES, MAX_TOTAL_BYTES
+    from .pdf_webp import image_info
     metadata = extraction.get('images', [])
     if not isinstance(metadata, list) or len(metadata) > MAX_IMAGES or not isinstance(images, dict) or len(images) != len(metadata):
         raise StoreError('画像と抽出根拠の数が一致しません')
@@ -117,9 +140,11 @@ def validate_images(extraction, images):
         seen.add(image_id)
         raw = images.get(image_id)
         try:
-            width, height = png_size(raw)
+            (width, height), mime = image_info(raw)
         except ValueError as error:
             raise StoreError(str(error)) from None
+        if mime != item.get('mime_type', 'image/png'):
+            raise StoreError('画像の保存形式が一致しません')
         digest = hashlib.sha256(raw).hexdigest()
         if (item.get('sha256') != digest or item.get('size_bytes') != len(raw)
                 or item.get('width') != width or item.get('height') != height
